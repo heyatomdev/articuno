@@ -6,11 +6,11 @@ Questo documento descrive l'architettura e il flusso logico della moderazione de
 
 Ogni commento nel database può assumere uno dei seguenti stati (`ContentStatus`):
 
-| Stato | Visibilità Pubblica | Descrizione |
-| :--- | :--- | :--- |
-| **VISIBLE** | ✅ Si | Commento approvato e visibile a tutti. |
-| **HIDDEN** | ❌ No | Nascondo il commento per violazione termini o troppe segnalazioni. |
-| **BANNED** | ❌ No | Eliminazione logica permanente (non recuperabile). |
+| Stato       | Visibilità Pubblica | Descrizione                                                        |
+|:------------|:--------------------|:-------------------------------------------------------------------|
+| **VISIBLE** | ✅ Si                | Commento approvato e visibile a tutti.                             |
+| **HIDDEN**  | ❌ No                | Nascondo il commento per violazione termini o troppe segnalazioni. |
+| **BANNED**  | ❌ No                | Eliminazione logica permanente (non recuperabile).                 |
 
 In parallelo, l'utente ha uno stato (`UserStatus`):
 - **ACTIVE**: Operatività normale.

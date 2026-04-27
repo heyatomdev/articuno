@@ -41,7 +41,7 @@ async function bootstrap() {
     // Swagger documentation
     const config = new DocumentBuilder()
         .setTitle('Articuno')
-        .setDescription('Multi-tenant article manage API')
+        .setDescription('Multi-tenant CMS management system built with NestJS, Prisma ORM, and PostgreSQL.')
         .setVersion(process?.env?.npm_package_version || '2.0.0')
         .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
         .addBearerAuth()

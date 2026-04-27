@@ -27,11 +27,13 @@ model Tenant {
   categories    Category[]
   tags          Tag[]
   articles      Article[]
+  articleTranslations ArticleTranslation[]
   comments      Comment[]
   dailyStats    DailyStats[]
   reports       Report[]
   bannedWords   BannedWord[]
   notifications Notification[]
+  webhookEvents  WebhookEvent[]
 
   // Configurazione Webhook per notifiche e moderazione
   webhookUrl    String?
@@ -41,6 +43,25 @@ model Tenant {
   updatedAt DateTime @updatedAt
 
   @@map("tenants")
+}
+
+model WebhookEvent {
+  id       String @id @default(uuid())
+  event    String
+  payload  Json
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sentAt      DateTime?
+  attempts    Int      @default(0)
+  lastError   String?
+  nextRetryAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, sentAt, nextRetryAt])
+  @@map("webhook_events")
 }
 
 model User {
@@ -101,14 +122,13 @@ model Tag {
 
 model Article {
   id            String  @id @default(uuid())
-  slug          String  @unique // Lo slug principale (es. ID o slug della lingua base)
   coverImage    String?
   featured      Boolean @default(false)
   views         Int     @default(0)
   likesCount    Int     @default(0)
   commentsCount Int     @default(0)
 
-  status ContentStatus @default(VISIBLE)
+  status ContentStatus @default(DRAFT)
 
   // Relazioni strutturali
   authorId   String?
@@ -145,6 +165,7 @@ model ArticleTranslation {
   articleId String
   article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
   tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([articleId, languageCode])
   @@unique([tenantId, slug])
@@ -162,6 +183,7 @@ model Comment {
   tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   status ContentStatus @default(VISIBLE)
+  reportCount Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -287,6 +309,7 @@ enum TargetType {
 enum ContentStatus {
   PUBLISHED
   DRAFT
+  UNDER_REVIEW
   HIDDEN
   BANNED
   VISIBLE // Per i commenti
