@@ -16,6 +16,8 @@ import { TagsModule } from '@/modules/tags/tags.module';
 import { ArticlesModule } from '@/modules/articles/articles.module';
 import { InteractionsModule } from '@/modules/interactions/interactions.module';
 import { CommentsModule } from '@/modules/comments/comments.module';
+import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
+import { WebhookModule } from '@/modules/webhook/webhook.module';
 
 @Module({
     controllers: [StatusController],
@@ -56,9 +58,11 @@ import { CommentsModule } from '@/modules/comments/comments.module';
         UsersModule,
         CategoriesModule,
         TagsModule,
+        BannedWordsModule,
         ArticlesModule,
         InteractionsModule,
         CommentsModule,
+        WebhookModule,
     ],
 })
 export class AppModule {}

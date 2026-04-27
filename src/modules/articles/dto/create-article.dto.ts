@@ -2,26 +2,32 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
-  IsNotEmpty,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
   ValidateNested,
 } from 'class-validator';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
+import { ContentStatus } from '@prisma/client';
+
+const ARTICLE_STATUSES: ContentStatus[] = [
+  ContentStatus.DRAFT,
+  ContentStatus.PUBLISHED,
+  ContentStatus.UNDER_REVIEW,
+  ContentStatus.HIDDEN,
+  ContentStatus.BANNED,
+];
 
 export class CreateArticleDto {
-  @IsString()
-  @IsNotEmpty()
-  slug: string;
 
   @IsOptional()
   @IsString()
   coverImage?: string;
 
-  @IsString()
-  @IsNotEmpty()
-  status: string;
+  @IsOptional()
+  @IsIn(ARTICLE_STATUSES)
+  status?: ContentStatus;
 
   @IsOptional()
   @IsBoolean()

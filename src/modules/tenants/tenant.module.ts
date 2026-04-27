@@ -1,10 +1,11 @@
 import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import {TenantMiddleware} from "@/modules/tenants/middleware/tenant.middleware";
+import { TenantSeedService } from '@/modules/tenants/tenant-seed.service';
 
 @Module({
     imports: [PrismaModule],
-    providers: [TenantMiddleware],
+    providers: [TenantMiddleware, TenantSeedService],
     exports: [TenantMiddleware],
 })
 export class TenantModule implements NestModule {

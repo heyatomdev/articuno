@@ -1,10 +1,5 @@
-import { IsEnum, IsString, IsOptional, IsUUID } from 'class-validator';
-
-export enum TargetType {
-    ARTICLE = 'ARTICLE',
-    COMMENT = 'COMMENT',
-    USER = 'USER',
-}
+import { IsEnum, IsString, IsOptional } from 'class-validator';
+import { TargetType } from '@prisma/client';
 
 export class CreateReportDto {
     @IsEnum(TargetType)

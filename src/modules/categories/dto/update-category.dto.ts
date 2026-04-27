@@ -1,12 +1,14 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpdateCategoryDto {
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   name?: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   slug?: string;
 
   @IsOptional()
@@ -17,4 +19,3 @@ export class UpdateCategoryDto {
   @IsString()
   color?: string;
 }
-

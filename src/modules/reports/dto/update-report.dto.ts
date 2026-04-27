@@ -1,11 +1,5 @@
-import { IsEnum, IsString, IsOptional, IsUUID } from 'class-validator';
-
-export enum ReportStatus {
-    PENDING = 'PENDING',
-    REVIEWED = 'REVIEWED',
-    RESOLVED = 'RESOLVED',
-    DISMISSED = 'DISMISSED',
-}
+import { IsEnum, IsString, IsOptional } from 'class-validator';
+import { ReportStatus } from '@prisma/client';
 
 export class UpdateReportStatusDto {
     @IsEnum(ReportStatus)

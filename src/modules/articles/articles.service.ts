@@ -1,14 +1,21 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
+import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
+import { ContentStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ArticlesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bannedWordsService: BannedWordsService,
+  ) {}
+
+  private static readonly AUTO_MODERATION_REASON = 'BANNED_WORD_DETECTED';
 
   private readonly articleIncludes = {
     category: true,
@@ -18,6 +25,59 @@ export class ArticlesService {
       orderBy: { languageCode: 'asc' as const },
     },
   };
+
+  private async enqueueWebhookEvent(
+    tenantId: string,
+    event: string,
+    data: Prisma.InputJsonValue,
+  ) {
+    const payload: Prisma.InputJsonObject = {
+      event,
+      tenantId,
+      data,
+    };
+
+    await this.prisma.webhookEvent.create({
+      data: {
+        tenantId,
+        event,
+        payload,
+      },
+    });
+  }
+
+  private async hideArticleForBannedContent(tenantId: string, articleId: string) {
+    const article = await this.ensureArticleExists(tenantId, articleId);
+
+    if (article.status === ContentStatus.HIDDEN || article.status === ContentStatus.BANNED) {
+      return;
+    }
+
+    await this.prisma.article.update({
+      where: { id: article.id },
+      data: { status: ContentStatus.HIDDEN },
+    });
+
+    await this.enqueueWebhookEvent(tenantId, 'article.status_changed', {
+      articleId: article.id,
+      oldStatus: article.status,
+      newStatus: ContentStatus.HIDDEN,
+      reason: ArticlesService.AUTO_MODERATION_REASON,
+      moderatorId: 'system',
+    });
+  }
+
+  private async hasBannedWordsInTranslations(
+    tenantId: string,
+    translations?: Array<{ title: string; content: string }>,
+  ) {
+    if (!translations?.length) {
+      return false;
+    }
+
+    const textToCheck = translations.map((t) => `${t.title}\n${t.content}`).join('\n');
+    return this.bannedWordsService.checkText(tenantId, textToCheck);
+  }
 
   private async ensureArticleExists(tenantId: string, articleId: string) {
     const article = await this.prisma.article.findFirst({
@@ -90,12 +150,15 @@ export class ArticlesService {
       await this.ensureTagsExist(tenantId, dto.tagIds);
     }
 
+    const requestedStatus = dto.status ?? ContentStatus.DRAFT;
+    const hasBannedWords = await this.hasBannedWordsInTranslations(tenantId, dto.translations);
+    const finalStatus = hasBannedWords ? ContentStatus.HIDDEN : requestedStatus;
+
     try {
       return await this.prisma.article.create({
         data: {
-          slug: dto.slug,
           coverImage: dto.coverImage,
-          status: dto.status,
+          status: finalStatus,
           featured: dto.featured,
           categoryId: dto.categoryId,
           authorId: dto.authorId,
@@ -118,7 +181,7 @@ export class ArticlesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug articolo o traduzione gia esistente');
+        throw new ConflictException('Slug traduzione gia esistente');
       }
       throw error;
     }
@@ -163,7 +226,7 @@ export class ArticlesService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateArticleDto) {
-    await this.ensureArticleExists(tenantId, id);
+    const currentArticle = await this.ensureArticleExists(tenantId, id);
 
     if (dto.categoryId) {
       await this.ensureCategoryExists(tenantId, dto.categoryId);
@@ -178,7 +241,6 @@ export class ArticlesService {
     }
 
     const data: any = {
-      slug: dto.slug,
       coverImage: dto.coverImage,
       status: dto.status,
       featured: dto.featured,
@@ -193,14 +255,26 @@ export class ArticlesService {
     }
 
     try {
-      return await this.prisma.article.update({
+      const updatedArticle = await this.prisma.article.update({
         where: { id },
         data,
         include: this.articleIncludes,
       });
+
+      if (dto.status && dto.status !== currentArticle.status) {
+        await this.enqueueWebhookEvent(tenantId, 'article.status_changed', {
+          articleId: updatedArticle.id,
+          oldStatus: currentArticle.status,
+          newStatus: updatedArticle.status,
+          reason: dto.moderationReason ?? null,
+          moderatorId: dto.moderatorId ?? null,
+        });
+      }
+
+      return updatedArticle;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug articolo gia esistente');
+        throw new ConflictException('Slug traduzione gia esistente');
       }
       throw error;
     }
@@ -226,14 +300,25 @@ export class ArticlesService {
   ) {
     await this.ensureArticleExists(tenantId, articleId);
 
+    const hasBannedWords = await this.bannedWordsService.checkText(
+      tenantId,
+      `${dto.title}\n${dto.content}`,
+    );
+
     try {
-      return await this.prisma.articleTranslation.create({
+      const translation = await this.prisma.articleTranslation.create({
         data: {
           ...dto,
           articleId,
           tenantId,
         },
       });
+
+      if (hasBannedWords) {
+        await this.hideArticleForBannedContent(tenantId, articleId);
+      }
+
+      return translation;
     } catch (error) {
       if (error.code === 'P2002') {
         throw new ConflictException('Traduzione gia esistente o slug duplicato');
@@ -278,11 +363,22 @@ export class ArticlesService {
   ) {
     const translation = await this.findTranslation(tenantId, articleId, languageCode);
 
+    const textToCheck = [dto.title, dto.content].filter(Boolean).join('\n');
+    const hasBannedWords = textToCheck
+      ? await this.bannedWordsService.checkText(tenantId, textToCheck)
+      : false;
+
     try {
-      return await this.prisma.articleTranslation.update({
+      const updatedTranslation = await this.prisma.articleTranslation.update({
         where: { id: translation.id },
         data: dto,
       });
+
+      if (hasBannedWords) {
+        await this.hideArticleForBannedContent(tenantId, articleId);
+      }
+
+      return updatedTranslation;
     } catch (error) {
       if (error.code === 'P2002') {
         throw new ConflictException('Slug traduzione gia esistente');

@@ -1,10 +1,19 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
+import { ContentStatus } from '@prisma/client';
+
+const ARTICLE_STATUSES: ContentStatus[] = [
+  ContentStatus.DRAFT,
+  ContentStatus.PUBLISHED,
+  ContentStatus.UNDER_REVIEW,
+  ContentStatus.HIDDEN,
+  ContentStatus.BANNED,
+];
 
 export class ArticleFiltersQueryDto {
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsIn(ARTICLE_STATUSES)
+  status?: ContentStatus;
 
   @IsOptional()
   @IsUUID()

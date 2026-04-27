@@ -1,11 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {CreateReportDto} from "@/modules/reports/dto/create-report.dto";
-import {UpdateReportStatusDto} from "@/modules/reports/dto/update-report.dto"; // Assumi di avere un PrismaService
+import {UpdateReportStatusDto} from "@/modules/reports/dto/update-report.dto";
+import { ContentStatus, Prisma, ReportStatus, TargetType } from '@prisma/client';
+import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
+import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 
 @Injectable()
 export class ReportsService {
-    constructor(private prisma: PrismaService) {}
+
+    constructor(
+      private prisma: PrismaService,
+      private moderationPolicy: ModerationPolicyService,
+      private webhookPublisher: WebhookEventPublisher,
+    ) {}
+
+    // ...existing code...
 
     async create(tenantId: string, dto: CreateReportDto) {
         // 1. Assicurati che l'utente (reporter) esista localmente (Minimal User)
@@ -20,16 +30,137 @@ export class ReportsService {
             create: { externalId: dto.reporterId, tenantId },
         });
 
-        // 2. Crea il report
-        return this.prisma.report.create({
-            data: {
+        if (dto.targetType === TargetType.ARTICLE) {
+            const article = await this.prisma.article.findFirst({
+                where: { id: dto.targetId, tenantId },
+                select: { id: true },
+            });
+
+            if (!article) {
+                throw new NotFoundException('Articolo non trovato');
+            }
+        }
+
+        if (dto.targetType === TargetType.COMMENT) {
+            const comment = await this.prisma.comment.findFirst({
+                where: { id: dto.targetId, tenantId },
+                select: { id: true },
+            });
+
+            if (!comment) {
+                throw new NotFoundException('Commento non trovato');
+            }
+        }
+
+        const duplicateReport = await this.prisma.report.findFirst({
+            where: {
                 targetType: dto.targetType,
                 targetId: dto.targetId,
-                reason: dto.reason,
-                description: dto.description,
-                reporterId: user.externalId, // Salviamo l'ID esterno per coerenza
-                tenantId: tenantId,
+                tenantId,
+                reporterId: user.externalId,
+                status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWED] },
             },
+            select: { id: true },
+        });
+
+        if (duplicateReport) {
+            throw new ConflictException('Hai gia segnalato questo contenuto');
+        }
+
+        // 2. Crea il report e applica eventuale auto-moderazione
+        return this.prisma.$transaction(async (tx) => {
+            const report = await tx.report.create({
+                data: {
+                    targetType: dto.targetType,
+                    targetId: dto.targetId,
+                    reason: dto.reason,
+                    description: dto.description,
+                    reporterId: user.externalId, // Salviamo l'ID esterno per coerenza
+                    tenantId: tenantId,
+                },
+            });
+
+            // Incrementa reportCount sul contenuto
+            if (dto.targetType === TargetType.ARTICLE) {
+                const article = await tx.article.findFirst({
+                    where: { id: dto.targetId, tenantId },
+                    select: { id: true, status: true },
+                });
+
+                const reportsCount = await tx.report.count({
+                    where: {
+                        tenantId,
+                        targetType: TargetType.ARTICLE,
+                        targetId: dto.targetId,
+                        status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWED] },
+                    },
+                });
+
+                const threshold = this.moderationPolicy.getReportThreshold('ARTICLE');
+                if (reportsCount >= threshold) {
+                    if (article?.status === ContentStatus.PUBLISHED) {
+                        await tx.article.update({
+                            where: { id: article.id },
+                            data: { status: ContentStatus.UNDER_REVIEW },
+                        });
+
+                        await this.webhookPublisher.publishArticleStatusChangedEvent(
+                          tenantId,
+                          article.id,
+                          ContentStatus.PUBLISHED,
+                          ContentStatus.UNDER_REVIEW,
+                          'REPORT_THRESHOLD_REACHED',
+                          'system',
+                        );
+
+                        await this.webhookPublisher.publishArticleFlaggedEvent(
+                          tenantId,
+                          article.id,
+                          reportsCount,
+                          threshold,
+                        );
+                    }
+                }
+            } else if (dto.targetType === TargetType.COMMENT) {
+                const comment = await tx.comment.findFirst({
+                    where: { id: dto.targetId, tenantId },
+                    select: { id: true, status: true, reportCount: true, authorId: true },
+                });
+
+                // Incrementa reportCount
+                const newReportCount = (comment?.reportCount ?? 0) + 1;
+                await tx.comment.update({
+                    where: { id: dto.targetId },
+                    data: { reportCount: newReportCount },
+                });
+
+                const threshold = this.moderationPolicy.getReportThreshold('COMMENT');
+                if (newReportCount >= threshold && comment?.status === ContentStatus.VISIBLE) {
+                    // Auto-hide il commento
+                    await tx.comment.update({
+                        where: { id: dto.targetId },
+                        data: { status: ContentStatus.HIDDEN },
+                    });
+
+                    // Recupera info per l'autore
+                    const author = await tx.user.findFirst({
+                        where: { id: comment?.authorId },
+                        select: { externalId: true },
+                    });
+
+                    // Pubblica webhook
+                    await this.webhookPublisher.publishCommentHiddenEvent(
+                      tenantId,
+                      comment!.id,
+                      author?.externalId ?? 'unknown',
+                      'REPORT_THRESHOLD_REACHED',
+                      newReportCount,
+                      threshold,
+                    );
+                }
+            }
+
+            return report;
         });
     }
 
@@ -50,13 +181,114 @@ export class ReportsService {
 
         if (!report) throw new NotFoundException('Report non trovato');
 
-        return this.prisma.report.update({
-            where: { id },
-            data: {
-                status: dto.status,
-                moderatorNote: dto.moderatorNote,
-                moderatorId: dto.moderatorId,
-            },
+        return this.prisma.$transaction(async (tx) => {
+            const updatedReport = await tx.report.update({
+                where: { id },
+                data: {
+                    status: dto.status,
+                    moderatorNote: dto.moderatorNote,
+                    moderatorId: dto.moderatorId,
+                },
+            });
+
+            // Gestione cambio stato articolo quando report è DISMISSED
+            if (report.targetType === TargetType.ARTICLE && dto.status === ReportStatus.DISMISSED) {
+                const article = await tx.article.findFirst({
+                    where: { id: report.targetId, tenantId },
+                    select: { id: true, status: true },
+                });
+
+                const activeReportsCount = await tx.report.count({
+                    where: {
+                        tenantId,
+                        targetType: TargetType.ARTICLE,
+                        targetId: report.targetId,
+                        status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWED] },
+                    },
+                });
+
+                if (article?.status === ContentStatus.UNDER_REVIEW && activeReportsCount === 0) {
+                    await tx.article.update({
+                        where: { id: article.id },
+                        data: { status: ContentStatus.PUBLISHED },
+                    });
+
+                    await this.webhookPublisher.publishArticleStatusChangedEvent(
+                      tenantId,
+                      article.id,
+                      ContentStatus.UNDER_REVIEW,
+                      ContentStatus.PUBLISHED,
+                      'REPORTS_DISMISSED',
+                      dto.moderatorId,
+                    );
+                }
+            }
+
+            // Gestione revisione umana per commenti
+            if (report.targetType === TargetType.COMMENT) {
+                const comment = await tx.comment.findFirst({
+                    where: { id: report.targetId, tenantId },
+                    select: { id: true, status: true, authorId: true },
+                });
+
+                const author = comment?.authorId
+                  ? await tx.user.findFirst({
+                      where: { id: comment.authorId },
+                      select: { externalId: true },
+                    })
+                  : null;
+
+                // Caso A: Falso positivo - approva report, ripristina visibilità
+                if (dto.status === ReportStatus.DISMISSED) {
+                    const activeReportsCount = await tx.report.count({
+                        where: {
+                            tenantId,
+                            targetType: TargetType.COMMENT,
+                            targetId: report.targetId,
+                            status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWED] },
+                        },
+                    });
+
+                    if (comment && comment.status === ContentStatus.HIDDEN && activeReportsCount === 0) {
+                        // Resetta reportCount e ripristina visibilità
+                        await tx.comment.update({
+                            where: { id: comment.id },
+                            data: {
+                                status: ContentStatus.VISIBLE,
+                                reportCount: 0,
+                            },
+                        });
+
+                        await this.webhookPublisher.publishCommentModerationEvent(
+                          tenantId,
+                          comment.id,
+                          author?.externalId ?? 'unknown',
+                          ContentStatus.VISIBLE,
+                          'REPORT_DISMISSED_FALSE_POSITIVE',
+                          dto.moderatorId,
+                        );
+                    }
+                }
+
+                // Caso B: Violazione confermata - ban permanente del commento
+                if (dto.status === ReportStatus.RESOLVED && comment?.status !== ContentStatus.BANNED) {
+                    await tx.comment.update({
+                        where: { id: comment.id },
+                        data: { status: ContentStatus.BANNED },
+                    });
+
+                    await this.webhookPublisher.publishCommentModerationEvent(
+                      tenantId,
+                      comment.id,
+                      author?.externalId ?? 'unknown',
+                      ContentStatus.BANNED,
+                      'REPORT_RESOLVED_VIOLATION_CONFIRMED',
+                      dto.moderatorId,
+                    );
+                }
+            }
+
+            return updatedReport;
         });
     }
 }

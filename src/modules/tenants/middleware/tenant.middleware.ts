@@ -1,6 +1,7 @@
 import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import {PrismaService} from "@/modules/prisma/prisma.service";
+import * as crypto from 'crypto';
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
@@ -13,17 +14,26 @@ export class TenantMiddleware implements NestMiddleware {
             throw new UnauthorizedException('API Key mancante');
         }
 
-        // Cerchiamo il tenant (idealmente qui dovresti confrontare l'hash della chiave)
-        const tenant = await this.prisma.tenant.findUnique({
-            where: { apiKey, enabled: true },
+        // Hash the incoming API key to match the stored hash
+        const hashedApiKey = crypto.createHash('sha256').update(apiKey).digest('hex');
+
+        // Find tenant by hashed API key and enabled status
+        const tenant = await this.prisma.tenant.findFirst({
+            where: {
+                apiKey: hashedApiKey,
+                enabled: true
+            },
         });
 
         if (!tenant) {
             throw new UnauthorizedException('API Key non valida o Tenant disattivato');
         }
 
-        // Iniettiamo il tenant nell'oggetto request per renderlo disponibile ovunque
+        // Inject tenant object into request for use throughout the request scope
         req['tenant'] = tenant;
         next();
     }
 }
+
+
+

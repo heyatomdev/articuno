@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
+import { ModerationModule } from '@/modules/moderation/moderation.module';
 
 @Module({
+  imports: [ModerationModule],
   controllers: [CommentsController],
   providers: [CommentsService],
   exports: [CommentsService],

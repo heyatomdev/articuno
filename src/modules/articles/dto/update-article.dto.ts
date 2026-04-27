@@ -1,17 +1,23 @@
-import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
+import { ContentStatus } from '@prisma/client';
+
+const ARTICLE_STATUSES: ContentStatus[] = [
+  ContentStatus.DRAFT,
+  ContentStatus.PUBLISHED,
+  ContentStatus.UNDER_REVIEW,
+  ContentStatus.HIDDEN,
+  ContentStatus.BANNED,
+];
 
 export class UpdateArticleDto {
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsString()
-  slug?: string;
+  coverImage?: string | null;
 
   @IsOptional()
-  @IsString()
-  coverImage?: string;
-
-  @IsOptional()
-  @IsString()
-  status?: string;
+  @IsIn(ARTICLE_STATUSES)
+  status?: ContentStatus;
 
   @IsOptional()
   @IsBoolean()
@@ -30,4 +36,12 @@ export class UpdateArticleDto {
   @IsArray()
   @IsUUID(undefined, { each: true })
   tagIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  moderationReason?: string;
+
+  @IsOptional()
+  @IsString()
+  moderatorId?: string;
 }
