@@ -1,0 +1,299 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id              String  @id @default(uuid())
+  slug            String  @unique
+  name            String
+  description     String?
+  domain          String  @unique
+  defaultLanguage String  @default("it")
+
+  apiKey  String  @unique // Hash della chiave (tipo password)
+  enabled Boolean @default(true)
+
+  users         User[]
+  categories    Category[]
+  tags          Tag[]
+  articles      Article[]
+  comments      Comment[]
+  dailyStats    DailyStats[]
+  reports       Report[]
+  bannedWords   BannedWord[]
+  notifications Notification[]
+
+  // Configurazione Webhook per notifiche e moderazione
+  webhookUrl    String?
+  webhookSecret String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenants")
+}
+
+model User {
+  id         String @id @default(uuid())
+  externalId String
+  tenantId   String
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  language  String  @default("it")
+  username  String?
+  avatarUrl String?
+
+  status UserStatus @default(ACTIVE)
+
+  articles      Article[]
+  comments      Comment[]
+  likes         Like[]
+  bookmarks     Bookmark[]
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([externalId, tenantId])
+  @@map("users")
+}
+
+model Category {
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique
+  description String?
+  color       String?
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  articles Article[] @relation("ArticleCategories")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Tag {
+  id       String @id @default(uuid())
+  name     String
+  slug     String @unique
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  articles Article[] @relation("ArticleTags")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tags")
+}
+
+model Article {
+  id            String  @id @default(uuid())
+  slug          String  @unique // Lo slug principale (es. ID o slug della lingua base)
+  coverImage    String?
+  featured      Boolean @default(false)
+  views         Int     @default(0)
+  likesCount    Int     @default(0)
+  commentsCount Int     @default(0)
+
+  status ContentStatus @default(VISIBLE)
+
+  // Relazioni strutturali
+  authorId   String?
+  author     User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  categoryId String
+  category   Category @relation("ArticleCategories", fields: [categoryId], references: [id])
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  translations ArticleTranslation[]
+  commentsList Comment[]
+  likes        Like[]
+  bookmarks    Bookmark[]
+
+  // Many-to-many relation with tags
+  tags Tag[] @relation("ArticleTags")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("articles")
+}
+
+model ArticleTranslation {
+  id              String  @id @default(uuid())
+  languageCode    String // "it", "en", etc.
+  title           String
+  content         String  @db.Text
+  excerpt         String  @db.Text
+  slug            String
+  metaTitle       String?
+  metaDescription String?
+
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tenantId  String
+
+  @@unique([articleId, languageCode])
+  @@unique([tenantId, slug])
+  @@map("article_translations")
+}
+
+model Comment {
+  id        String  @id @default(uuid())
+  content   String
+  authorId  String
+  author    User    @relation(fields: [authorId], references: [id])
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  status ContentStatus @default(VISIBLE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("comments")
+}
+
+model Like {
+  id        String  @id @default(uuid())
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId  String // Denormalizziamo il tenantId per query di analytics veloci
+
+  createdAt DateTime @default(now())
+
+  @@unique([articleId, userId]) // Impedisce duplicati
+  @@index([tenantId])
+  @@map("likes")
+}
+
+model Bookmark {
+  id        String  @id @default(uuid())
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId  String
+
+  createdAt DateTime @default(now())
+
+  @@unique([articleId, userId])
+  @@index([userId, tenantId]) // Ottimizza la query "i miei preferiti"
+  @@map("bookmarks")
+}
+
+model Notification {
+  id      String @id @default(uuid())
+  type    String
+  title   String
+  message String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Logica Outbox per Webhook
+  sentToClient Boolean   @default(false)
+  readAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model DailyStats {
+  id                String   @id @default(uuid())
+  date              DateTime
+  articlesPublished Int      @default(0)
+  totalViews        Int      @default(0)
+  totalLikes        Int      @default(0)
+  totalComments     Int      @default(0)
+  totalBookmarks    Int      @default(0)
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, tenantId])
+  @@map("daily_stats")
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  reason      String // Es: "SPAM", "OFFENSIVE", "INACCURATE"
+  description String?      @db.Text
+  status      ReportStatus @default(PENDING)
+
+  // Polimorfismo semplificato: cosa stiamo segnalando?
+  targetType TargetType // ENUM: ARTICLE, COMMENT, USER
+  targetId   String // L'ID dell'entità segnalata
+
+  reporterId    String // externalId dell'utente
+  moderatorId   String? // externalId dello staff
+  moderatorNote String?
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, status])
+  @@map("reports")
+}
+
+model BannedWord {
+  id       String @id @default(uuid())
+  word     String
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([word, tenantId])
+  @@map("banned_words")
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum TargetType {
+  ARTICLE
+  COMMENT
+  USER
+}
+
+enum ContentStatus {
+  PUBLISHED
+  DRAFT
+  HIDDEN
+  BANNED
+  VISIBLE // Per i commenti
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED // L'utente non può più interagire
+  SHADOW_BANNED // L'utente interagisce ma nessuno vede i suoi contenuti
+}
