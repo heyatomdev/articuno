@@ -7,6 +7,8 @@ import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-artic
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ContentStatus, Prisma } from '@prisma/client';
+import { sanitizeContent } from '@/utils/html-sanitizer';
+import { slugifySafe } from '@/utils/slugify';
 
 @Injectable()
 export class ArticlesService {
@@ -65,6 +67,15 @@ export class ArticlesService {
       reason: ArticlesService.AUTO_MODERATION_REASON,
       moderatorId: 'system',
     });
+  }
+
+  private sanitizeTranslation<T extends { content: string; excerpt?: string; slug: string }>(translation: T): T {
+    return {
+      ...translation,
+      slug: slugifySafe(translation.slug),
+      content: sanitizeContent(translation.content),
+      ...(translation.excerpt !== undefined ? { excerpt: sanitizeContent(translation.excerpt) } : {}),
+    };
   }
 
   private async hasBannedWordsInTranslations(
@@ -154,6 +165,8 @@ export class ArticlesService {
     const hasBannedWords = await this.hasBannedWordsInTranslations(tenantId, dto.translations);
     const finalStatus = hasBannedWords ? ContentStatus.HIDDEN : requestedStatus;
 
+    const sanitizedTranslations = dto.translations?.map((t) => this.sanitizeTranslation(t));
+
     try {
       return await this.prisma.article.create({
         data: {
@@ -168,9 +181,9 @@ export class ArticlesService {
                 connect: dto.tagIds.map((id) => ({ id })),
               }
             : undefined,
-          translations: dto.translations
+          translations: sanitizedTranslations
             ? {
-                create: dto.translations.map((translation) => ({
+                create: sanitizedTranslations.map((translation) => ({
                   ...translation,
                   tenantId,
                 })),
@@ -305,10 +318,12 @@ export class ArticlesService {
       `${dto.title}\n${dto.content}`,
     );
 
+    const sanitizedDto = this.sanitizeTranslation(dto);
+
     try {
       const translation = await this.prisma.articleTranslation.create({
         data: {
-          ...dto,
+          ...sanitizedDto,
           articleId,
           tenantId,
         },
@@ -368,10 +383,16 @@ export class ArticlesService {
       ? await this.bannedWordsService.checkText(tenantId, textToCheck)
       : false;
 
+    const sanitizedDto: UpdateArticleTranslationDto = {
+      ...dto,
+      ...(dto.content !== undefined ? { content: sanitizeContent(dto.content) } : {}),
+      ...(dto.excerpt !== undefined ? { excerpt: sanitizeContent(dto.excerpt) } : {}),
+    };
+
     try {
       const updatedTranslation = await this.prisma.articleTranslation.update({
         where: { id: translation.id },
-        data: dto,
+        data: sanitizedDto,
       });
 
       if (hasBannedWords) {

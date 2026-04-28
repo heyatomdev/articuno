@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { BannedWordsService } from './banned-words.service';
 import { BannedWordsController } from './banned-words.controller';
+import { BannedWordsSeedService } from './banned-words-seed.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
     imports: [PrismaModule],
     controllers: [BannedWordsController],
-    providers: [BannedWordsService],
-    exports: [BannedWordsService],
+    providers: [BannedWordsService, BannedWordsSeedService],
+    exports: [BannedWordsService, BannedWordsSeedService],
 })
 export class BannedWordsModule {}

@@ -1,12 +1,16 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BannedWordsSeedService } from '@/modules/banned-worlds/banned-words-seed.service';
 import * as crypto from 'crypto';
 
 @Injectable()
 export class TenantSeedService implements OnModuleInit {
   private readonly logger = new Logger(TenantSeedService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bannedWordsSeed: BannedWordsSeedService,
+  ) {}
 
   async onModuleInit() {
     await this.seedDefaultTenant();
@@ -59,13 +63,14 @@ export class TenantSeedService implements OnModuleInit {
         },
       });
 
-      this.logger.log(
-        `🌱 Default tenant seeded successfully!`,
-      );
+      this.logger.log(`🌱 Default tenant seeded successfully!`);
       this.logger.log(`   Tenant ID: ${defaultTenant.id}`);
       this.logger.log(`   Slug: ${defaultTenant.slug}`);
       this.logger.log(`   Domain: ${defaultTenant.domain}`);
       this.logger.log(`   ⚠️  Header to use: x-api-key: ${plainApiKey}`);
+
+      // Seed default banned words for the new tenant
+      await this.bannedWordsSeed.seedDefaultBannedWords(defaultTenant.id);
     } catch (error) {
       this.logger.error(`Error seeding default tenant: ${error.message}`, error.stack);
       throw error;
