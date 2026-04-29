@@ -1,17 +1,36 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './modules/app/app.module';
 import { HttpExceptionFilter } from '@/filters/http-exception.filter';
-import { json } from 'express';
 import * as cookieParser from 'cookie-parser';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   try {
-    const app = await NestFactory.create(AppModule, {
+    const bootstrapLogger = new Logger('Bootstrap');
+
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bufferLogs: true,
       logger: ['log', 'error', 'warn', 'debug', 'verbose'],
     });
+
+    const configService = app.get(ConfigService);
+    const environment = configService.get<string>('environment') ?? 'development';
+    const isProduction = environment === 'production';
+    const corsOrigins = (configService.get<string>('corsOrigin') ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+    const trustProxy = configService.get<boolean>('trustProxy') ?? false;
+    const port = configService.get<number>('port') ?? 3000;
+    const baseUrl = configService.get<string>('baseUrl') ?? 'Not Set';
+
+    app.enableShutdownHooks();
+    if (trustProxy) {
+      app.set('trust proxy', 1);
+    }
 
     // Global validation pipe
     app.useGlobalPipes(
@@ -24,19 +43,22 @@ async function bootstrap() {
 
     // Enable CORS
     app.enableCors({
-      origin: process.env.CORS_ORIGIN || '*',
+      origin: corsOrigins.length > 0 ? corsOrigins : !isProduction,
       methods: ['GET', 'POST', 'PATCH', 'DELETE'],
       allowedHeaders: ['Content-Type', 'X-API-Key', 'X-User-Id', 'Authorization'],
       credentials: true,
     });
+    if (isProduction && corsOrigins.length === 0) {
+      bootstrapLogger.warn('CORS_ORIGIN is not set in production: browser cross-origin requests are disabled');
+    }
 
     // Use global exception filter
     app.useGlobalFilters(new HttpExceptionFilter());
 
-    app.use(json({ limit: '5mb' }));
-    app.use(cookieParser());
+    app.useBodyParser('json', { limit: '1mb' });
+    app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
 
-    const productionPath = process.env.NODE_ENV === 'develop' ? '' : '/v2';
+    app.use(cookieParser());
 
     // Swagger documentation
     const config = new DocumentBuilder()
@@ -45,10 +67,9 @@ async function bootstrap() {
         .setVersion(process?.env?.npm_package_version || '2.0.0')
         .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
         .addBearerAuth()
-        .setBasePath(productionPath)
         .setLicense(
             'MIT',
-            'https://github.com/heyatomdev/fileharbor/blob/main/README.md',
+            'https://github.com/heyatomdev/articuno/blob/main/README.md',
         )
         .setContact('Andrea Tombolato', 'https://heyatom.dev', 'hey@heyatom.dev')
         .build();
@@ -56,42 +77,44 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('/docs', app, document);
 
-    const port = process.env.PORT || 3000;
     await app.listen(port);
 
-    const logger = new Logger('Bootstrap');
-    logger.log(`🚀 FileHarbor started successfully!`);
-    logger.log(`📚 API Documentation: http://localhost:${port}/docs`);
-    logger.log(`📈 Metrics endpoint: http://localhost:${port}/metrics`);
-    logger.log(`📝 Logging enabled for: log, error, warn, debug, verbose`);
-    logger.log(`Current BASE_URL is set to: ${process.env.BASE_URL || 'Not Set'}`);
+    bootstrapLogger.log(`🚀 Articuno started successfully`);
+    bootstrapLogger.log(`📚 API Documentation: http://localhost:${port}/docs`);
+    bootstrapLogger.log(`📈 Metrics endpoint: http://localhost:${port}/metrics`);
+    bootstrapLogger.log(`📝 Logging enabled for: log, error, warn, debug, verbose`);
+    bootstrapLogger.log(`Current BASE_URL is set to: ${baseUrl}`);
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    const stack = error instanceof Error ? error.stack : undefined;
 
     Logger.error('❌ Failed to start the application', 'Bootstrap');
 
-    if (error.message.includes('Database connection failed')) {
+    if (message.includes('Database connection failed')) {
       Logger.error('Database connection issue detected', 'Bootstrap');
-    } else if (error.message.includes('EADDRINUSE')) {
+    } else if (message.includes('EADDRINUSE')) {
       Logger.error(`Port is already in use. Another service might be running on the same port`, 'Bootstrap');
-    } else if (error.message.includes('EACCES')) {
+    } else if (message.includes('EACCES')) {
       Logger.error(`Permission denied. You might not have permission to bind to this port`, 'Bootstrap');
     } else {
-      Logger.error(`Unexpected error: ${error.message}`, 'Bootstrap');
+      Logger.error(`Unexpected error: ${message}`, 'Bootstrap');
     }
 
-    Logger.error('Stack trace:', error.stack, 'Bootstrap');
+    Logger.error('Stack trace:', stack ?? 'N/A', 'Bootstrap');
     throw error;
   }
 }
 
 bootstrap()
-    .then((app) => {
-      Logger.log('🎉 App running now!', 'Bootstrap');
+    .then(() => {
+      Logger.log('🎉 App running now', 'Bootstrap');
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+
       Logger.error('💥 Critical error during application startup:', 'Bootstrap');
-      Logger.error(error.message, 'Bootstrap');
+      Logger.error(message, 'Bootstrap');
       Logger.error('🔄 Please fix the issues above and try again', 'Bootstrap');
       process.exit(1);
     });
