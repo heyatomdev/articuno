@@ -1,6 +1,6 @@
 {
   "name": "articuno",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Multi-tenant blog platform with Prisma",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/src/main",
+    "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
