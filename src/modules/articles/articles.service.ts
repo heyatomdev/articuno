@@ -9,6 +9,7 @@ import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-q
 import { ContentStatus, Prisma } from '@prisma/client';
 import { sanitizeContent } from '@/utils/html-sanitizer';
 import { slugifySafe } from '@/utils/slugify';
+import { limit, PagedResponse } from '@/pagination';
 
 @Injectable()
 export class ArticlesService {
@@ -200,13 +201,13 @@ export class ArticlesService {
     }
   }
 
-  async findAll(tenantId: string, query?: ArticleFiltersQueryDto) {
+  async findAll(tenantId: string, query: ArticleFiltersQueryDto): Promise<PagedResponse<any>> {
     const where: any = {
       tenantId,
-      ...(query?.status ? { status: query.status } : {}),
-      ...(query?.categoryId ? { categoryId: query.categoryId } : {}),
-      ...(query?.featured !== undefined ? { featured: query.featured } : {}),
-      ...(query?.tagId
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.featured !== undefined ? { featured: query.featured } : {}),
+      ...(query.tagId
         ? {
             tags: {
               some: {
@@ -218,11 +219,29 @@ export class ArticlesService {
         : {}),
     };
 
-    return this.prisma.article.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: this.articleIncludes,
-    });
+    const [items, totalCount] = await this.prisma.$transaction([
+      this.prisma.article.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit(query),
+        skip: query.offset,
+        include: this.articleIncludes,
+      }),
+      this.prisma.article.count({ where }),
+    ]);
+
+    const pageSize = query.limit ?? 20;
+    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
+
+    return {
+      items,
+      pagination: {
+        totalCount,
+        currentPage,
+        pageSize,
+        totalPages: Math.ceil(totalCount / pageSize),
+      },
+    };
   }
 
   async findOne(tenantId: string, id: string) {

@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { ContentStatus } from '@prisma/client';
+import { PagedQuery } from '@/pagination';
 
 const ARTICLE_STATUSES: ContentStatus[] = [
   ContentStatus.DRAFT,
@@ -10,7 +11,7 @@ const ARTICLE_STATUSES: ContentStatus[] = [
   ContentStatus.BANNED,
 ];
 
-export class ArticleFiltersQueryDto {
+export class ArticleFiltersQueryDto extends PagedQuery {
   @IsOptional()
   @IsIn(ARTICLE_STATUSES)
   status?: ContentStatus;
