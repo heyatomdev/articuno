@@ -16,7 +16,7 @@ import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
-import { ArticleParamsDto } from '@/modules/articles/dto/article-params.dto';
+import { ArticleParamsDto, ArticleSlugParamsDto } from '@/modules/articles/dto/article-params.dto';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
@@ -37,9 +37,9 @@ export class ArticlesController {
     return this.articlesService.findAll(tenant.id, query);
   }
 
-  @Get(':id')
-  findOne(@GetTenant() tenant: any, @Param() params: ArticleParamsDto) {
-    return this.articlesService.findOne(tenant.id, params.id);
+  @Get(':slug')
+  findOne(@GetTenant() tenant: any, @Param() params: ArticleSlugParamsDto) {
+    return this.articlesService.findOne(tenant.id, params.slug);
   }
 
   @Patch(':id')

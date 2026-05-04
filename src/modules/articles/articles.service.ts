@@ -244,9 +244,17 @@ export class ArticlesService {
     };
   }
 
-  async findOne(tenantId: string, id: string) {
+  async findOne(tenantId: string, slug: string) {
     const article = await this.prisma.article.findFirst({
-      where: { id, tenantId },
+      where: {
+        tenantId,
+        translations: {
+          some: {
+            tenantId,
+            slug,
+          },
+        },
+      },
       include: this.articleIncludes,
     });
 
