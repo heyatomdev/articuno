@@ -18,6 +18,8 @@ import { InteractionsModule } from '@/modules/interactions/interactions.module';
 import { CommentsModule } from '@/modules/comments/comments.module';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
 import { WebhookModule } from '@/modules/webhook/webhook.module';
+import { AuthModule } from '@/modules/auth/auth.module';
+import { AdminModule } from '@/modules/admin/admin.module';
 
 @Module({
     controllers: [StatusController],
@@ -63,6 +65,8 @@ import { WebhookModule } from '@/modules/webhook/webhook.module';
         InteractionsModule,
         CommentsModule,
         WebhookModule,
+        AuthModule,
+        AdminModule,
     ],
 })
 export class AppModule {}

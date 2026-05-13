@@ -2,20 +2,23 @@
  * Seed locale per ambiente di sviluppo.
  *
  * Crea:
- *  - 1 Tenant "Demo" con API key in chiaro stampata a schermo
- *  - 4 Categorie
- *  - 3 Utenti
- *  - 6 Articoli (con traduzione IT) distribuiti nelle categorie
+ *  - 1 Tenant "Kaish DBD" con API key in chiaro stampata a schermo
+ *  - 4 Categorie DBD
+ *  - 3 Utenti + 1 Admin (con AdminCredentials)
+ *  - 6 Articoli DBD (con traduzione IT) distribuiti nelle categorie
  *
  * Uso:  pnpm run db:seed
  */
 import 'dotenv/config';
 import { createHash, randomBytes } from 'crypto';
-import { PrismaClient, ContentStatus } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { PrismaClient, ContentStatus, UserRole } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL as string });
 const prisma = new PrismaClient({ adapter } as any);
+
+const DBD_COVER = 'https://fileharbor.heyatom.dev/v2/images/bf6dbd59-2f9c-4f67-8b82-6c0507f2ddfa';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -29,13 +32,13 @@ async function main() {
   const hashedKey = sha256(rawApiKey);
 
   const tenant = await prisma.tenant.upsert({
-    where: { slug: 'demo-tenant' },
+    where: { slug: 'kaish-dbd' },
     update: {},
     create: {
-      slug: 'demo-tenant',
-      name: 'Demo Tenant',
-      description: 'Tenant di sviluppo locale',
-      domain: 'demo.localhost',
+      slug: 'kaish-dbd',
+      name: 'Kaish DBD',
+      description: 'Il portale italiano su Dead by Daylight: guide, killer, survivor e molto altro.',
+      domain: 'kaishdbd.localhost',
       defaultLanguage: 'it',
       apiKey: hashedKey,
       enabled: true,
@@ -51,10 +54,10 @@ async function main() {
 
   // ── 2. CATEGORIE ─────────────────────────────────────────────────────────────
   const categoriesData = [
-    { name: 'Tecnologia', slug: `tecnologia-${tenant.id.slice(0, 8)}`, description: 'Articoli tech & software', color: '#3B82F6' },
-    { name: 'Business',   slug: `business-${tenant.id.slice(0, 8)}`,   description: 'Strategie e mercati',     color: '#10B981' },
-    { name: 'Design',     slug: `design-${tenant.id.slice(0, 8)}`,     description: 'UI/UX e grafica',          color: '#F59E0B' },
-    { name: 'Lifestyle',  slug: `lifestyle-${tenant.id.slice(0, 8)}`,  description: 'Benessere e cultura',      color: '#EC4899' },
+    { name: 'Killer',    slug: `killer-${tenant.id.slice(0, 8)}`,    description: 'Guide e lore sui Killer di DBD',          color: '#DC2626' },
+    { name: 'Survivor',  slug: `survivor-${tenant.id.slice(0, 8)}`,  description: 'Strategie e lore per i Survivor',         color: '#2563EB' },
+    { name: 'Perks',     slug: `perks-${tenant.id.slice(0, 8)}`,     description: 'Analisi e tier list dei perk',             color: '#7C3AED' },
+    { name: 'Guide',     slug: `guide-${tenant.id.slice(0, 8)}`,     description: 'Tutorial, build e consigli pratici',       color: '#059669' },
   ];
 
   const categories = await Promise.all(
@@ -73,9 +76,9 @@ async function main() {
 
   // ── 3. UTENTI ─────────────────────────────────────────────────────────────────
   const usersData = [
-    { externalId: 'user-alice', username: 'alice',   avatarUrl: 'https://i.pravatar.cc/150?u=alice'   },
-    { externalId: 'user-bob',   username: 'bob',     avatarUrl: 'https://i.pravatar.cc/150?u=bob'     },
-    { externalId: 'user-carol', username: 'carol',   avatarUrl: 'https://i.pravatar.cc/150?u=carol'   },
+    { externalId: 'user-kaish',   username: 'Kaish',      avatarUrl: 'https://i.pravatar.cc/150?u=kaish'   },
+    { externalId: 'user-wraith',  username: 'TheWraith',  avatarUrl: 'https://i.pravatar.cc/150?u=wraith'  },
+    { externalId: 'user-nea',     username: 'Nea_Karlsson', avatarUrl: 'https://i.pravatar.cc/150?u=nea'   },
   ];
 
   const users = await Promise.all(
@@ -92,79 +95,122 @@ async function main() {
   users.forEach((u) => console.log(`    • [${u.id}] ${u.username} (externalId: ${u.externalId})`));
   console.log();
 
+  // ── 3b. ADMIN USER ────────────────────────────────────────────────────────────
+  const rawAdminPassword = `Admin@${randomBytes(6).toString('hex')}1!`;
+  const hashedAdminPassword = await bcrypt.hash(rawAdminPassword, 12);
+  const adminEmail = `admin@${tenant.slug}.dev`;
+
+  const existingAdmin = await prisma.adminCredentials.findUnique({ where: { email: adminEmail } });
+
+  if (!existingAdmin) {
+    const adminUser = await prisma.user.upsert({
+      where: { externalId_tenantId: { externalId: 'user-admin', tenantId: tenant.id } },
+      update: {},
+      create: {
+        externalId: 'user-admin',
+        username: 'admin',
+        tenantId: tenant.id,
+        language: 'it',
+        role: UserRole.TENANT_ADMIN,
+      },
+    });
+
+    await prisma.adminCredentials.create({
+      data: {
+        userId: adminUser.id,
+        email: adminEmail,
+        password: hashedAdminPassword,
+      },
+    });
+
+    console.log('✅  Admin creato');
+    console.log(`    Email    : ${adminEmail}`);
+    console.log(`    Password : ${rawAdminPassword}   ← usa questa per il login admin`);
+  } else {
+    console.log('ℹ️   Admin già esistente, skip.');
+    console.log(`    Email    : ${adminEmail}`);
+  }
+  console.log();
+
   // ── 4. ARTICOLI ──────────────────────────────────────────────────────────────
   const articlesData = [
     {
       categoryIndex: 0, authorIndex: 0, status: ContentStatus.PUBLISHED,
+      coverImage: DBD_COVER,
       translation: {
-        title: 'Introduzione a NestJS',
-        excerpt: 'Scopri come costruire API scalabili con NestJS e TypeScript.',
-        content: '<p>NestJS è un framework progressivo per Node.js che sfrutta TypeScript per costruire applicazioni lato server efficienti e scalabili.</p>',
-        slug: `introduzione-nestjs-${tenant.id.slice(0, 8)}`,
-        metaTitle: 'Introduzione a NestJS - Demo',
-        metaDescription: 'Guida pratica a NestJS per sviluppatori TypeScript.',
+        title: 'Guida completa al Trapper',
+        excerpt: 'Il Trapper è il Killer simbolo di DBD: scopri la sua build ottimale e come padroneggiare le trappole.',
+        content: '<p>Il Trapper è uno dei Killer più iconici di Dead by Daylight. La sua abilità speciale consiste nel posizionare trappole a orso sul terreno che catturano i Survivor di passaggio.</p><p>Per una build efficace si consigliano i perk <strong>Corrupt Intervention</strong>, <strong>Hex: Ruin</strong>, <strong>Nowhere to Hide</strong> e <strong>Deadlock</strong>.</p>',
+        slug: `guida-trapper-${tenant.id.slice(0, 8)}`,
+        metaTitle: 'Guida Trapper DBD - Kaish DBD',
+        metaDescription: 'Tutto sul Trapper di Dead by Daylight: build, strategie e addons.',
       },
     },
     {
       categoryIndex: 0, authorIndex: 1, status: ContentStatus.PUBLISHED,
+      coverImage: DBD_COVER,
       translation: {
-        title: 'Prisma ORM: guida rapida',
-        excerpt: 'Come usare Prisma con PostgreSQL in un progetto Node.js.',
-        content: '<p>Prisma è un ORM moderno che semplifica l\'accesso al database con type-safety completo.</p>',
-        slug: `prisma-orm-guida-${tenant.id.slice(0, 8)}`,
-        metaTitle: 'Prisma ORM - Demo',
-        metaDescription: 'Prisma con PostgreSQL: tutto quello che devi sapere.',
+        title: 'Nurse: la Killer più difficile da masterare',
+        excerpt: 'La Nurse rompe tutte le regole del gioco: una guida per chi vuole salire di livello.',
+        content: '<p>La Nurse è considerata la Killer con il potenziale più alto in Dead by Daylight grazie alla sua abilità di teletrasportarsi attraverso i muri con il Blink.</p><p>Richiede centinaia di ore di pratica, ma una volta masterata è quasi imbattibile. Consigliamo di comenzar con addon che aumentano la velocità di recupero dal Blink.</p>',
+        slug: `guida-nurse-${tenant.id.slice(0, 8)}`,
+        metaTitle: 'Guida Nurse DBD - Kaish DBD',
+        metaDescription: 'Come giocare la Nurse in Dead by Daylight: consigli e build.',
       },
     },
     {
-      categoryIndex: 1, authorIndex: 0, status: ContentStatus.PUBLISHED,
+      categoryIndex: 1, authorIndex: 2, status: ContentStatus.PUBLISHED,
+      coverImage: DBD_COVER,
       translation: {
-        title: 'Come costruire un SaaS nel 2025',
-        excerpt: 'Strategie e strumenti per lanciare un prodotto SaaS di successo.',
-        content: '<p>Il mercato SaaS è in continua crescita. Ecco come posizionare il tuo prodotto e trovare i primi clienti.</p>',
-        slug: `come-costruire-saas-2025-${tenant.id.slice(0, 8)}`,
-        metaTitle: 'Costruire SaaS 2025 - Demo',
-        metaDescription: 'Guida al lancio di un SaaS nel 2025.',
+        title: 'Dwight Fairfield: il Survivor per eccellenza',
+        excerpt: 'Dwight è il Survivor più giocato e per una buona ragione: i suoi perk sono tra i migliori del gioco.',
+        content: '<p>Dwight Fairfield è spesso il primo Survivor che i nuovi giocatori scelgono. I suoi perk esclusivi <strong>Bond</strong>, <strong>Prove Thyself</strong> e <strong>Leader</strong> lo rendono un ottimo supporto per il team.</p><p>Una build meta include Bond per tracciare i compagni, Prove Thyself per generatori veloci e Dead Hard per l\'escape.</p>',
+        slug: `guida-dwight-${tenant.id.slice(0, 8)}`,
+        metaTitle: 'Guida Dwight DBD - Kaish DBD',
+        metaDescription: 'Build e strategie per Dwight Fairfield in Dead by Daylight.',
       },
     },
     {
-      categoryIndex: 1, authorIndex: 2, status: ContentStatus.DRAFT,
+      categoryIndex: 1, authorIndex: 0, status: ContentStatus.DRAFT,
+      coverImage: DBD_COVER,
       translation: {
-        title: 'Growth hacking per startup',
-        excerpt: 'Tecniche di crescita rapida per startup early-stage.',
-        content: '<p>Il growth hacking combina marketing, prodotto e dati per accelerare la crescita di una startup.</p>',
-        slug: `growth-hacking-startup-${tenant.id.slice(0, 8)}`,
-        metaTitle: 'Growth Hacking - Demo',
-        metaDescription: 'Growth hacking per startup: strategie pratiche.',
+        title: 'Meg Thomas: velocità e agilità',
+        excerpt: 'Meg è la Survivor più agile del gioco: scopri come sfruttare al massimo le sue doti atletiche.',
+        content: '<p>Meg Thomas è una dei Survivor più giocati grazie alla sua abilità innata <strong>Sprint Burst</strong> che le permette di scattare velocemente quando inizia a correre.</p><p>La sua build da loop prevede Sprint Burst, Dead Hard, Adrenaline e Off the Record per massimizzare le possibilità di sopravvivenza.</p>',
+        slug: `guida-meg-${tenant.id.slice(0, 8)}`,
+        metaTitle: 'Guida Meg Thomas DBD - Kaish DBD',
+        metaDescription: 'Come usare Meg Thomas in Dead by Daylight: build e strategie.',
       },
     },
     {
       categoryIndex: 2, authorIndex: 1, status: ContentStatus.PUBLISHED,
+      coverImage: DBD_COVER,
       translation: {
-        title: 'Principi di Design System',
-        excerpt: 'Come creare e mantenere un design system efficace.',
-        content: '<p>Un design system è una collezione di componenti riutilizzabili con regole chiare che guida team di prodotto nella coerenza.</p>',
-        slug: `principi-design-system-${tenant.id.slice(0, 8)}`,
-        metaTitle: 'Design System - Demo',
-        metaDescription: 'Tutto sui design system moderni.',
+        title: 'Tier List Perk Survivor 2026',
+        excerpt: 'I migliori perk per Survivor nel meta attuale: guida aggiornata al capitolo più recente.',
+        content: '<p><strong>S Tier:</strong> Dead Hard, Adrenaline, Decisive Strike, Off The Record</p><p><strong>A Tier:</strong> Borrowed Time, Unbreakable, Sprint Burst, Windows of Opportunity</p><p><strong>B Tier:</strong> Lithe, Iron Will, Kindred, We\'ll Make It</p><p>Il meta 2026 favorisce build autonome dopo il nerf a Decisive Strike del capitolo 32.</p>',
+        slug: `tier-list-perk-survivor-2026-${tenant.id.slice(0, 8)}`,
+        metaTitle: 'Tier List Perk Survivor 2026 - Kaish DBD',
+        metaDescription: 'I migliori perk survivor in DBD aggiornati al 2026.',
       },
     },
     {
       categoryIndex: 3, authorIndex: 2, status: ContentStatus.PUBLISHED,
+      coverImage: DBD_COVER,
       translation: {
-        title: 'Produttività per sviluppatori',
-        excerpt: 'Abitudini e tool per massimizzare la produttività da sviluppatore.',
-        content: '<p>Dalla gestione del tempo agli strumenti CLI: scopri come lavorare meglio ogni giorno come developer.</p>',
-        slug: `produttivita-sviluppatori-${tenant.id.slice(0, 8)}`,
-        metaTitle: 'Produttività Dev - Demo',
-        metaDescription: 'Consigli pratici di produttività per sviluppatori.',
+        title: 'Come migliorare al loop: guida per principianti',
+        excerpt: 'Il loop è la meccanica core del gioco da Survivor. Ecco come sfruttare i punti forti della mappa.',
+        content: '<p>Il <strong>loop</strong> consiste nel girare attorno a strutture della mappa per tenere il Killer impegnato il più a lungo possibile, guadagnando tempo prezioso per i compagni ai generatori.</p><p>I punti di loop migliori sono: <strong>Il Pallet</strong>, <strong>La Finestra</strong> e i loop lunghi tipo la struttura L. Impara a prevedere i movimenti del Killer e a usare i pallet in modo strategico, non panico.</p>',
+        slug: `guida-loop-principianti-${tenant.id.slice(0, 8)}`,
+        metaTitle: 'Guida al Loop DBD - Kaish DBD',
+        metaDescription: 'Come fare loop in Dead by Daylight: guida per nuovi giocatori.',
       },
     },
   ];
 
   let articleCount = 0;
   for (const data of articlesData) {
-    const { translation, categoryIndex, authorIndex, status } = data;
+    const { translation, categoryIndex, authorIndex, status, coverImage } = data;
 
     // Evita duplicati sullo slug della traduzione
     const existing = await prisma.articleTranslation.findFirst({
@@ -178,6 +224,7 @@ async function main() {
         categoryId: categories[categoryIndex].id,
         authorId: users[authorIndex].id,
         status,
+        coverImage,
         featured: articleCount === 0,
         translations: {
           create: {
@@ -195,10 +242,18 @@ async function main() {
 
   // ── RIEPILOGO ─────────────────────────────────────────────────────────────────
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🚀  Ambiente locale pronto!');
+  console.log('🚀  Ambiente locale pronto! — Kaish DBD');
   console.log();
   console.log('  Header da usare nelle richieste HTTP:');
   console.log(`    x-api-key: ${rawApiKey}`);
+  console.log();
+  console.log('  Login admin panel:');
+  console.log(`    Email    : ${adminEmail}`);
+  if (!existingAdmin) {
+    console.log(`    Password : ${rawAdminPassword}`);
+  } else {
+    console.log('    Password : (già impostata in precedenza)');
+  }
   console.log();
   console.log('  Esempio curl:');
   console.log(`    curl -H "x-api-key: ${rawApiKey}" http://localhost:3000/categories`);
