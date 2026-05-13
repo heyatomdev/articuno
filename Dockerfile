@@ -1,4 +1,4 @@
-FROM node:24.13.0-slim AS builder
+FROM node:24.15.0-slim AS builder
 
 ENV NODE_ENV=build
 
@@ -6,7 +6,7 @@ ENV NODE_ENV=build
 WORKDIR /usr/src/app
 
 # Install pnpm and build dependencies
-RUN npm install -g pnpm
+RUN npm install -g pnpm@8.15.0
 
 # Install build deps needed for native modules and prisma generation
 RUN apt-get update && \
@@ -14,8 +14,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install app dependencies (including dev dependencies) for the build
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml .npmrc ./
+RUN pnpm install --no-frozen-lockfile
 
 # Bundle app source
 COPY . .
@@ -28,7 +28,7 @@ RUN pnpm build
 RUN pnpm prune --prod
 
 # Start a fresh runtime image
-FROM node:24.13.0-slim AS prod
+FROM node:24.15.0-slim AS prod
 
 # Set the NODE_ENV to production
 ENV NODE_ENV=production
@@ -38,6 +38,11 @@ WORKDIR /usr/src/app
 
 # Create a non-root user and group with specific UID/GID to match host user
 RUN groupadd -g 1001 app && useradd -u 1001 -g app -m app
+
+# Install runtime dependencies for Sharp image processing
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libvips-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy built artifacts and dependencies from builder with ownership set during copy
 COPY --chown=app:app package.json pnpm-lock.yaml ./
