@@ -8,5 +8,6 @@ import { ModerationModule } from '@/modules/moderation/moderation.module';
   imports: [PrismaModule, ModerationModule],
   controllers: [ReportsController],
   providers: [ReportsService],
+  exports: [ReportsService],
 })
 export class ReportsModule {}

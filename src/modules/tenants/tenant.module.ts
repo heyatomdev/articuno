@@ -13,7 +13,11 @@ export class TenantModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer
             .apply(TenantMiddleware)
-            .exclude({ path: 'health', method: RequestMethod.GET }) // Escludi health check
+            .exclude(
+              { path: 'health', method: RequestMethod.GET },
+              { path: 'admin', method: RequestMethod.ALL },
+              { path: 'admin/(.*)', method: RequestMethod.ALL },
+            )
             .forRoutes('*'); // Applica a tutto il resto
     }
 }

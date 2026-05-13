@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import {CreateReportDto} from "@/modules/reports/dto/create-report.dto";
 import {UpdateReportStatusDto} from "@/modules/reports/dto/update-report.dto";
 import {TenantGuard} from "@/modules/tenants/guards/tenant.guard";
 import {UseGuards} from '@nestjs/common';
 import {GetTenant} from "@/modules/tenants/decorators/get-tenant.decorator";
+import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto';
 
 @Controller('reports')
 @UseGuards(TenantGuard)
@@ -17,8 +18,8 @@ export class ReportsController {
     }
 
     @Get()
-    findAll(@GetTenant() tenant: any, @Query('status') status?: string) {
-        return this.reportsService.findAll(tenant.id, status);
+    findAll(@GetTenant() tenant: any, @Query() query: ReportListQueryDto) {
+        return this.reportsService.findAll(tenant.id, query);
     }
 
     @Patch(':id/status')

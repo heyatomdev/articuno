@@ -10,6 +10,7 @@ import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-q
 import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ContentStatus, TargetType } from '@prisma/client';
+import { limit, PagedResponse } from '@/pagination';
 
 @Injectable()
 export class CommentsService {
@@ -139,23 +140,43 @@ export class CommentsService {
     return comment;
   }
 
-  async findAll(tenantId: string, query: CommentFiltersQueryDto) {
+  async findAll(tenantId: string, query: CommentFiltersQueryDto): Promise<PagedResponse<any>> {
     // Per query pubbliche: mostra solo commenti VISIBLE
     // Se in futuro serve distinguere query private, aggiungere parametro nella DTO
-    return this.prisma.comment.findMany({
-      where: {
-        tenantId,
-        ...(query.articleId && { articleId: query.articleId }),
-        // Filtra solo commenti visibili pubblicamente
-        status: ContentStatus.VISIBLE,
+    const where = {
+      tenantId,
+      ...(query.articleId && { articleId: query.articleId }),
+      // Filtra solo commenti visibili pubblicamente
+      status: ContentStatus.VISIBLE,
+    };
+
+    const [items, totalCount] = await this.prisma.$transaction([
+      this.prisma.comment.findMany({
+        where,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: limit(query),
+        skip: query.offset,
+        include: {
+          author: true,
+        },
+      }),
+      this.prisma.comment.count({ where }),
+    ]);
+
+    const pageSize = query.limit ?? 20;
+    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
+
+    return {
+      items,
+      pagination: {
+        totalCount,
+        currentPage,
+        pageSize,
+        totalPages: Math.ceil(totalCount / pageSize),
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        author: true,
-      },
-    });
+    };
   }
 
   async findOne(tenantId: string, id: string) {

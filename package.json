@@ -1,6 +1,6 @@
 {
   "name": "articuno",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Multi-tenant blog platform with Prisma",
   "main": "index.js",
   "scripts": {
@@ -16,7 +16,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "db:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
   },
   "engines": {
     "npm": ">=10.0.0",
@@ -35,6 +36,7 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.7.0",
     "@willsoto/nestjs-prometheus": "^6.1.0",
+    "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
@@ -96,5 +98,8 @@
       "@nestjs/core",
       "@swc/core"
     ]
+  },
+  "prisma": {
+    "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
   }
 }

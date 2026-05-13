@@ -8,5 +8,6 @@ import {AnalyticsJob} from "@/modules/analytics/analytics.job";
   imports: [PrismaModule],
   controllers: [AnalyticsController],
   providers: [AnalyticsService, AnalyticsJob],
+  exports: [AnalyticsService],
 })
 export class AnalyticsModule {}

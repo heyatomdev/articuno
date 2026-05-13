@@ -2,6 +2,8 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
+import { limit, PagedResponse } from '@/pagination';
+import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
 
 @Injectable()
 export class CategoriesService {
@@ -23,21 +25,42 @@ export class CategoriesService {
     }
   }
 
-  async findAll(tenantId: string) {
-    const categories = await this.prisma.category.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: { articles: true },
-        },
-      },
-    });
+  async findAll(
+    tenantId: string,
+    query: CategoryListQueryDto,
+  ): Promise<PagedResponse<any>> {
+    const where = { tenantId };
 
-    return categories.map(({ _count, ...category }) => ({
-      ...category,
-      articlesCount: _count.articles,
-    }));
+    const [items, totalCount] = await this.prisma.$transaction([
+      this.prisma.category.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit(query),
+        skip: query.offset,
+        include: {
+          _count: {
+            select: { articles: true },
+          },
+        },
+      }),
+      this.prisma.category.count({ where }),
+    ]);
+
+    const pageSize = query.limit ?? 20;
+    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
+
+    return {
+      items: items.map(({ _count, ...category }) => ({
+        ...category,
+        articlesCount: _count.articles,
+      })),
+      pagination: {
+        totalCount,
+        currentPage,
+        pageSize,
+        totalPages: Math.ceil(totalCount / pageSize),
+      },
+    };
   }
 
   async findOne(tenantId: string, id: string) {

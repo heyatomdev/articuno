@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CategoriesService } from '@/modules/categories/categories.service';
@@ -16,6 +17,7 @@ import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
 import { CategoryParamsDto } from '@/modules/categories/dto/category-params.dto';
+import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
 
 @Controller('categories')
 @UseGuards(TenantGuard)
@@ -28,8 +30,8 @@ export class CategoriesController {
   }
 
   @Get()
-  findAll(@GetTenant() tenant: any) {
-    return this.categoriesService.findAll(tenant.id);
+  findAll(@GetTenant() tenant: any, @Query() query: CategoryListQueryDto) {
+    return this.categoriesService.findAll(tenant.id, query);
   }
 
   @Get(':id')

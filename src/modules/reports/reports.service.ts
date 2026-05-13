@@ -2,9 +2,11 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import {CreateReportDto} from "@/modules/reports/dto/create-report.dto";
 import {UpdateReportStatusDto} from "@/modules/reports/dto/update-report.dto";
-import { ContentStatus, Prisma, ReportStatus, TargetType } from '@prisma/client';
+import { ContentStatus, ReportStatus, TargetType } from '@prisma/client';
 import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
+import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto';
+import { limit, PagedResponse } from '@/pagination';
 
 @Injectable()
 export class ReportsService {
@@ -14,8 +16,6 @@ export class ReportsService {
       private moderationPolicy: ModerationPolicyService,
       private webhookPublisher: WebhookEventPublisher,
     ) {}
-
-    // ...existing code...
 
     async create(tenantId: string, dto: CreateReportDto) {
         // 1. Assicurati che l'utente (reporter) esista localmente (Minimal User)
@@ -164,14 +164,34 @@ export class ReportsService {
         });
     }
 
-    async findAll(tenantId: string, status?: string) {
-        return this.prisma.report.findMany({
-            where: {
-                tenantId,
-                ...(status && { status: status as any })
+    async findAll(tenantId: string, query: ReportListQueryDto): Promise<PagedResponse<any>> {
+        const where = {
+            tenantId,
+            ...(query.status && { status: query.status }),
+        };
+
+        const [items, totalCount] = await this.prisma.$transaction([
+            this.prisma.report.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                take: limit(query),
+                skip: query.offset,
+            }),
+            this.prisma.report.count({ where }),
+        ]);
+
+        const pageSize = query.limit ?? 20;
+        const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
+
+        return {
+            items,
+            pagination: {
+                totalCount,
+                currentPage,
+                pageSize,
+                totalPages: Math.ceil(totalCount / pageSize),
             },
-            orderBy: { createdAt: 'desc' },
-        });
+        };
     }
 
     async updateStatus(id: string, tenantId: string, dto: UpdateReportStatusDto) {

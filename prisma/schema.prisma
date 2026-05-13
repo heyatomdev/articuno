@@ -23,17 +23,17 @@ model Tenant {
   apiKey  String  @unique // Hash della chiave (tipo password)
   enabled Boolean @default(true)
 
-  users         User[]
-  categories    Category[]
-  tags          Tag[]
-  articles      Article[]
+  users               User[]
+  categories          Category[]
+  tags                Tag[]
+  articles            Article[]
   articleTranslations ArticleTranslation[]
-  comments      Comment[]
-  dailyStats    DailyStats[]
-  reports       Report[]
-  bannedWords   BannedWord[]
-  notifications Notification[]
-  webhookEvents  WebhookEvent[]
+  comments            Comment[]
+  dailyStats          DailyStats[]
+  reports             Report[]
+  bannedWords         BannedWord[]
+  notifications       Notification[]
+  webhookEvents       WebhookEvent[]
 
   // Configurazione Webhook per notifiche e moderazione
   webhookUrl    String?
@@ -46,15 +46,15 @@ model Tenant {
 }
 
 model WebhookEvent {
-  id       String @id @default(uuid())
-  event    String
-  payload  Json
+  id      String @id @default(uuid())
+  event   String
+  payload Json
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   sentAt      DateTime?
-  attempts    Int      @default(0)
+  attempts    Int       @default(0)
   lastError   String?
   nextRetryAt DateTime?
 
@@ -75,17 +75,53 @@ model User {
   avatarUrl String?
 
   status UserStatus @default(ACTIVE)
+  role   UserRole   @default(MEMBER)
 
   articles      Article[]
   comments      Comment[]
   likes         Like[]
   bookmarks     Bookmark[]
   notifications Notification[]
+  sessions      SessionStorage[]
+
+  adminCredentials AdminCredentials?
 
   createdAt DateTime @default(now())
 
   @@unique([externalId, tenantId])
   @@map("users")
+}
+
+model AdminCredentials {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Email admin (potrebbe essere diversa dall'email dell'app)
+  email String @unique
+
+  // Password hash (bcrypt)
+  password String
+
+  // Autenticazione multi-factor (opzionale)
+  totpSecret  String?
+  totpEnabled Boolean @default(false)
+
+  // Audit
+  lastLoginAt          DateTime?
+  lastPasswordChangeAt DateTime  @default(now())
+  loginAttempts        Int       @default(0)
+  isLockedOut          Boolean   @default(false)
+  lockedUntil          DateTime?
+
+  // Soft delete per disattivare senza cancellare
+  disabledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@map("admin_credentials")
 }
 
 model Category {
@@ -182,8 +218,8 @@ model Comment {
   tenantId  String
   tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  status ContentStatus @default(VISIBLE)
-  reportCount Int @default(0)
+  status      ContentStatus @default(VISIBLE)
+  reportCount Int           @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -293,6 +329,97 @@ model BannedWord {
   @@map("banned_words")
 }
 
+model SessionStorage {
+  id String @id @default(cuid())
+
+  // Chi ha effettuato il login
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId String
+
+  // User snapshot (per performance, non per autorizzazione)
+  userRole   UserRole
+  externalId String
+
+  // Timing
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+  lastAccessedAt DateTime @default(now())
+
+  // Sicurezza
+  ipAddress String?
+  userAgent String?
+
+  @@index([id])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model ApiKey {
+  id String @id @default(uuid())
+
+  // Public identifier
+  keyId  String @unique
+  secret String
+
+  // Metadati
+  name     String // "CI/CD deploy", "External bot"
+  tenantId String
+  userId   String
+
+  // Autorizzazioni
+  scopes String[] // ["articles:write", "reports:read"]
+
+  // Audit
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+
+  // Soft delete
+  revokedAt DateTime?
+
+  @@index([tenantId])
+  @@index([keyId])
+  @@unique([tenantId, keyId])
+  @@map("api_keys")
+}
+
+model AuditLog {
+  // Primary key
+  id String @id @default(uuid())
+
+  // Timing (UTC)
+  timestamp DateTime @default(now())
+
+  // Tenant context (MANDATORY)
+  tenantId String
+
+  // Actor (who did it)
+  actorUserId String // externalId of user who performed action
+  actorRole   UserRole // cached role at time of action (for audit trail)
+
+  // Action details
+  action       AuditAction
+  resourceType AuditResourceType
+  resourceId   String // ID of what was changed (article, user, comment, etc)
+  resourceName String? // optional: name/slug for easier reading (e.g. article title)
+
+  // What changed
+  changesBefore Json? // previous state (optional, depends on action)
+  changesAfter  Json? // new state (optional, depends on action)
+  changeSummary String? // human-readable summary (e.g. "Status: draft → published")
+
+  // Indexes for query performance
+  @@index([tenantId])
+  @@index([tenantId, timestamp])
+  @@index([tenantId, action])
+  @@index([tenantId, actorUserId])
+  @@index([tenantId, resourceId])
+  @@index([timestamp]) // For retention cleanup queries
+  @@map("audit_logs")
+}
+
 enum ReportStatus {
   PENDING
   REVIEWED
@@ -319,4 +446,49 @@ enum UserStatus {
   ACTIVE
   BANNED // L'utente non può più interagire
   SHADOW_BANNED // L'utente interagisce ma nessuno vede i suoi contenuti
+}
+
+enum UserRole {
+  TENANT_ADMIN // Può gestire tutto all'interno del tenant, inclusi utenti e configurazioni
+  EDITOR // Può creare e gestire articoli, ma non utenti o configurazioni
+  MODERATOR // Può gestire commenti e segnalazioni, ma non articoli o utenti
+  MEMBER // Utente normale, può leggere e interagire con i contenuti
+}
+
+enum AuditAction {
+  // User management
+  USER_CREATED
+  USER_UPDATED_ROLE
+  USER_DELETED
+
+  // Article operations
+  ARTICLE_CREATED
+  ARTICLE_UPDATED
+  ARTICLE_DELETED
+  ARTICLE_STATUS_CHANGED // published, draft, archived
+
+  // Comment operations
+  COMMENT_CREATED
+  COMMENT_UPDATED
+  COMMENT_DELETED
+  COMMENT_STATUS_CHANGED // approved, rejected, hidden
+
+  // Reports / Moderation
+  REPORT_CREATED
+  REPORT_STATUS_CHANGED // resolved, dismissed, pending
+
+  // Banned words
+  BANNED_WORD_CREATED
+  BANNED_WORD_DELETED
+
+  // Permission/Role changes (critical)
+  ROLE_ASSIGNMENT_CHANGED
+}
+
+enum AuditResourceType {
+  USER
+  ARTICLE
+  COMMENT
+  REPORT
+  BANNED_WORD
 }
