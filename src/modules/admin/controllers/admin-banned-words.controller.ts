@@ -26,7 +26,10 @@ export class AdminBannedWordsController {
 
   @Post()
   create(@GetSession() session: any, @Body() dto: CreateBannedWordDto) {
-    return this.bannedWordsService.create(session.tenantId, dto);
+    return this.bannedWordsService.create(session.tenantId, dto, {
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+    });
   }
 
   @Get()
@@ -40,7 +43,10 @@ export class AdminBannedWordsController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string, @GetSession() session: any) {
-    await this.bannedWordsService.remove(id, session.tenantId);
+    await this.bannedWordsService.remove(id, session.tenantId, {
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+    });
   }
 }
 
