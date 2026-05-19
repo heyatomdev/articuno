@@ -8,6 +8,7 @@ import { ReportsModule } from '@/modules/reports/reports.module';
 import { AnalyticsModule } from '@/modules/analytics/analytics.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { AuditsModule } from '@/modules/audits/audits.module';
+import { UsersModule } from '@/modules/users/users.module';
 import { AdminArticlesController } from '@/modules/admin/controllers/admin-articles.controller';
 import { AdminTagsController } from '@/modules/admin/controllers/admin-tags.controller';
 import { AdminCategoriesController } from '@/modules/admin/controllers/admin-categories.controller';
@@ -15,6 +16,7 @@ import { AdminBannedWordsController } from '@/modules/admin/controllers/admin-ba
 import { AdminReportsController } from '@/modules/admin/controllers/admin-reports.controller';
 import { AdminStatsController } from '@/modules/admin/controllers/admin-stats.controller';
 import { AdminAuditsController } from '@/modules/admin/controllers/admin-audits.controller';
+import { AdminUsersController } from '@/modules/admin/controllers/admin-users.controller';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { AdminAuditsController } from '@/modules/admin/controllers/admin-audits.
     AnalyticsModule,
     AuthModule,
     AuditsModule,
+    UsersModule,
   ],
   controllers: [
     AdminArticlesController,
@@ -36,6 +39,7 @@ import { AdminAuditsController } from '@/modules/admin/controllers/admin-audits.
     AdminReportsController,
     AdminStatsController,
     AdminAuditsController,
+    AdminUsersController,
   ],
 })
 export class AdminModule {}

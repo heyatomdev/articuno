@@ -24,9 +24,5 @@ export class CreateArticleTranslationDto {
   @IsOptional()
   @IsString()
   metaDescription?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  slug: string;
 }
 

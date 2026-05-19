@@ -4,15 +4,17 @@
  * Crea:
  *  - 1 Tenant "Kaish DBD" con API key in chiaro stampata a schermo
  *  - 4 Categorie DBD
- *  - 3 Utenti + 1 Admin (con AdminCredentials)
+ *  - 7 Utenti (3 base + 4 aggiuntivi con status vari) + 1 Admin
  *  - 6 Articoli DBD (con traduzione IT) distribuiti nelle categorie
+ *  - 4 Report (ARTICLE, COMMENT, USER con stati diversi)
+ *  - 7 Daily Stats (ultimi 7 giorni con contatori realistici)
  *
- * Uso:  pnpm run db:seed
+ *  Uso:  pnpm run db:seed
  */
 import 'dotenv/config';
 import { createHash, randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
-import { PrismaClient, ContentStatus, UserRole } from '@prisma/client';
+import { PrismaClient, ContentStatus, UserRole, UserStatus, ReportStatus, TargetType } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL as string });
@@ -91,11 +93,33 @@ async function main() {
     ),
   );
 
-  console.log(`✅  ${users.length} utenti creati`);
-  users.forEach((u) => console.log(`    • [${u.id}] ${u.username} (externalId: ${u.externalId})`));
-  console.log();
+   console.log(`✅  ${users.length} utenti creati`);
+   users.forEach((u) => console.log(`    • [${u.id}] ${u.username} (externalId: ${u.externalId})`));
+   console.log();
 
-  // ── 3b. ADMIN USER ────────────────────────────────────────────────────────────
+   // ── 3b. UTENTI AGGIUNTIVI CON STATUS DIVERSI ──────────────────────────────────
+   const additionalUsersData = [
+     { externalId: 'user-spammer',      username: 'SpammerBot',    avatarUrl: 'https://i.pravatar.cc/150?u=spammer', status: UserStatus.BANNED },
+     { externalId: 'user-troll',        username: 'TrollKing',     avatarUrl: 'https://i.pravatar.cc/150?u=troll', status: UserStatus.SHADOW_BANNED },
+     { externalId: 'user-contributor',  username: 'ItalianoMD',    avatarUrl: 'https://i.pravatar.cc/150?u=contributor', status: UserStatus.ACTIVE },
+     { externalId: 'user-moderator',    username: 'ModerationAI',  avatarUrl: 'https://i.pravatar.cc/150?u=mod', status: UserStatus.ACTIVE },
+   ];
+
+   const additionalUsers = await Promise.all(
+     additionalUsersData.map((u) =>
+       prisma.user.upsert({
+         where: { externalId_tenantId: { externalId: u.externalId, tenantId: tenant.id } },
+         update: { status: u.status },
+         create: { ...u, tenantId: tenant.id, language: 'it' },
+       }),
+     ),
+   );
+
+   console.log(`✅  ${additionalUsers.length} utenti aggiuntivi creati`);
+   additionalUsers.forEach((u) => console.log(`    • [${u.id}] ${u.username} (status: ${u.status})`));
+   console.log();
+
+   // ── 3b. ADMIN USER ────────────────────────────────────────────────────────────
   const rawAdminPassword = `Admin@${randomBytes(6).toString('hex')}1!`;
   const hashedAdminPassword = await bcrypt.hash(rawAdminPassword, 12);
   const adminEmail = `admin@${tenant.slug}.dev`;
@@ -238,26 +262,146 @@ async function main() {
     articleCount++;
   }
 
-  console.log(`✅  ${articleCount} articoli creati\n`);
+   console.log(`✅  ${articleCount} articoli creati\n`);
 
-  // ── RIEPILOGO ─────────────────────────────────────────────────────────────────
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🚀  Ambiente locale pronto! — Kaish DBD');
-  console.log();
-  console.log('  Header da usare nelle richieste HTTP:');
-  console.log(`    x-api-key: ${rawApiKey}`);
-  console.log();
-  console.log('  Login admin panel:');
-  console.log(`    Email    : ${adminEmail}`);
-  if (!existingAdmin) {
-    console.log(`    Password : ${rawAdminPassword}`);
-  } else {
-    console.log('    Password : (già impostata in precedenza)');
-  }
-  console.log();
-  console.log('  Esempio curl:');
-  console.log(`    curl -H "x-api-key: ${rawApiKey}" http://localhost:3000/categories`);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+   // ── 5. REPORTS ────────────────────────────────────────────────────────────────
+   // Recupera articoli e commenti per i report
+   const articles = await prisma.article.findMany({
+     where: { tenantId: tenant.id },
+     take: 3,
+   });
+
+   const comments = await prisma.comment.findMany({
+     where: { tenantId: tenant.id },
+     take: 2,
+   });
+
+   const reportsData = [
+     {
+       reason: 'OFFENSIVE',
+       description: 'Contenuto offensivo e discriminatorio',
+       status: ReportStatus.PENDING,
+       targetType: TargetType.ARTICLE,
+       targetId: articles[0]?.id,
+       reporterId: 'user-kaish',
+     },
+     {
+       reason: 'SPAM',
+       description: 'Commento contenente link spam',
+       status: ReportStatus.REVIEWED,
+       targetType: TargetType.COMMENT,
+       targetId: comments[0]?.id,
+       reporterId: 'user-wraith',
+       moderatorId: 'user-moderator',
+       moderatorNote: 'Spam confirmed, hidden',
+     },
+     {
+       reason: 'INACCURATE',
+       description: 'Informazioni non verificate e false',
+       status: ReportStatus.RESOLVED,
+       targetType: TargetType.ARTICLE,
+       targetId: articles[1]?.id,
+       reporterId: 'user-nea',
+       moderatorId: 'user-moderator',
+       moderatorNote: 'Content updated with correct information',
+     },
+     {
+       reason: 'HARASSMENT',
+       description: 'Utente molesto e aggressivo',
+       status: ReportStatus.DISMISSED,
+       targetType: TargetType.USER,
+       targetId: additionalUsers[0]?.id, // SpammerBot
+       reporterId: 'user-contributor',
+       moderatorId: 'user-admin',
+       moderatorNote: 'User already BANNED',
+     },
+   ];
+
+   let reportCount = 0;
+   for (const data of reportsData) {
+     if (!data.targetId) continue;
+
+     await prisma.report.upsert({
+       where: {
+         // Usa una combinazione unica per evitare duplicati
+         id: `${data.targetType}-${data.targetId}-${data.reporterId}`.slice(0, 36),
+       },
+       update: {},
+       create: {
+         ...data,
+         tenantId: tenant.id,
+       },
+     });
+     reportCount++;
+   }
+
+   console.log(`✅  ${reportCount} report creati`);
+   console.log(`    • 1 PENDING - Articolo offensivo`);
+   console.log(`    • 1 REVIEWED - Commento spam`);
+   console.log(`    • 1 RESOLVED - Articolo con info inesatte`);
+   console.log(`    • 1 DISMISSED - Utente molesto\n`);
+
+   // ── 6. DAILY STATS ────────────────────────────────────────────────────────────
+   const today = new Date();
+   today.setHours(0, 0, 0, 0);
+
+   const dailyStatsData = [];
+   for (let i = 6; i >= 0; i--) {
+     const date = new Date(today);
+     date.setDate(date.getDate() - i);
+
+     dailyStatsData.push({
+       date,
+       articlesPublished: Math.floor(Math.random() * 5) + 1, // 1-5 articoli al giorno
+       totalViews: Math.floor(Math.random() * 500) + 100, // 100-600 visualizzazioni
+       totalLikes: Math.floor(Math.random() * 150) + 20, // 20-170 like
+       totalComments: Math.floor(Math.random() * 50) + 5, // 5-55 commenti
+       totalBookmarks: Math.floor(Math.random() * 30) + 2, // 2-32 preferiti
+     });
+   }
+
+   let statsCount = 0;
+   for (const data of dailyStatsData) {
+     await prisma.dailyStats.upsert({
+       where: {
+         date_tenantId: { date: data.date, tenantId: tenant.id },
+       },
+       update: {},
+       create: {
+         ...data,
+         tenantId: tenant.id,
+       },
+     });
+     statsCount++;
+   }
+
+   console.log(`✅  ${statsCount} statistiche giornaliere create (ultimi 7 giorni)\n`);
+
+   // ── RIEPILOGO ─────────────────────────────────────────────────────────────────
+   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+   console.log('🚀  Ambiente locale pronto! — Kaish DBD');
+   console.log();
+   console.log('📊 DATA CREATI:');
+   console.log(`    • 1 Tenant con ${categories.length} categorie`);
+   console.log(`    • ${users.length + additionalUsers.length + 1} Utenti (base + aggiuntivi con status vari + admin)`);
+   console.log(`    • ${articleCount} Articoli (DBD content)`);
+   console.log(`    • ${reportCount} Report (ARTICLE, COMMENT, USER - stati vari)`);
+   console.log(`    • ${statsCount} Daily Stats (ultimi 7 giorni con contatori realistici)`);
+   console.log();
+   console.log('  Header da usare nelle richieste HTTP:');
+   console.log(`    x-api-key: ${rawApiKey}`);
+   console.log();
+   console.log('  Login admin panel:');
+   console.log(`    Email    : ${adminEmail}`);
+   if (!existingAdmin) {
+     console.log(`    Password : ${rawAdminPassword}`);
+   } else {
+     console.log('    Password : (già impostata in precedenza)');
+   }
+   console.log();
+   console.log('  Esempio curl:');
+   console.log(`    curl -H "x-api-key: ${rawApiKey}" http://localhost:3000/categories`);
+   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 }
 
 main()

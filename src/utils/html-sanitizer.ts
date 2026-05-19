@@ -1,4 +1,4 @@
-import sanitizeHtml from 'sanitize-html';
+import sanitizeHtml = require('sanitize-html');
 /**
  * Sanitizes an HTML string by removing dangerous tags (script, iframe, object,
  * embed, form, …) and unsafe attributes (onclick, onerror, style with
@@ -58,4 +58,3 @@ export function sanitizeContent(html: string): string {
     enforceHtmlBoundary: false,
   });
 }
-

@@ -16,7 +16,7 @@ import { SessionGuard } from '@/modules/auth/guards/session.guard';
 import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
-import { ArticleParamsDto, ArticleSlugParamsDto } from '@/modules/articles/dto/article-params.dto';
+import { ArticleParamsDto } from '@/modules/articles/dto/article-params.dto';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
@@ -37,9 +37,9 @@ export class AdminArticlesController {
     return this.articlesService.findAll(session.tenantId, query);
   }
 
-  @Get(':slug')
-  findOne(@GetSession() session: any, @Param() params: ArticleSlugParamsDto) {
-    return this.articlesService.findOne(session.tenantId, params.slug);
+  @Get(':id')
+  findOne(@GetSession() session: any, @Param() params: ArticleParamsDto) {
+    return this.articlesService.findOneById(session.tenantId, params.id);
   }
 
   @Patch(':id')
@@ -110,4 +110,3 @@ export class AdminArticlesController {
     );
   }
 }
-

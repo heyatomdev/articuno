@@ -21,10 +21,45 @@ export class ArticlesService {
   private static readonly AUTO_MODERATION_REASON = 'BANNED_WORD_DETECTED';
 
   private readonly articleIncludes = {
-    category: true,
-    author: true,
-    tags: true,
+    category: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        color: true,
+      }
+    },
+    author: {
+      select: {
+        id: true,
+        username: true,
+        externalId: true,
+        status: true,
+        role: true,
+      }
+    },
+    tags: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      }
+    },
     translations: {
+      orderBy: { languageCode: 'asc' as const },
+    },
+  };
+
+  private readonly articleListIncludes = {
+    ...this.articleIncludes,
+    translations: {
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        languageCode: true,
+      },
       orderBy: { languageCode: 'asc' as const },
     },
   };
@@ -70,10 +105,12 @@ export class ArticlesService {
     });
   }
 
-  private sanitizeTranslation<T extends { content: string; excerpt?: string; slug: string }>(translation: T): T {
+  private sanitizeTranslation<T extends { title: string; content: string; excerpt?: string }>(
+    translation: T,
+  ): T & { slug: string } {
     return {
       ...translation,
-      slug: slugifySafe(translation.slug),
+      slug: slugifySafe(translation.title),
       content: sanitizeContent(translation.content),
       ...(translation.excerpt !== undefined ? { excerpt: sanitizeContent(translation.excerpt) } : {}),
     };
@@ -225,7 +262,7 @@ export class ArticlesService {
         orderBy: { createdAt: 'desc' },
         take: limit(query),
         skip: query.offset,
-        include: this.articleIncludes,
+        include: this.articleListIncludes,
       }),
       this.prisma.article.count({ where }),
     ]);
@@ -254,6 +291,22 @@ export class ArticlesService {
             slug,
           },
         },
+      },
+      include: this.articleIncludes,
+    });
+
+    if (!article) {
+      throw new NotFoundException('Articolo non trovato');
+    }
+
+    return article;
+  }
+
+  async findOneById(tenantId: string, id: string) {
+    const article = await this.prisma.article.findFirst({
+      where: {
+        tenantId,
+        id,
       },
       include: this.articleIncludes,
     });
@@ -377,6 +430,12 @@ export class ArticlesService {
         articleId,
         tenantId,
       },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        languageCode: true,
+      },
       orderBy: { languageCode: 'asc' },
     });
   }
@@ -410,11 +469,15 @@ export class ArticlesService {
       ? await this.bannedWordsService.checkText(tenantId, textToCheck)
       : false;
 
-    const sanitizedDto: UpdateArticleTranslationDto = {
+    const sanitizedDto: UpdateArticleTranslationDto & { slug?: string } = {
       ...dto,
       ...(dto.content !== undefined ? { content: sanitizeContent(dto.content) } : {}),
       ...(dto.excerpt !== undefined ? { excerpt: sanitizeContent(dto.excerpt) } : {}),
     };
+
+    if (dto.title !== undefined && dto.title !== translation.title) {
+      sanitizedDto.slug = slugifySafe(dto.title);
+    }
 
     try {
       const updatedTranslation = await this.prisma.articleTranslation.update({
@@ -453,4 +516,3 @@ export class ArticlesService {
     }
   }
 }
-

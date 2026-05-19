@@ -5,9 +5,4 @@ export class UpdateTagDto {
   @IsString()
   @IsNotEmpty()
   name?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  slug?: string;
 }
