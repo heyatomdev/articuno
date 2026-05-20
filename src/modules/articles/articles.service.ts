@@ -9,6 +9,7 @@ import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-q
 import { ContentStatus, Prisma } from '@prisma/client';
 import { sanitizeContent } from '@/utils/html-sanitizer';
 import { slugifySafe } from '@/utils/slugify';
+import { generateRandomName } from '@/utils/random-name';
 import { limit, PagedResponse } from '@/pagination';
 
 @Injectable()
@@ -200,10 +201,25 @@ export class ArticlesService {
     }
 
     const requestedStatus = dto.status ?? ContentStatus.DRAFT;
-    const hasBannedWords = await this.hasBannedWordsInTranslations(tenantId, dto.translations);
+
+    // Se nessuna traduzione è fornita, genera una traduzione italiana di default
+    // con un titolo casuale in stile Docker (es. "brillante_turing")
+    const translationsInput =
+      dto.translations && dto.translations.length > 0
+        ? dto.translations
+        : [
+            {
+              languageCode: 'it',
+              title: generateRandomName(),
+              content: '',
+              excerpt: '',
+            },
+          ];
+
+    const hasBannedWords = await this.hasBannedWordsInTranslations(tenantId, translationsInput);
     const finalStatus = hasBannedWords ? ContentStatus.HIDDEN : requestedStatus;
 
-    const sanitizedTranslations = dto.translations?.map((t) => this.sanitizeTranslation(t));
+    const sanitizedTranslations = translationsInput.map((t) => this.sanitizeTranslation(t));
 
     try {
       return await this.prisma.article.create({
@@ -219,14 +235,12 @@ export class ArticlesService {
                 connect: dto.tagIds.map((id) => ({ id })),
               }
             : undefined,
-          translations: sanitizedTranslations
-            ? {
-                create: sanitizedTranslations.map((translation) => ({
-                  ...translation,
-                  tenantId,
-                })),
-              }
-            : undefined,
+          translations: {
+              create: sanitizedTranslations.map((translation) => ({
+                ...translation,
+                tenantId,
+              })),
+            },
         },
         include: this.articleIncludes,
       });

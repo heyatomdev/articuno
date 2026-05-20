@@ -94,9 +94,12 @@ export class AdminArticlesController {
   async create(
     @GetSession() session: any,
     @Body('data') rawData: string,
+    @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const dto = await this.parseAndValidateDto(CreateArticleDto, rawData);
+    // Support both multipart/form-data (data field as JSON string) and application/json
+    const payload = rawData ?? (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
+    const dto = await this.parseAndValidateDto(CreateArticleDto, payload);
 
     if (file) {
       const config = await this.getFileHarborConfig(session.tenantId);
@@ -135,9 +138,12 @@ export class AdminArticlesController {
     @GetSession() session: any,
     @Param() params: ArticleParamsDto,
     @Body('data') rawData: string,
+    @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const dto = await this.parseAndValidateDto(UpdateArticleDto, rawData);
+    // Support both multipart/form-data (data field as JSON string) and application/json
+    const payload = rawData ?? (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
+    const dto = await this.parseAndValidateDto(UpdateArticleDto, payload);
 
     if (file) {
       const config = await this.getFileHarborConfig(session.tenantId);
