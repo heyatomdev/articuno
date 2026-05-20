@@ -6,6 +6,7 @@ import {limit, PagedResponse} from "@/pagination";
 import {TagsListQuery} from "@/modules/tags/queries/tags.query";
 import {TagDto} from "@/modules/tags/dto/tags.dto";
 import {plainToInstance} from "class-transformer";
+import {slugifySafe} from '@/utils/slugify';
 
 @Injectable()
 export class TagsService {
@@ -20,7 +21,8 @@ export class TagsService {
       return await this.prisma.tag.create({
         data: {
           tenantId,
-          ...dto,
+          name: dto.name,
+          slug: slugifySafe(dto.name),
         },
       });
     } catch (error) {
@@ -119,12 +121,20 @@ export class TagsService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateTagDto) {
-    await this.findOne(tenantId, id);
+    const existingTag = await this.findOne(tenantId, id);
+
+    const data: UpdateTagDto & { slug?: string } = {};
+    if (dto.name !== undefined) {
+      data.name = dto.name;
+      if (dto.name !== existingTag.name) {
+        data.slug = slugifySafe(dto.name);
+      }
+    }
 
     try {
       return await this.prisma.tag.update({
         where: { id },
-        data: dto,
+        data,
       });
     } catch (error) {
       if (error.code === 'P2002') {

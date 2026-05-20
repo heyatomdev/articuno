@@ -39,6 +39,10 @@ model Tenant {
   webhookUrl    String?
   webhookSecret String?
 
+  // Fileharbor storage configuration
+  fileharborEndpoint String?
+  fileharborApiKey   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -450,6 +454,7 @@ enum UserStatus {
 
 enum UserRole {
   TENANT_ADMIN // Può gestire tutto all'interno del tenant, inclusi utenti e configurazioni
+  SUPER_MODERATOR // Può gestire contenuti e moderazione, ma non utenti o configurazioni
   EDITOR // Può creare e gestire articoli, ma non utenti o configurazioni
   MODERATOR // Può gestire commenti e segnalazioni, ma non articoli o utenti
   MEMBER // Utente normale, può leggere e interagire con i contenuti
@@ -473,6 +478,16 @@ enum AuditAction {
   COMMENT_DELETED
   COMMENT_STATUS_CHANGED // approved, rejected, hidden
 
+  // Category management
+  CATEGORY_CREATED
+  CATEGORY_UPDATED
+  CATEGORY_DELETED
+
+  // Tag management
+  TAG_CREATED
+  TAG_UPDATED
+  TAG_DELETED
+
   // Reports / Moderation
   REPORT_CREATED
   REPORT_STATUS_CHANGED // resolved, dismissed, pending
@@ -491,4 +506,6 @@ enum AuditResourceType {
   COMMENT
   REPORT
   BANNED_WORD
+  TAG
+  CATEGORY
 }

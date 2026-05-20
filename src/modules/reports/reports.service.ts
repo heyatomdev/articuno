@@ -194,6 +194,18 @@ export class ReportsService {
         };
     }
 
+    async findOne(id: string, tenantId: string) {
+        const report = await this.prisma.report.findFirst({
+            where: { id, tenantId },
+        });
+
+        if (!report) {
+            throw new NotFoundException('Report non trovato');
+        }
+
+        return report;
+    }
+
     async updateStatus(id: string, tenantId: string, dto: UpdateReportStatusDto) {
         const report = await this.prisma.report.findFirst({
             where: { id, tenantId },

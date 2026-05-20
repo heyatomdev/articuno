@@ -8,11 +8,6 @@ export class UpdateCategoryDto {
 
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  slug?: string;
-
-  @IsOptional()
-  @IsString()
   description?: string;
 
   @IsOptional()

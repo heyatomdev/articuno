@@ -4,6 +4,7 @@ import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto'
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
 import { limit, PagedResponse } from '@/pagination';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
+import { slugifySafe } from '@/utils/slugify';
 
 @Injectable()
 export class CategoriesService {
@@ -15,6 +16,7 @@ export class CategoriesService {
         data: {
           tenantId,
           ...dto,
+          slug: slugifySafe(dto.name),
         },
       });
     } catch (error) {
@@ -76,12 +78,17 @@ export class CategoriesService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateCategoryDto) {
-    await this.findOne(tenantId, id);
+    const existingCategory = await this.findOne(tenantId, id);
+
+    const data: UpdateCategoryDto & { slug?: string } = { ...dto };
+    if (dto.name !== undefined && dto.name !== existingCategory.name) {
+      data.slug = slugifySafe(dto.name);
+    }
 
     try {
       return await this.prisma.category.update({
         where: { id },
-        data: dto,
+        data,
       });
     } catch (error) {
       if (error.code === 'P2002') {

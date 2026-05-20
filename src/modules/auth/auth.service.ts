@@ -33,6 +33,15 @@ export class AuthService {
     private readonly passwordService: PasswordService,
   ) {}
 
+  private maskEmail(email: string): string {
+    const [localPart, domain] = email.split('@');
+    if (!domain || localPart.length === 0) {
+      return email; // fallback if email format is invalid
+    }
+    const firstChar = localPart[0];
+    return `${firstChar}***@${domain}`;
+  }
+
   async login(dto: LoginDto, context: LoginContext) {
     const now = new Date();
     const credentials = await this.prisma.adminCredentials.findUnique({
@@ -137,44 +146,134 @@ export class AuthService {
     };
   }
 
-  async getMe(session: AuthSessionContext): Promise<MeResponseDto> {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        id: session.userId,
-        tenantId: session.tenantId,
-      },
-      include: {
-        tenant: true,
-        adminCredentials: {
-          select: {
-            email: true,
-          },
-        },
-      },
-    });
+   async getMe(session: AuthSessionContext): Promise<MeResponseDto> {
+     const user = await this.prisma.user.findFirst({
+       where: {
+         id: session.userId,
+         tenantId: session.tenantId,
+       },
+       include: {
+         tenant: true,
+         adminCredentials: {
+           select: {
+             email: true,
+             totpEnabled: true,
+             lastLoginAt: true,
+             lastPasswordChangeAt: true,
+             createdAt: true,
+             updatedAt: true,
+           },
+         },
+       },
+     });
 
-    if (!user) {
-      throw new NotFoundException('Utente non trovato');
-    }
+     if (!user) {
+       throw new NotFoundException('Utente non trovato');
+     }
 
-    if (!user.adminCredentials) {
-      throw new ForbiddenException('Accesso admin non disponibile');
-    }
+     if (!user.adminCredentials) {
+       throw new ForbiddenException('Accesso admin non disponibile');
+     }
 
-    return {
-      id: user.id,
-      tenantId: user.tenantId,
-      externalId: user.externalId,
-      email: user.adminCredentials.email,
-      role: user.role,
-      status: user.status,
-      language: user.language,
-      username: user.username,
-      avatarUrl: user.avatarUrl,
-      session: {
-        id: session.id,
-        expiresAt: session.expiresAt,
-      },
-    };
-  }
-}
+     return {
+       id: user.id,
+       tenantId: user.tenantId,
+       externalId: user.externalId,
+       email: this.maskEmail(user.adminCredentials.email),
+       role: user.role,
+       status: user.status,
+       language: user.language,
+       username: user.username,
+       avatarUrl: user.avatarUrl,
+       totpEnabled: user.adminCredentials.totpEnabled,
+       lastLoginAt: user.adminCredentials.lastLoginAt,
+       lastPasswordChangeAt: user.adminCredentials.lastPasswordChangeAt,
+       credentialsCreatedAt: user.adminCredentials.createdAt,
+       credentialsUpdatedAt: user.adminCredentials.updatedAt,
+       session: {
+         id: session.id,
+         expiresAt: session.expiresAt,
+       },
+     };
+   }
+
+   async updateEmail(session: AuthSessionContext, newEmail: string, password: string): Promise<void> {
+     const credentials = await this.prisma.adminCredentials.findUnique({
+       where: {
+         userId: session.userId,
+       },
+     });
+
+     if (!credentials) {
+       throw new NotFoundException('Credenziali admin non trovate');
+     }
+
+     const isPasswordValid = await this.passwordService.comparePassword(
+       password,
+       credentials.password,
+     );
+
+     if (!isPasswordValid) {
+       throw new UnauthorizedException('Password non valida');
+     }
+
+     // Check if email is already in use
+     const existingEmail = await this.prisma.adminCredentials.findUnique({
+       where: { email: newEmail },
+     });
+
+     if (existingEmail && existingEmail.id !== credentials.id) {
+       throw new ForbiddenException('Email già in uso');
+     }
+
+     await this.prisma.adminCredentials.update({
+       where: { id: credentials.id },
+       data: { email: newEmail },
+     });
+   }
+
+   async updatePassword(
+     session: AuthSessionContext,
+     currentPassword: string,
+     newPassword: string,
+     confirmPassword: string,
+   ): Promise<void> {
+     if (newPassword !== confirmPassword) {
+       throw new ForbiddenException('Le password non corrispondono');
+     }
+
+     const credentials = await this.prisma.adminCredentials.findUnique({
+       where: {
+         userId: session.userId,
+       },
+     });
+
+     if (!credentials) {
+       throw new NotFoundException('Credenziali admin non trovate');
+     }
+
+     const isPasswordValid = await this.passwordService.comparePassword(
+       currentPassword,
+       credentials.password,
+     );
+
+     if (!isPasswordValid) {
+       throw new UnauthorizedException('Password attuale non valida');
+     }
+
+     const passwordStrength = this.passwordService.validatePasswordStrength(newPassword);
+     if (!passwordStrength.isValid) {
+       throw new ForbiddenException(passwordStrength.errors.join(', '));
+     }
+
+     const hashedPassword = await this.passwordService.hashPassword(newPassword);
+
+     await this.prisma.adminCredentials.update({
+       where: { id: credentials.id },
+       data: {
+         password: hashedPassword,
+         lastPasswordChangeAt: new Date(),
+       },
+     });
+   }
+ }
