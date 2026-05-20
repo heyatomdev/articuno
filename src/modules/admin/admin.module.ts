@@ -9,6 +9,7 @@ import { AnalyticsModule } from '@/modules/analytics/analytics.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { AuditsModule } from '@/modules/audits/audits.module';
 import { UsersModule } from '@/modules/users/users.module';
+import { FileHarborModule } from '@/modules/fileharbor/fileharbor.module';
 import { AdminArticlesController } from '@/modules/admin/controllers/admin-articles.controller';
 import { AdminTagsController } from '@/modules/admin/controllers/admin-tags.controller';
 import { AdminCategoriesController } from '@/modules/admin/controllers/admin-categories.controller';
@@ -30,6 +31,7 @@ import { AdminUsersController } from '@/modules/admin/controllers/admin-users.co
     AuthModule,
     AuditsModule,
     UsersModule,
+    FileHarborModule,
   ],
   controllers: [
     AdminArticlesController,
