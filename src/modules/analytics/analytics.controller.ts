@@ -1,8 +1,8 @@
 import { Controller, Get, Query, Req } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
-import {UseGuards} from '@nestjs/common';
-import {SessionGuard} from "@/modules/auth/guards/session.guard";
-import {GetSession} from "@/modules/auth/decorators/get-session.decorator";
+import { UseGuards } from '@nestjs/common';
+import { SessionGuard } from "@/modules/auth/guards/session.guard";
+import { GetSession } from "@/modules/auth/decorators/get-session.decorator";
 
 @Controller('admin/stats')
 @UseGuards(SessionGuard)

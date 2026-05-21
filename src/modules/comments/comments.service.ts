@@ -157,7 +157,24 @@ export class CommentsService {
         orderBy: { createdAt: 'desc' },
         take: limit(query),
         skip: query.offset,
-        include: { author: true },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+            }
+          },
+          author: {
+            select: {
+              id: true,
+              status: true,
+              role: true,
+              createdAt: true,
+              username: true,
+              avatarUrl: true,
+            }
+          }
+        },
       }),
       this.prisma.comment.count({ where }),
     ]);

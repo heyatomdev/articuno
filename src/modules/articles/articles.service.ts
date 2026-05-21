@@ -50,6 +50,11 @@ export class ArticlesService {
     translations: {
       orderBy: { languageCode: 'asc' as const },
     },
+    _count: {
+      select: {
+        commentsList: true as const,
+      },
+    },
   };
 
   private readonly articleListIncludes = {
