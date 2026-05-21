@@ -140,27 +140,24 @@ export class CommentsService {
     return comment;
   }
 
-  async findAll(tenantId: string, query: CommentFiltersQueryDto): Promise<PagedResponse<any>> {
-    // Per query pubbliche: mostra solo commenti VISIBLE
-    // Se in futuro serve distinguere query private, aggiungere parametro nella DTO
+  async findAll(
+    tenantId: string,
+    query: CommentFiltersQueryDto,
+    status?: ContentStatus,
+  ): Promise<PagedResponse<any>> {
     const where = {
       tenantId,
       ...(query.articleId && { articleId: query.articleId }),
-      // Filtra solo commenti visibili pubblicamente
-      status: ContentStatus.VISIBLE,
+      ...(status && { status }),
     };
 
     const [items, totalCount] = await this.prisma.$transaction([
       this.prisma.comment.findMany({
         where,
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: { createdAt: 'desc' },
         take: limit(query),
         skip: query.offset,
-        include: {
-          author: true,
-        },
+        include: { author: true },
       }),
       this.prisma.comment.count({ where }),
     ]);
@@ -179,11 +176,12 @@ export class CommentsService {
     };
   }
 
-  async findOne(tenantId: string, id: string) {
+  async findOne(tenantId: string, id: string, status?: ContentStatus) {
     const comment = await this.prisma.comment.findFirst({
       where: {
         id,
         tenantId,
+        ...(status && { status }),
       },
       include: {
         author: true,

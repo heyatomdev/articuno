@@ -18,6 +18,7 @@ import { CreateCommentDto } from '@/modules/comments/dto/create-comment.dto';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
 import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
+import { ContentStatus } from '@prisma/client';
 
 @Controller('comments')
 @UseGuards(TenantGuard)
@@ -31,12 +32,12 @@ export class CommentsController {
 
   @Get()
   findAll(@GetTenant() tenant: any, @Query() query: CommentFiltersQueryDto) {
-    return this.commentsService.findAll(tenant.id, query);
+    return this.commentsService.findAll(tenant.id, query, ContentStatus.VISIBLE);
   }
 
   @Get(':id')
   findOne(@GetTenant() tenant: any, @Param() params: CommentParamsDto) {
-    return this.commentsService.findOne(tenant.id, params.id);
+    return this.commentsService.findOne(tenant.id, params.id, ContentStatus.VISIBLE);
   }
 
   @Patch(':id')

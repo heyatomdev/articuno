@@ -18,6 +18,8 @@ import { AdminReportsController } from '@/modules/admin/controllers/admin-report
 import { AdminStatsController } from '@/modules/admin/controllers/admin-stats.controller';
 import { AdminAuditsController } from '@/modules/admin/controllers/admin-audits.controller';
 import { AdminUsersController } from '@/modules/admin/controllers/admin-users.controller';
+import { AdminCommentsController } from '@/modules/admin/controllers/admin-comments.controller';
+import { CommentsModule } from '@/modules/comments/comments.module';
 
 @Module({
   imports: [
@@ -32,6 +34,7 @@ import { AdminUsersController } from '@/modules/admin/controllers/admin-users.co
     AuditsModule,
     UsersModule,
     FileHarborModule,
+    CommentsModule,
   ],
   controllers: [
     AdminArticlesController,
@@ -42,6 +45,7 @@ import { AdminUsersController } from '@/modules/admin/controllers/admin-users.co
     AdminStatsController,
     AdminAuditsController,
     AdminUsersController,
+    AdminCommentsController,
   ],
 })
 export class AdminModule {}
