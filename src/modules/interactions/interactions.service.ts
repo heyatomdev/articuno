@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
+import { PagedQuery, limit } from '@/pagination';
 
 @Injectable()
 export class InteractionsService {
@@ -167,7 +168,7 @@ export class InteractionsService {
     };
   }
 
-  async getMyBookmarks(tenantId: string, externalUserId: string) {
+  async getMyBookmarks(tenantId: string, externalUserId: string, query: PagedQuery) {
     const user = await this.prisma.user.findFirst({
       where: {
         externalId: externalUserId,
@@ -179,29 +180,50 @@ export class InteractionsService {
     });
 
     if (!user) {
-      return [];
+      return {
+        items: [],
+        pagination: {
+          totalCount: 0,
+          currentPage: 0,
+          pageSize: limit(query),
+          totalPages: 0,
+        },
+      };
     }
 
-    return this.prisma.bookmark.findMany({
-      where: {
-        userId: user.id,
-        tenantId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        article: {
-          include: {
-            category: true,
-            tags: true,
-            translations: {
-              orderBy: { languageCode: 'asc' },
+    const pageSize = limit(query);
+    const where = { userId: user.id, tenantId };
+
+    const [totalCount, items] = await this.prisma.$transaction([
+      this.prisma.bookmark.count({ where }),
+      this.prisma.bookmark.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: query.offset,
+        take: pageSize,
+        include: {
+          article: {
+            include: {
+              category: true,
+              tags: true,
+              translations: {
+                orderBy: { languageCode: 'asc' },
+              },
             },
           },
         },
+      }),
+    ]);
+
+    return {
+      items,
+      pagination: {
+        totalCount,
+        currentPage: Math.floor(query.offset / pageSize),
+        pageSize,
+        totalPages: Math.ceil(totalCount / pageSize),
       },
-    });
+    };
   }
 }
 
