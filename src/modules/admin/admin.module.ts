@@ -5,7 +5,6 @@ import { TagsModule } from '@/modules/tags/tags.module';
 import { CategoriesModule } from '@/modules/categories/categories.module';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
 import { ReportsModule } from '@/modules/reports/reports.module';
-import { AnalyticsModule } from '@/modules/analytics/analytics.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { AuditsModule } from '@/modules/audits/audits.module';
 import { UsersModule } from '@/modules/users/users.module';
@@ -15,7 +14,6 @@ import { AdminTagsController } from '@/modules/admin/controllers/admin-tags.cont
 import { AdminCategoriesController } from '@/modules/admin/controllers/admin-categories.controller';
 import { AdminBannedWordsController } from '@/modules/admin/controllers/admin-banned-words.controller';
 import { AdminReportsController } from '@/modules/admin/controllers/admin-reports.controller';
-import { AdminStatsController } from '@/modules/admin/controllers/admin-stats.controller';
 import { AdminAuditsController } from '@/modules/admin/controllers/admin-audits.controller';
 import { AdminUsersController } from '@/modules/admin/controllers/admin-users.controller';
 import { AdminCommentsController } from '@/modules/admin/controllers/admin-comments.controller';
@@ -29,7 +27,6 @@ import { CommentsModule } from '@/modules/comments/comments.module';
     CategoriesModule,
     BannedWordsModule,
     ReportsModule,
-    AnalyticsModule,
     AuthModule,
     AuditsModule,
     UsersModule,
@@ -42,7 +39,6 @@ import { CommentsModule } from '@/modules/comments/comments.module';
     AdminCategoriesController,
     AdminBannedWordsController,
     AdminReportsController,
-    AdminStatsController,
     AdminAuditsController,
     AdminUsersController,
     AdminCommentsController,
