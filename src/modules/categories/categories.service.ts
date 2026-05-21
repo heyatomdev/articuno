@@ -77,6 +77,18 @@ export class CategoriesService {
     return category;
   }
 
+  async findOneBySlug(tenantId: string, slug: string) {
+    const category = await this.prisma.category.findFirst({
+      where: { slug, tenantId },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Categoria non trovata');
+    }
+
+    return category;
+  }
+
   async update(tenantId: string, id: string, dto: UpdateCategoryDto) {
     const existingCategory = await this.findOne(tenantId, id);
 

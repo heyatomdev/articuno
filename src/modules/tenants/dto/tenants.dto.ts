@@ -53,10 +53,18 @@ export class TenantDto {
   @IsOptional()
   defaultLanguage?: string;
 
+  @ApiPropertyOptional({
+    description: 'Timestamp when the tenant was created',
+    example: '2026-01-15T10:23:00.000Z',
+  })
   @Expose()
   @IsOptional()
   createdAt?: Date;
 
+  @ApiPropertyOptional({
+    description: 'Timestamp when the tenant was last updated',
+    example: '2026-03-22T08:45:00.000Z',
+  })
   @Expose()
   @IsOptional()
   updatedAt?: Date;
