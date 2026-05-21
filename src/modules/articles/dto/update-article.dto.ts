@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
 import { ContentStatus } from '@prisma/client';
 
@@ -20,6 +21,11 @@ export class UpdateArticleDto {
   status?: ContentStatus;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   @IsBoolean()
   featured?: boolean;
 
