@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/modules/prisma/prisma.module';
 import { ArticlesModule } from '@/modules/articles/articles.module';
+import { ArticleTranslationsModule } from '@/modules/article-translations/article-translations.module';
 import { TagsModule } from '@/modules/tags/tags.module';
 import { CategoriesModule } from '@/modules/categories/categories.module';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
@@ -23,6 +24,7 @@ import { CommentsModule } from '@/modules/comments/comments.module';
   imports: [
     PrismaModule,
     ArticlesModule,
+    ArticleTranslationsModule,
     TagsModule,
     CategoriesModule,
     BannedWordsModule,

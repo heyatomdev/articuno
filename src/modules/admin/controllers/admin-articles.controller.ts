@@ -28,6 +28,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { ArticlesService } from '@/modules/articles/articles.service';
+import { ArticleTranslationsService } from '@/modules/article-translations/article-translations.service';
 import { SessionGuard } from '@/modules/auth/guards/session.guard';
 import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
@@ -50,6 +51,7 @@ import { AuditAction, AuditResourceType } from '@prisma/client';
 export class AdminArticlesController {
   constructor(
     private readonly articlesService: ArticlesService,
+    private readonly articleTranslationsService: ArticleTranslationsService,
     private readonly fileHarborService: FileHarborService,
     private readonly prisma: PrismaService,
     private readonly auditLogger: AuditLoggerService,
@@ -334,7 +336,7 @@ export class AdminArticlesController {
     @Param() params: ArticleParamsDto,
     @Body() dto: CreateArticleTranslationDto,
   ) {
-    const translation = await this.articlesService.createTranslation(session.tenantId, params.id, dto);
+    const translation = await this.articleTranslationsService.create(session.tenantId, params.id, dto);
 
     await this.auditLogger.log({
       tenantId: session.tenantId,
@@ -360,7 +362,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   findTranslations(@GetSession() session: any, @Param() params: ArticleParamsDto) {
-    return this.articlesService.findTranslations(session.tenantId, params.id);
+    return this.articleTranslationsService.findAll(session.tenantId, params.id);
   }
 
   @Get(':id/translations/:languageCode')
@@ -377,7 +379,7 @@ export class AdminArticlesController {
     @GetSession() session: any,
     @Param() params: ArticleTranslationParamsDto,
   ) {
-    return this.articlesService.findTranslation(
+    return this.articleTranslationsService.findOne(
       session.tenantId,
       params.id,
       params.languageCode,
@@ -401,7 +403,7 @@ export class AdminArticlesController {
     @Param() params: ArticleTranslationParamsDto,
     @Body() dto: UpdateArticleTranslationDto,
   ) {
-    const translation = await this.articlesService.updateTranslation(
+    const translation = await this.articleTranslationsService.update(
       session.tenantId,
       params.id,
       params.languageCode,
@@ -437,7 +439,7 @@ export class AdminArticlesController {
     @GetSession() session: any,
     @Param() params: ArticleTranslationParamsDto,
   ) {
-    await this.articlesService.removeTranslation(
+    await this.articleTranslationsService.remove(
       session.tenantId,
       params.id,
       params.languageCode,

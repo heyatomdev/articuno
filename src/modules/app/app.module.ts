@@ -14,6 +14,7 @@ import { TenantModule } from '@/modules/tenants/tenant.module';
 import { CategoriesModule } from '@/modules/categories/categories.module';
 import { TagsModule } from '@/modules/tags/tags.module';
 import { ArticlesModule } from '@/modules/articles/articles.module';
+import { ArticleTranslationsModule } from '@/modules/article-translations/article-translations.module';
 import { InteractionsModule } from '@/modules/interactions/interactions.module';
 import { CommentsModule } from '@/modules/comments/comments.module';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
@@ -54,6 +55,7 @@ import { AdminModule } from '@/modules/admin/admin.module';
 
         // Core modules
         ArticlesModule,
+        ArticleTranslationsModule,
         BannedWordsModule,
         CategoriesModule,
         CommentsModule,

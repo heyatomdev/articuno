@@ -25,9 +25,6 @@ import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { ArticleParamsDto, ArticleSlugParamsDto } from '@/modules/articles/dto/article-params.dto';
-import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
-import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
-import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 
 @ApiTags('Articles')
@@ -117,104 +114,4 @@ export class ArticlesController {
     await this.articlesService.remove(tenant.id, params.id);
   }
 
-  @Post(':id/translations')
-  @ApiOperation({
-    summary: 'Add a translation',
-    description: 'Creates a new translation for an existing article. Each language code must be unique per article.',
-  })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiBody({ type: CreateArticleTranslationDto })
-  @ApiResponse({ status: 201, description: 'Translation created successfully.' })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article not found.' })
-  @ApiResponse({ status: 409, description: 'A translation for this language code already exists.' })
-  createTranslation(
-    @GetTenant() tenant: any,
-    @Param() params: ArticleParamsDto,
-    @Body() dto: CreateArticleTranslationDto,
-  ) {
-    return this.articlesService.createTranslation(tenant.id, params.id, dto);
-  }
-
-  @Get(':id/translations')
-  @ApiOperation({
-    summary: 'List translations',
-    description: 'Returns all translations for an article, ordered by language code.',
-  })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 200, description: 'List of translations.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article not found.' })
-  findTranslations(@GetTenant() tenant: any, @Param() params: ArticleParamsDto) {
-    return this.articlesService.findTranslations(tenant.id, params.id);
-  }
-
-  @Get(':id/translations/:languageCode')
-  @ApiOperation({
-    summary: 'Get a translation by language',
-    description: 'Returns a single translation for the given article and BCP 47 language code.',
-  })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code', example: 'en' })
-  @ApiResponse({ status: 200, description: 'Translation found.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Translation not found.' })
-  findTranslation(
-    @GetTenant() tenant: any,
-    @Param() params: ArticleTranslationParamsDto,
-  ) {
-    return this.articlesService.findTranslation(
-      tenant.id,
-      params.id,
-      params.languageCode,
-    );
-  }
-
-  @Patch(':id/translations/:languageCode')
-  @ApiOperation({
-    summary: 'Update a translation',
-    description: 'Partially updates an existing article translation. Only provided fields are changed.',
-  })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code of the translation to update', example: 'en' })
-  @ApiBody({ type: UpdateArticleTranslationDto })
-  @ApiResponse({ status: 200, description: 'Translation updated successfully.' })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article or translation not found.' })
-  updateTranslation(
-    @GetTenant() tenant: any,
-    @Param() params: ArticleTranslationParamsDto,
-    @Body() dto: UpdateArticleTranslationDto,
-  ) {
-    return this.articlesService.updateTranslation(
-      tenant.id,
-      params.id,
-      params.languageCode,
-      dto,
-    );
-  }
-
-  @Delete(':id/translations/:languageCode')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({
-    summary: 'Delete a translation',
-    description: 'Permanently removes a single language translation from an article.',
-  })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code of the translation to delete', example: 'en' })
-  @ApiResponse({ status: 204, description: 'Translation deleted successfully – no content returned.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article or translation not found.' })
-  async removeTranslation(
-    @GetTenant() tenant: any,
-    @Param() params: ArticleTranslationParamsDto,
-  ) {
-    await this.articlesService.removeTranslation(
-      tenant.id,
-      params.id,
-      params.languageCode,
-    );
-  }
 }
