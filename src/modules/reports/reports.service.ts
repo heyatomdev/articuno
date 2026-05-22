@@ -18,6 +18,28 @@ type CreateReportInput = CreateReportDto & {
     moderatorId?: string;
 };
 
+/** Shared include clause that enriches Report queries with reporter/moderator user data. */
+const reportUserIncludes = {
+    reporter: {
+        select: {
+            externalId: true,
+            username: true,
+            avatarUrl: true,
+            role: true,
+            status: true,
+        },
+    },
+    moderator: {
+        select: {
+            externalId: true,
+            username: true,
+            avatarUrl: true,
+            role: true,
+            status: true,
+        },
+    },
+} as const;
+
 @Injectable()
 export class ReportsService {
 
@@ -92,6 +114,7 @@ export class ReportsService {
                     ...(dto.moderatorNote && { moderatorNote: dto.moderatorNote }),
                     ...(dto.moderatorId   && { moderatorId: dto.moderatorId }),
                 },
+                include: reportUserIncludes,
             });
 
             // Incrementa reportCount sul contenuto
@@ -181,7 +204,12 @@ export class ReportsService {
     async findAll(tenantId: string, query: ReportListQueryDto): Promise<PagedResponse<any>> {
         const where = {
             tenantId,
-            ...(query.status && { status: query.status }),
+            ...(query.status     && { status: query.status }),
+            ...(query.reporterId && { reporterId: query.reporterId }),
+            ...(query.targetType && { targetType: query.targetType }),
+            ...(query.targetId   && { targetId: query.targetId }),
+            ...(query.moderatorId && { moderatorId: query.moderatorId }),
+            ...(query.reason     && { reason: { contains: query.reason, mode: 'insensitive' as const } }),
         };
 
         const [items, totalCount] = await this.prisma.$transaction([
@@ -190,6 +218,7 @@ export class ReportsService {
                 orderBy: { createdAt: 'desc' },
                 take: limit(query),
                 skip: query.offset,
+                include: reportUserIncludes,
             }),
             this.prisma.report.count({ where }),
         ]);
@@ -211,6 +240,7 @@ export class ReportsService {
     async findOne(id: string, tenantId: string) {
         const report = await this.prisma.report.findFirst({
             where: { id, tenantId },
+            include: reportUserIncludes,
         });
 
         if (!report) {
@@ -238,6 +268,7 @@ export class ReportsService {
                     moderatorNote: dto.moderatorNote,
                     moderatorId: resolvedModeratorId,
                 },
+                include: reportUserIncludes,
             });
 
             // Gestione cambio stato articolo quando report è DISMISSED

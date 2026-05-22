@@ -57,7 +57,12 @@ export class UsersService {
     tenantId: string,
     query: UserListQueryDto,
   ): Promise<PagedResponse<UserListItemDto>> {
-    const where = { tenantId };
+    const where: Parameters<typeof this.prisma.user.findMany>[0]['where'] = {
+      tenantId,
+      ...(query.username ? { username: { contains: query.username, mode: 'insensitive' } } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.role ? { role: query.role } : {}),
+    };
     const pageSize = limit(query);
 
     const [items, totalCount] = await this.prisma.$transaction([

@@ -90,6 +90,9 @@ model User {
 
   adminCredentials AdminCredentials?
 
+  reportsFiled     Report[] @relation("ReporterReports")
+  reportsModerated Report[] @relation("ModeratorReports")
+
   createdAt DateTime @default(now())
 
   @@unique([externalId, tenantId])
@@ -310,8 +313,10 @@ model Report {
   targetType TargetType // ENUM: ARTICLE, COMMENT, USER
   targetId   String // L'ID dell'entità segnalata
 
-  reporterId    String // externalId dell'utente
-  moderatorId   String? // externalId dello staff
+  reporterId    String
+  reporter      User     @relation("ReporterReports", fields: [reporterId, tenantId], references: [externalId, tenantId], onDelete: Cascade)
+  moderatorId   String?
+  moderator     User?    @relation("ModeratorReports", fields: [moderatorId, tenantId], references: [externalId, tenantId], onDelete: SetNull)
   moderatorNote String?
 
   tenantId String
