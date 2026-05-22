@@ -17,7 +17,7 @@ import { ArticlesModule } from '@/modules/articles/articles.module';
 import { InteractionsModule } from '@/modules/interactions/interactions.module';
 import { CommentsModule } from '@/modules/comments/comments.module';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
-import { WebhookModule } from '@/modules/webhook/webhook.module';
+import { WebhooksModule } from '@/modules/webhook/webhooks.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { AdminModule } from '@/modules/admin/admin.module';
 
@@ -53,20 +53,22 @@ import { AdminModule } from '@/modules/admin/admin.module';
         ScheduleModule.forRoot(),
 
         // Core modules
-        PrismaModule,
-        TenantModule,
-        AnalyticsModule,
-        ReportsModule,
-        UsersModule,
-        CategoriesModule,
-        TagsModule,
-        BannedWordsModule,
         ArticlesModule,
-        InteractionsModule,
+        BannedWordsModule,
+        CategoriesModule,
         CommentsModule,
-        WebhookModule,
+        InteractionsModule,
+        PrismaModule,
+        ReportsModule,
+        TagsModule,
+        TenantModule,
+        UsersModule,
+
+        // Admin only module
         AuthModule,
         AdminModule,
+        AnalyticsModule,
+        WebhooksModule,
     ],
 })
 export class AppModule {}

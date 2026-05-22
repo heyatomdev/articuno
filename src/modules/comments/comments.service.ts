@@ -140,15 +140,34 @@ export class CommentsService {
     return comment;
   }
 
+
+  /**
+   * Strips the `content` field from comments that are not yet publicly visible,
+   * so the API caller can render a meaningful placeholder without leaking
+   * moderated text.
+   */
+  private sanitizeForPublicApi(comment: any): any {
+    if (comment.status !== ContentStatus.VISIBLE) {
+      return { ...comment, content: null };
+    }
+    return comment;
+  }
+
   async findAll(
     tenantId: string,
     query: CommentFiltersQueryDto,
-    status?: ContentStatus,
+    statusFilter?: ContentStatus | ContentStatus[],
   ): Promise<PagedResponse<any>> {
+    const statusCondition = statusFilter
+      ? Array.isArray(statusFilter)
+        ? { in: statusFilter }
+        : statusFilter
+      : undefined;
+
     const where = {
       tenantId,
       ...(query.articleId && { articleId: query.articleId }),
-      ...(status && { status }),
+      ...(statusCondition && { status: statusCondition }),
     };
 
     const [items, totalCount] = await this.prisma.$transaction([
@@ -183,7 +202,7 @@ export class CommentsService {
     const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
 
     return {
-      items,
+      items: items.map((c) => this.sanitizeForPublicApi(c)),
       pagination: {
         totalCount,
         currentPage,
@@ -193,12 +212,18 @@ export class CommentsService {
     };
   }
 
-  async findOne(tenantId: string, id: string, status?: ContentStatus) {
+  async findOne(tenantId: string, id: string, statusFilter?: ContentStatus | ContentStatus[]) {
+    const statusCondition = statusFilter
+      ? Array.isArray(statusFilter)
+        ? { in: statusFilter }
+        : statusFilter
+      : undefined;
+
     const comment = await this.prisma.comment.findFirst({
       where: {
         id,
         tenantId,
-        ...(status && { status }),
+        ...(statusCondition && { status: statusCondition }),
       },
       include: {
         author: true,
@@ -209,7 +234,7 @@ export class CommentsService {
       throw new NotFoundException('Commento non trovato');
     }
 
-    return comment;
+    return this.sanitizeForPublicApi(comment);
   }
 
   async update(tenantId: string, id: string, dto: UpdateCommentDto) {

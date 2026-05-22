@@ -18,15 +18,37 @@ import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto'
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
 import { CategoryParamsDto } from '@/modules/categories/dto/category-params.dto';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
+import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
+import { PrismaService } from '@/modules/prisma/prisma.service';
+import { AuditAction, AuditResourceType } from '@prisma/client';
+import {ApiTags} from "@nestjs/swagger";
 
+@ApiTags('Admin / Categories')
 @Controller('admin/categories')
 @UseGuards(SessionGuard)
 export class AdminCategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly auditLogger: AuditLoggerService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post()
-  create(@GetSession() session: any, @Body() dto: CreateCategoryDto) {
-    return this.categoriesService.create(session.tenantId, dto);
+  async create(@GetSession() session: any, @Body() dto: CreateCategoryDto) {
+    const category = await this.categoriesService.create(session.tenantId, dto);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.CATEGORY_CREATED,
+      resourceType: AuditResourceType.CATEGORY,
+      resourceId: category.id,
+      resourceName: category.name,
+      changeSummary: `Category created: ${category.name}`,
+    });
+
+    return category;
   }
 
   @Get()
@@ -40,18 +62,46 @@ export class AdminCategoriesController {
   }
 
   @Patch(':id')
-  update(
+  async update(
     @GetSession() session: any,
     @Param() params: CategoryParamsDto,
     @Body() dto: UpdateCategoryDto,
   ) {
-    return this.categoriesService.update(session.tenantId, params.id, dto);
+    const category = await this.categoriesService.update(session.tenantId, params.id, dto);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.CATEGORY_UPDATED,
+      resourceType: AuditResourceType.CATEGORY,
+      resourceId: category.id,
+      resourceName: category.name,
+      changeSummary: `Category updated: ${category.name}`,
+    });
+
+    return category;
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@GetSession() session: any, @Param() params: CategoryParamsDto) {
+    const category = await this.prisma.category.findFirst({
+      where: { id: params.id, tenantId: session.tenantId },
+      select: { name: true },
+    });
+
     await this.categoriesService.remove(session.tenantId, params.id);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.CATEGORY_DELETED,
+      resourceType: AuditResourceType.CATEGORY,
+      resourceId: params.id,
+      resourceName: category?.name,
+      changeSummary: `Category deleted: ${category?.name ?? params.id}`,
+    });
   }
 }
-

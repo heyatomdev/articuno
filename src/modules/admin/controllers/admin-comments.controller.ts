@@ -24,13 +24,20 @@ import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
 import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
+import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
+import { PrismaService } from '@/modules/prisma/prisma.service';
+import { AuditAction, AuditResourceType } from '@prisma/client';
 
 @ApiTags('Admin / Comments')
 @ApiCookieAuth('sessionId')
 @Controller('admin/comments')
 @UseGuards(SessionGuard)
 export class AdminCommentsController {
-  constructor(private readonly commentsService: CommentsService) {}
+  constructor(
+    private readonly commentsService: CommentsService,
+    private readonly auditLogger: AuditLoggerService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -68,12 +75,35 @@ export class AdminCommentsController {
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
-  update(
+  async update(
     @GetSession() session: any,
     @Param() params: CommentParamsDto,
     @Body() dto: UpdateCommentDto,
   ) {
-    return this.commentsService.update(session.tenantId, params.id, dto);
+    const before = await this.prisma.comment.findFirst({
+      where: { id: params.id, tenantId: session.tenantId },
+      select: { status: true, content: true },
+    });
+
+    const comment = await this.commentsService.update(session.tenantId, params.id, dto);
+
+    const statusChanged = dto.status && before?.status && dto.status !== before.status;
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: statusChanged ? AuditAction.COMMENT_STATUS_CHANGED : AuditAction.COMMENT_UPDATED,
+      resourceType: AuditResourceType.COMMENT,
+      resourceId: comment.id,
+      changesBefore: before ?? undefined,
+      changesAfter: { status: comment.status },
+      changeSummary: statusChanged
+        ? `Status: ${before.status} → ${comment.status}`
+        : 'Comment updated',
+    });
+
+    return comment;
   }
 
   @Delete(':id')
@@ -87,7 +117,21 @@ export class AdminCommentsController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
   async remove(@GetSession() session: any, @Param() params: CommentParamsDto) {
+    const comment = await this.prisma.comment.findFirst({
+      where: { id: params.id, tenantId: session.tenantId },
+      select: { status: true, content: true },
+    });
+
     await this.commentsService.remove(session.tenantId, params.id);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.COMMENT_DELETED,
+      resourceType: AuditResourceType.COMMENT,
+      resourceId: params.id,
+      changeSummary: `Comment deleted (was ${comment?.status ?? 'unknown'})`,
+    });
   }
 }
-

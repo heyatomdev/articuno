@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { WebhookService } from './webhook.service';
+import { WebhooksService } from './webhooks.service';
 
 @Injectable()
-export class WebhookJob {
-    private readonly logger = new Logger(WebhookJob.name);
+export class WebhooksJob {
+    private readonly logger = new Logger(WebhooksJob.name);
 
     constructor(
         private prisma: PrismaService,
-        private webhookService: WebhookService,
+        private webhookService: WebhooksService,
     ) {}
 
     @Cron(CronExpression.EVERY_30_SECONDS)

@@ -1,12 +1,22 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import {CreateReportDto} from "@/modules/reports/dto/create-report.dto";
-import {UpdateReportStatusDto} from "@/modules/reports/dto/update-report.dto";
+import { CreateReportDto } from '@/modules/reports/dto/create-report.dto';
+import { UpdateReportStatusDto } from '@/modules/reports/dto/update-report.dto';
 import { ContentStatus, ReportStatus, TargetType } from '@prisma/client';
 import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto';
 import { limit, PagedResponse } from '@/pagination';
+
+/**
+ * Internal extension of CreateReportDto used by the admin path only.
+ * These extra fields are never exposed on the public API DTO.
+ */
+type CreateReportInput = CreateReportDto & {
+    status?: ReportStatus;
+    moderatorNote?: string;
+    moderatorId?: string;
+};
 
 @Injectable()
 export class ReportsService {
@@ -17,7 +27,7 @@ export class ReportsService {
       private webhookPublisher: WebhookEventPublisher,
     ) {}
 
-    async create(tenantId: string, dto: CreateReportDto) {
+    async create(tenantId: string, dto: CreateReportInput) {
         // 1. Assicurati che l'utente (reporter) esista localmente (Minimal User)
         const user = await this.prisma.user.upsert({
             where: {
@@ -77,6 +87,10 @@ export class ReportsService {
                     description: dto.description,
                     reporterId: user.externalId, // Salviamo l'ID esterno per coerenza
                     tenantId: tenantId,
+                    // Optional admin-supplied fields (auto-populated when coming from admin panel)
+                    ...(dto.status      && { status: dto.status }),
+                    ...(dto.moderatorNote && { moderatorNote: dto.moderatorNote }),
+                    ...(dto.moderatorId   && { moderatorId: dto.moderatorId }),
                 },
             });
 
@@ -206,12 +220,15 @@ export class ReportsService {
         return report;
     }
 
-    async updateStatus(id: string, tenantId: string, dto: UpdateReportStatusDto) {
+    async updateStatus(id: string, tenantId: string, dto: UpdateReportStatusDto, moderatorId?: string) {
         const report = await this.prisma.report.findFirst({
             where: { id, tenantId },
         });
 
         if (!report) throw new NotFoundException('Report non trovato');
+
+        // Prefer an explicitly passed moderatorId (admin auto-populate) over the one in the DTO
+        const resolvedModeratorId = moderatorId ?? dto.moderatorId;
 
         return this.prisma.$transaction(async (tx) => {
             const updatedReport = await tx.report.update({
@@ -219,7 +236,7 @@ export class ReportsService {
                 data: {
                     status: dto.status,
                     moderatorNote: dto.moderatorNote,
-                    moderatorId: dto.moderatorId,
+                    moderatorId: resolvedModeratorId,
                 },
             });
 
@@ -251,7 +268,7 @@ export class ReportsService {
                       ContentStatus.UNDER_REVIEW,
                       ContentStatus.PUBLISHED,
                       'REPORTS_DISMISSED',
-                      dto.moderatorId,
+                      resolvedModeratorId,
                     );
                 }
             }
@@ -291,14 +308,14 @@ export class ReportsService {
                             },
                         });
 
-                        await this.webhookPublisher.publishCommentModerationEvent(
-                          tenantId,
-                          comment.id,
-                          author?.externalId ?? 'unknown',
-                          ContentStatus.VISIBLE,
-                          'REPORT_DISMISSED_FALSE_POSITIVE',
-                          dto.moderatorId,
-                        );
+                         await this.webhookPublisher.publishCommentModerationEvent(
+                           tenantId,
+                           comment.id,
+                           author?.externalId ?? 'unknown',
+                           ContentStatus.VISIBLE,
+                           'REPORT_DISMISSED_FALSE_POSITIVE',
+                           resolvedModeratorId,
+                         );
                     }
                 }
 
@@ -309,14 +326,14 @@ export class ReportsService {
                         data: { status: ContentStatus.BANNED },
                     });
 
-                    await this.webhookPublisher.publishCommentModerationEvent(
-                      tenantId,
-                      comment.id,
-                      author?.externalId ?? 'unknown',
-                      ContentStatus.BANNED,
-                      'REPORT_RESOLVED_VIOLATION_CONFIRMED',
-                      dto.moderatorId,
-                    );
+                     await this.webhookPublisher.publishCommentModerationEvent(
+                       tenantId,
+                       comment.id,
+                       author?.externalId ?? 'unknown',
+                       ContentStatus.BANNED,
+                       'REPORT_RESOLVED_VIOLATION_CONFIRMED',
+                       resolvedModeratorId,
+                     );
                 }
             }
 

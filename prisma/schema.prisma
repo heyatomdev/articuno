@@ -464,6 +464,7 @@ enum AuditAction {
   // User management
   USER_CREATED
   USER_UPDATED_ROLE
+  USER_STATUS_CHANGED
   USER_DELETED
 
   // Article operations

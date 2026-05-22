@@ -40,6 +40,8 @@ import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-q
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { FileHarborConfig } from '@/modules/fileharbor/interfaces/fileharbor-config.interface';
 import { PrismaService } from '@/modules/prisma/prisma.service';
+import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
+import { AuditAction, AuditResourceType } from '@prisma/client';
 
 @ApiTags('Admin / Articles')
 @ApiCookieAuth('sessionId')
@@ -50,6 +52,7 @@ export class AdminArticlesController {
     private readonly articlesService: ArticlesService,
     private readonly fileHarborService: FileHarborService,
     private readonly prisma: PrismaService,
+    private readonly auditLogger: AuditLoggerService,
   ) {}
 
   /**
@@ -129,7 +132,6 @@ export class AdminArticlesController {
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    // Support both multipart/form-data (data field as JSON string) and application/json
     const payload = rawData ?? (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
     const dto = await this.parseAndValidateDto(CreateArticleDto, payload);
 
@@ -144,7 +146,20 @@ export class AdminArticlesController {
       if (imageUrl) dto.coverImage = imageUrl;
     }
 
-    return this.articlesService.create(session.tenantId, dto);
+    const article = await this.articlesService.create(session.tenantId, dto);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.ARTICLE_CREATED,
+      resourceType: AuditResourceType.ARTICLE,
+      resourceId: article.id,
+      resourceName: article.translations?.[0]?.title,
+      changeSummary: `Article created with status: ${article.status}`,
+    });
+
+    return article;
   }
 
   @Get()
@@ -210,14 +225,18 @@ export class AdminArticlesController {
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    // Support both multipart/form-data (data field as JSON string) and application/json
     const payload = rawData ?? (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
     const dto = await this.parseAndValidateDto(UpdateArticleDto, payload);
+
+    // Fetch current state before update for audit comparison
+    const before = await this.prisma.article.findFirst({
+      where: { id: params.id, tenantId: session.tenantId },
+      select: { status: true, coverImage: true, featured: true },
+    });
 
     if (file) {
       const config = await this.getFileHarborConfig(session.tenantId);
 
-      // Recupera l'immagine corrente per eliminarla dopo l'upload
       const existing = await this.prisma.article.findFirst({
         where: { id: params.id, tenantId: session.tenantId },
         select: { coverImage: true },
@@ -233,7 +252,26 @@ export class AdminArticlesController {
       if (imageUrl) dto.coverImage = imageUrl;
     }
 
-    return this.articlesService.update(session.tenantId, params.id, dto);
+    const article = await this.articlesService.update(session.tenantId, params.id, dto);
+
+    const statusChanged = dto.status && before?.status && dto.status !== before.status;
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: statusChanged ? AuditAction.ARTICLE_STATUS_CHANGED : AuditAction.ARTICLE_UPDATED,
+      resourceType: AuditResourceType.ARTICLE,
+      resourceId: article.id,
+      resourceName: article.translations?.[0]?.title,
+      changesBefore: before ?? undefined,
+      changesAfter: { status: article.status, featured: article.featured },
+      changeSummary: statusChanged
+        ? `Status: ${before.status} → ${article.status}`
+        : 'Article updated',
+    });
+
+    return article;
   }
 
   @Delete(':id')
@@ -249,7 +287,11 @@ export class AdminArticlesController {
   async remove(@GetSession() session: any, @Param() params: ArticleParamsDto) {
     const existing = await this.prisma.article.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
-      select: { coverImage: true },
+      select: {
+        coverImage: true,
+        status: true,
+        translations: { select: { title: true }, orderBy: { languageCode: 'asc' as const } },
+      },
     });
 
     if (existing?.coverImage) {
@@ -262,6 +304,17 @@ export class AdminArticlesController {
     }
 
     await this.articlesService.remove(session.tenantId, params.id);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.ARTICLE_DELETED,
+      resourceType: AuditResourceType.ARTICLE,
+      resourceId: params.id,
+      resourceName: existing?.translations?.[0]?.title,
+      changeSummary: `Article deleted (was ${existing?.status ?? 'unknown'})`,
+    });
   }
 
   @Post(':id/translations')
@@ -276,12 +329,25 @@ export class AdminArticlesController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   @ApiResponse({ status: 409, description: 'A translation for this language code already exists.' })
-  createTranslation(
+  async createTranslation(
     @GetSession() session: any,
     @Param() params: ArticleParamsDto,
     @Body() dto: CreateArticleTranslationDto,
   ) {
-    return this.articlesService.createTranslation(session.tenantId, params.id, dto);
+    const translation = await this.articlesService.createTranslation(session.tenantId, params.id, dto);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.ARTICLE_UPDATED,
+      resourceType: AuditResourceType.ARTICLE,
+      resourceId: params.id,
+      resourceName: translation.title,
+      changeSummary: `Translation added: ${translation.languageCode}`,
+    });
+
+    return translation;
   }
 
   @Get(':id/translations')
@@ -330,17 +396,30 @@ export class AdminArticlesController {
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article or translation not found.' })
-  updateTranslation(
+  async updateTranslation(
     @GetSession() session: any,
     @Param() params: ArticleTranslationParamsDto,
     @Body() dto: UpdateArticleTranslationDto,
   ) {
-    return this.articlesService.updateTranslation(
+    const translation = await this.articlesService.updateTranslation(
       session.tenantId,
       params.id,
       params.languageCode,
       dto,
     );
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.ARTICLE_UPDATED,
+      resourceType: AuditResourceType.ARTICLE,
+      resourceId: params.id,
+      resourceName: translation.title,
+      changeSummary: `Translation updated: ${params.languageCode}`,
+    });
+
+    return translation;
   }
 
   @Delete(':id/translations/:languageCode')
@@ -363,5 +442,15 @@ export class AdminArticlesController {
       params.id,
       params.languageCode,
     );
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.ARTICLE_UPDATED,
+      resourceType: AuditResourceType.ARTICLE,
+      resourceId: params.id,
+      changeSummary: `Translation removed: ${params.languageCode}`,
+    });
   }
 }

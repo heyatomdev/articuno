@@ -3,7 +3,9 @@ import { AnalyticsService } from './analytics.service';
 import { UseGuards } from '@nestjs/common';
 import { SessionGuard } from "@/modules/auth/guards/session.guard";
 import { GetSession } from "@/modules/auth/decorators/get-session.decorator";
+import {ApiTags} from "@nestjs/swagger";
 
+@ApiTags('Admin / Analytics')
 @Controller('admin/stats')
 @UseGuards(SessionGuard)
 export class AnalyticsController {

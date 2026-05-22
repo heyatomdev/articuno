@@ -4,6 +4,7 @@ import { UpsertUserDto } from '@/modules/users/dto/upsert-user.dto';
 import { limit, PagedResponse } from '@/pagination';
 import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
+import { UserRole, UserStatus } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -123,6 +124,39 @@ export class UsersService {
         avatarUrl: dto.avatarUrl,
       },
     });
+  }
+
+  async updateStatus(tenantId: string, id: string, status: UserStatus): Promise<UserListItemDto> {
+    const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
+    if (!user) throw new NotFoundException('Utente non trovato');
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { status },
+      select: this.userListSelect,
+    });
+
+    return this.mapUserListItem(updated);
+  }
+
+  async updateRole(tenantId: string, id: string, role: UserRole): Promise<UserListItemDto> {
+    const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
+    if (!user) throw new NotFoundException('Utente non trovato');
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { role },
+      select: this.userListSelect,
+    });
+
+    return this.mapUserListItem(updated);
+  }
+
+  async deleteById(tenantId: string, id: string): Promise<void> {
+    const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
+    if (!user) throw new NotFoundException('Utente non trovato');
+
+    await this.prisma.user.delete({ where: { id } });
   }
 
   async deleteByExternalId(tenantId: string, externalId: string): Promise<void> {
