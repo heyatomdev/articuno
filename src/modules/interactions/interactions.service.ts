@@ -90,41 +90,6 @@ export class InteractionsService {
     return { liked: true };
   }
 
-  async toggleBookmarkArticle(tenantId: string, articleId: string, externalUserId: string) {
-    await this.ensureArticleExists(tenantId, articleId);
-    const user = await this.ensureUser(tenantId, externalUserId);
-
-    const existingBookmark = await this.prisma.bookmark.findFirst({
-      where: {
-        articleId,
-        userId: user.id,
-        tenantId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (existingBookmark) {
-      await this.prisma.bookmark.delete({
-        where: {
-          id: existingBookmark.id,
-        },
-      });
-
-      return { bookmarked: false };
-    }
-
-    await this.prisma.bookmark.create({
-      data: {
-        articleId,
-        userId: user.id,
-        tenantId,
-      },
-    });
-
-    return { bookmarked: true };
-  }
 
   async getArticleStatus(tenantId: string, articleId: string, externalUserId: string) {
     await this.ensureArticleExists(tenantId, articleId);
@@ -167,41 +132,5 @@ export class InteractionsService {
     };
   }
 
-  async getMyBookmarks(tenantId: string, externalUserId: string) {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        externalId: externalUserId,
-        tenantId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!user) {
-      return [];
-    }
-
-    return this.prisma.bookmark.findMany({
-      where: {
-        userId: user.id,
-        tenantId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        article: {
-          include: {
-            category: true,
-            tags: true,
-            translations: {
-              orderBy: { languageCode: 'asc' },
-            },
-          },
-        },
-      },
-    });
-  }
 }
 

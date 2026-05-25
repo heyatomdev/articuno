@@ -21,15 +21,37 @@ import { TagParamsDto } from '@/modules/tags/dto/tag-params.dto';
 import { TagsListQuery } from '@/modules/tags/queries/tags.query';
 import { PagedResponse } from '@/pagination';
 import { TagDto } from '@/modules/tags/dto/tags.dto';
+import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
+import { PrismaService } from '@/modules/prisma/prisma.service';
+import { AuditAction, AuditResourceType } from '@prisma/client';
+import {ApiTags} from "@nestjs/swagger";
 
+@ApiTags('Admin / Tags')
 @Controller('admin/tags')
 @UseGuards(SessionGuard)
 export class AdminTagsController {
-  constructor(private readonly tagsService: TagsService) {}
+  constructor(
+    private readonly tagsService: TagsService,
+    private readonly auditLogger: AuditLoggerService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post()
-  create(@GetSession() session: any, @Body() dto: CreateTagDto) {
-    return this.tagsService.create(session.tenantId, dto);
+  async create(@GetSession() session: any, @Body() dto: CreateTagDto) {
+    const tag = await this.tagsService.create(session.tenantId, dto);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.TAG_CREATED,
+      resourceType: AuditResourceType.TAG,
+      resourceId: tag.id,
+      resourceName: tag.name,
+      changeSummary: `Tag created: ${tag.name}`,
+    });
+
+    return tag;
   }
 
   @Get()
@@ -46,18 +68,46 @@ export class AdminTagsController {
   }
 
   @Patch(':id')
-  update(
+  async update(
     @GetSession() session: any,
     @Param() params: TagParamsDto,
     @Body() dto: UpdateTagDto,
   ) {
-    return this.tagsService.update(session.tenantId, params.id, dto);
+    const tag = await this.tagsService.update(session.tenantId, params.id, dto);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.TAG_UPDATED,
+      resourceType: AuditResourceType.TAG,
+      resourceId: tag.id,
+      resourceName: tag.name,
+      changeSummary: `Tag updated: ${tag.name}`,
+    });
+
+    return tag;
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@GetSession() session: any, @Param() params: TagParamsDto) {
+    const tag = await this.prisma.tag.findFirst({
+      where: { id: params.id, tenantId: session.tenantId },
+      select: { name: true },
+    });
+
     await this.tagsService.remove(session.tenantId, params.id);
+
+    await this.auditLogger.log({
+      tenantId: session.tenantId,
+      actorUserId: session.externalId,
+      actorRole: session.userRole,
+      action: AuditAction.TAG_DELETED,
+      resourceType: AuditResourceType.TAG,
+      resourceId: params.id,
+      resourceName: tag?.name,
+      changeSummary: `Tag deleted: ${tag?.name ?? params.id}`,
+    });
   }
 }
-

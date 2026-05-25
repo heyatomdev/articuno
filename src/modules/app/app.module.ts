@@ -14,12 +14,15 @@ import { TenantModule } from '@/modules/tenants/tenant.module';
 import { CategoriesModule } from '@/modules/categories/categories.module';
 import { TagsModule } from '@/modules/tags/tags.module';
 import { ArticlesModule } from '@/modules/articles/articles.module';
+import { ArticleTranslationsModule } from '@/modules/article-translations/article-translations.module';
 import { InteractionsModule } from '@/modules/interactions/interactions.module';
+import { BookmarksModule } from '@/modules/bookmarks/bookmarks.module';
 import { CommentsModule } from '@/modules/comments/comments.module';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
-import { WebhookModule } from '@/modules/webhook/webhook.module';
+import { WebhooksModule } from '@/modules/webhook/webhooks.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { AdminModule } from '@/modules/admin/admin.module';
+import {NotificationsModule} from "@/modules/notifications/notifications.module";
 
 @Module({
     controllers: [StatusController],
@@ -53,20 +56,25 @@ import { AdminModule } from '@/modules/admin/admin.module';
         ScheduleModule.forRoot(),
 
         // Core modules
-        PrismaModule,
-        TenantModule,
-        AnalyticsModule,
-        ReportsModule,
-        UsersModule,
-        CategoriesModule,
-        TagsModule,
-        BannedWordsModule,
         ArticlesModule,
-        InteractionsModule,
+        ArticleTranslationsModule,
+        BannedWordsModule,
+        BookmarksModule,
+        CategoriesModule,
         CommentsModule,
-        WebhookModule,
-        AuthModule,
+        InteractionsModule,
+        PrismaModule,
+        ReportsModule,
+        TagsModule,
+        TenantModule,
+        UsersModule,
+
+        // Admin only module
         AdminModule,
+        AnalyticsModule,
+        AuthModule,
+        NotificationsModule,
+        WebhooksModule,
     ],
 })
 export class AppModule {}

@@ -67,6 +67,7 @@ async function bootstrap(): Promise<void> {
         .setVersion(process?.env?.npm_package_version || '2.0.0')
         .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
         .addBearerAuth()
+        .addCookieAuth('sessionId', { type: 'apiKey', in: 'cookie', name: 'sessionId', description: 'Admin session cookie (HTTP-only, 7-day TTL)' }, 'sessionId')
         .setLicense(
             'MIT',
             'https://github.com/heyatomdev/articuno/blob/main/README.md',

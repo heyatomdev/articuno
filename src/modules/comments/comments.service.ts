@@ -140,26 +140,60 @@ export class CommentsService {
     return comment;
   }
 
-  async findAll(tenantId: string, query: CommentFiltersQueryDto): Promise<PagedResponse<any>> {
-    // Per query pubbliche: mostra solo commenti VISIBLE
-    // Se in futuro serve distinguere query private, aggiungere parametro nella DTO
+
+  /**
+   * Strips the `content` field from comments that are not yet publicly visible,
+   * so the API caller can render a meaningful placeholder without leaking
+   * moderated text.
+   */
+  private sanitizeForPublicApi(comment: any): any {
+    if (comment.status !== ContentStatus.VISIBLE) {
+      return { ...comment, content: null };
+    }
+    return comment;
+  }
+
+  async findAll(
+    tenantId: string,
+    query: CommentFiltersQueryDto,
+    statusFilter?: ContentStatus | ContentStatus[],
+    skipSanitize = false,
+  ): Promise<PagedResponse<any>> {
+    const statusCondition = statusFilter
+      ? Array.isArray(statusFilter)
+        ? { in: statusFilter }
+        : statusFilter
+      : undefined;
+
     const where = {
       tenantId,
       ...(query.articleId && { articleId: query.articleId }),
-      // Filtra solo commenti visibili pubblicamente
-      status: ContentStatus.VISIBLE,
+      ...(statusCondition && { status: statusCondition }),
     };
 
     const [items, totalCount] = await this.prisma.$transaction([
       this.prisma.comment.findMany({
         where,
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: { createdAt: 'desc' },
         take: limit(query),
         skip: query.offset,
         include: {
-          author: true,
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+            }
+          },
+          author: {
+            select: {
+              id: true,
+              status: true,
+              role: true,
+              createdAt: true,
+              username: true,
+              avatarUrl: true,
+            }
+          }
         },
       }),
       this.prisma.comment.count({ where }),
@@ -169,7 +203,7 @@ export class CommentsService {
     const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
 
     return {
-      items,
+      items: items.map((c) => skipSanitize ? c : this.sanitizeForPublicApi(c)),
       pagination: {
         totalCount,
         currentPage,
@@ -179,11 +213,18 @@ export class CommentsService {
     };
   }
 
-  async findOne(tenantId: string, id: string) {
+  async findOne(tenantId: string, id: string, statusFilter?: ContentStatus | ContentStatus[], skipSanitize = false) {
+    const statusCondition = statusFilter
+      ? Array.isArray(statusFilter)
+        ? { in: statusFilter }
+        : statusFilter
+      : undefined;
+
     const comment = await this.prisma.comment.findFirst({
       where: {
         id,
         tenantId,
+        ...(statusCondition && { status: statusCondition }),
       },
       include: {
         author: true,
@@ -194,7 +235,7 @@ export class CommentsService {
       throw new NotFoundException('Commento non trovato');
     }
 
-    return comment;
+    return skipSanitize ? comment : this.sanitizeForPublicApi(comment);
   }
 
   async update(tenantId: string, id: string, dto: UpdateCommentDto) {

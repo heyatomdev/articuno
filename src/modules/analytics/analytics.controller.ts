@@ -1,17 +1,19 @@
 import { Controller, Get, Query, Req } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
-import {TenantGuard} from "@/modules/tenants/guards/tenant.guard";
-import {UseGuards} from '@nestjs/common';
-import {GetTenant} from "@/modules/tenants/decorators/get-tenant.decorator";
+import { UseGuards } from '@nestjs/common';
+import { SessionGuard } from "@/modules/auth/guards/session.guard";
+import { GetSession } from "@/modules/auth/decorators/get-session.decorator";
+import {ApiTags} from "@nestjs/swagger";
 
-@Controller('stats')
-@UseGuards(TenantGuard)
+@ApiTags('Admin / Analytics')
+@Controller('admin/stats')
+@UseGuards(SessionGuard)
 export class AnalyticsController {
     constructor(private readonly analyticsService: AnalyticsService) {}
 
     @Get('dashboard')
-    getDashboard(@GetTenant() tenant: any, @Query('days') days?: string) {
+    getDashboard(@GetSession() session: any, @Query('days') days?: string) {
         const period = days ? parseInt(days, 10) : 30;
-        return this.analyticsService.getDashboardStats(tenant.id, period);
+        return this.analyticsService.getDashboardStats(session.tenantId, period);
     }
 }

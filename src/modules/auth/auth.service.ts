@@ -177,7 +177,6 @@ export class AuthService {
 
      return {
        id: user.id,
-       tenantId: user.tenantId,
        externalId: user.externalId,
        email: this.maskEmail(user.adminCredentials.email),
        role: user.role,
@@ -190,6 +189,12 @@ export class AuthService {
        lastPasswordChangeAt: user.adminCredentials.lastPasswordChangeAt,
        credentialsCreatedAt: user.adminCredentials.createdAt,
        credentialsUpdatedAt: user.adminCredentials.updatedAt,
+       tenant: {
+         id: user.tenantId,
+         name: user.tenant.name,
+         domain: user.tenant.domain,
+         enabled: user.tenant.enabled,
+       },
        session: {
          id: session.id,
          expiresAt: session.expiresAt,

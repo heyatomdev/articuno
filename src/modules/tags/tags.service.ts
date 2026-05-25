@@ -15,7 +15,7 @@ export class TagsService {
   private readonly logger = new Logger(TagsService.name);
 
   private readonly CONFLICT_ERROR_MESSAGE = "Slug already exists";
-  
+
   async create(tenantId: string, dto: CreateTagDto) {
     try {
       return await this.prisma.tag.create({
@@ -97,6 +97,32 @@ export class TagsService {
   async findOne(tenantId: string, id: string) {
     const tag = await this.prisma.tag.findFirst({
       where: { id, tenantId },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            enabled: true,
+          }
+        },
+        _count: {
+          select: { articles: true },
+        },
+      },
+    });
+
+    if (!tag) {
+      throw new NotFoundException('Tag not found');
+    }
+
+    return plainToInstance(TagDto, tag, {
+      excludeExtraneousValues: false
+    });
+  }
+
+  async findOneBySlug(tenantId: string, slug: string) {
+    const tag = await this.prisma.tag.findFirst({
+      where: { slug, tenantId },
       include: {
         tenant: {
           select: {

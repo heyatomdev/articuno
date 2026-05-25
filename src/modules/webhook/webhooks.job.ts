@@ -1,15 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { WebhookService } from './webhook.service';
+import { WebhooksService } from './webhooks.service';
+
+/** Numero massimo di tentativi prima di mettere l'evento in dead-letter. */
+const MAX_ATTEMPTS = 10;
+
+/** Data sentinella usata come "dead-letter": l'evento non verrà più ripreso dal cron. */
+const DEAD_LETTER_DATE = new Date('9999-12-31T23:59:59.000Z');
 
 @Injectable()
-export class WebhookJob {
-    private readonly logger = new Logger(WebhookJob.name);
+export class WebhooksJob {
+    private readonly logger = new Logger(WebhooksJob.name);
 
     constructor(
         private prisma: PrismaService,
-        private webhookService: WebhookService,
+        private webhookService: WebhooksService,
     ) {}
 
     @Cron(CronExpression.EVERY_30_SECONDS)
@@ -30,6 +36,21 @@ export class WebhookJob {
         });
 
         for (const notif of pending) {
+            // --- Dead-letter check ---
+            if (notif.attempts >= MAX_ATTEMPTS) {
+                this.logger.warn(
+                    `Webhook ${notif.id} (${notif.event}) ha raggiunto il limite massimo di ${MAX_ATTEMPTS} tentativi — spostato in dead-letter`,
+                );
+                await this.prisma.webhookEvent.update({
+                    where: { id: notif.id },
+                    data: {
+                        lastError: `Numero massimo di tentativi raggiunto (${MAX_ATTEMPTS})`,
+                        nextRetryAt: DEAD_LETTER_DATE,
+                    },
+                });
+                continue;
+            }
+
             if (!notif.tenant.webhookUrl || !notif.tenant.webhookSecret) {
                 await this.prisma.webhookEvent.update({
                     where: { id: notif.id },
@@ -63,7 +84,7 @@ export class WebhookJob {
             const backoffSeconds = Math.min(2 ** nextAttempts, 300);
             const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000);
 
-            this.logger.warn(`Webhook delivery failed for event ${notif.event} (${notif.id})`);
+            this.logger.warn(`Webhook delivery failed for event ${notif.event} (${notif.id}) — attempt ${nextAttempts}/${MAX_ATTEMPTS}`);
 
             await this.prisma.webhookEvent.update({
                 where: { id: notif.id },
