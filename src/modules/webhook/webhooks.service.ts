@@ -1,4 +1,4 @@
-import {Injectable, Logger, NotFoundException} from '@nestjs/common';
+import {BadRequestException, Injectable, Logger, NotFoundException} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { createHmac } from 'crypto';
 import { lastValueFrom } from 'rxjs';
@@ -87,6 +87,36 @@ export class WebhooksService {
             this.logger.error(`Webhook fallito verso ${url}: ${message}`);
             return false;
         }
+    }
+
+    /**
+     * Ripristina un singolo evento webhook fallito (o in dead-letter) azzerando i tentativi
+     * in modo che il cron lo possa riprendere al prossimo ciclo.
+     */
+    async resendOne(tenantId: string, id: string): Promise<WebhookEvent> {
+        const event = await this.findOne(tenantId, id);
+
+        if (event.sentAt) {
+            throw new BadRequestException('Il webhook è già stato consegnato con successo e non può essere re-inviato');
+        }
+
+        return this.prisma.webhookEvent.update({
+            where: { id },
+            data: { attempts: 0, nextRetryAt: null, lastError: null },
+        });
+    }
+
+    /**
+     * Ripristina a 0 i tentativi di tutti gli eventi non ancora consegnati del tenant.
+     * Utilizzare in caso di down temporaneo del sistema ricevente.
+     */
+    async resendAllFailed(tenantId: string): Promise<{ reset: number }> {
+        const result = await this.prisma.webhookEvent.updateMany({
+            where: { tenantId, sentAt: null },
+            data: { attempts: 0, nextRetryAt: null, lastError: null },
+        });
+
+        return { reset: result.count };
     }
 
     private generateSignature(secret: string, payload: Prisma.JsonValue): string {
