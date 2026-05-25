@@ -48,7 +48,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 200, description: 'Paginated list of comments.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(@GetSession() session: any, @Query() query: CommentFiltersQueryDto) {
-    return this.commentsService.findAll(session.tenantId, query);
+    return this.commentsService.findAll(session.tenantId, query, undefined, true);
   }
 
   @Get(':id')
@@ -61,7 +61,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
   findOne(@GetSession() session: any, @Param() params: CommentParamsDto) {
-    return this.commentsService.findOne(session.tenantId, params.id);
+    return this.commentsService.findOne(session.tenantId, params.id, undefined, true);
   }
 
   @Patch(':id')

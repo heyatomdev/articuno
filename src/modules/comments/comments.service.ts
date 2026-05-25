@@ -157,6 +157,7 @@ export class CommentsService {
     tenantId: string,
     query: CommentFiltersQueryDto,
     statusFilter?: ContentStatus | ContentStatus[],
+    skipSanitize = false,
   ): Promise<PagedResponse<any>> {
     const statusCondition = statusFilter
       ? Array.isArray(statusFilter)
@@ -202,7 +203,7 @@ export class CommentsService {
     const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
 
     return {
-      items: items.map((c) => this.sanitizeForPublicApi(c)),
+      items: items.map((c) => skipSanitize ? c : this.sanitizeForPublicApi(c)),
       pagination: {
         totalCount,
         currentPage,
@@ -212,7 +213,7 @@ export class CommentsService {
     };
   }
 
-  async findOne(tenantId: string, id: string, statusFilter?: ContentStatus | ContentStatus[]) {
+  async findOne(tenantId: string, id: string, statusFilter?: ContentStatus | ContentStatus[], skipSanitize = false) {
     const statusCondition = statusFilter
       ? Array.isArray(statusFilter)
         ? { in: statusFilter }
@@ -234,7 +235,7 @@ export class CommentsService {
       throw new NotFoundException('Commento non trovato');
     }
 
-    return this.sanitizeForPublicApi(comment);
+    return skipSanitize ? comment : this.sanitizeForPublicApi(comment);
   }
 
   async update(tenantId: string, id: string, dto: UpdateCommentDto) {
