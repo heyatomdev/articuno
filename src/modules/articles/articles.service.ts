@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
+import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
@@ -15,6 +16,7 @@ export class ArticlesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bannedWordsService: BannedWordsService,
+    private readonly fileHarborService: FileHarborService,
   ) {}
 
   private readonly articleIncludes = {
@@ -368,15 +370,30 @@ export class ArticlesService {
   }
 
   async remove(tenantId: string, id: string): Promise<void> {
-    const result = await this.prisma.article.deleteMany({
-      where: {
-        id,
-        tenantId,
-      },
+    const article = await this.prisma.article.findFirst({
+      where: { id, tenantId },
+      select: { id: true, coverImage: true },
     });
 
-    if (result.count === 0) {
+    if (!article) {
       throw new NotFoundException('Articolo non trovato');
+    }
+
+    await this.prisma.article.delete({ where: { id } });
+
+    if (article.coverImage) {
+      const tenant = await this.prisma.tenant.findFirst({
+        where: { id: tenantId },
+        select: { fileharborEndpoint: true, fileharborApiKey: true },
+      });
+
+      if (tenant?.fileharborEndpoint && tenant?.fileharborApiKey) {
+        await this.fileHarborService.deleteImageSafely(
+          article.coverImage,
+          { endpoint: tenant.fileharborEndpoint, apiKey: tenant.fileharborApiKey },
+          { loggerContext: 'ArticleDelete' },
+        );
+      }
     }
   }
 
