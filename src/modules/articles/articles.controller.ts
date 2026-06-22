@@ -26,6 +26,7 @@ import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { ArticleParamsDto, ArticleSlugParamsDto } from '@/modules/articles/dto/article-params.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
+import { ArticleShowQueryDto } from '@/modules/articles/dto/article-show-query.dto';
 
 @ApiTags('Articles')
 @ApiSecurity('x-api-key')
@@ -75,8 +76,8 @@ export class ArticlesController {
   @ApiResponse({ status: 200, description: 'Article found.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  findOne(@GetTenant() tenant: any, @Param() params: ArticleSlugParamsDto) {
-    return this.articlesService.findOne(tenant.id, params.slug);
+  findOne(@GetTenant() tenant: any, @Param() params: ArticleSlugParamsDto, @Query() query: ArticleShowQueryDto) {
+    return this.articlesService.findOne(tenant.id, params.slug, query.languageCode);
   }
 
   @Patch(':id')

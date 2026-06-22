@@ -250,7 +250,29 @@ export class ArticlesService {
             },
           }
         : {}),
+      ...(query.languageCode
+        ? {
+            translations: {
+              some: { languageCode: query.languageCode },
+            },
+          }
+        : {}),
     };
+
+    const listIncludes = query.languageCode
+      ? {
+          ...this.articleListIncludes,
+          translations: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              languageCode: true,
+            },
+            where: { languageCode: query.languageCode },
+          },
+        }
+      : this.articleListIncludes;
 
     const [items, totalCount] = await this.prisma.$transaction([
       this.prisma.article.findMany({
@@ -258,7 +280,7 @@ export class ArticlesService {
         orderBy: { createdAt: 'desc' },
         take: limit(query),
         skip: query.offset,
-        include: this.articleListIncludes,
+        include: listIncludes,
       }),
       this.prisma.article.count({ where }),
     ]);
@@ -277,7 +299,16 @@ export class ArticlesService {
     };
   }
 
-  async findOne(tenantId: string, slug: string) {
+  async findOne(tenantId: string, slug: string, languageCode?: string) {
+    const articleIncludes = languageCode
+      ? {
+          ...this.articleIncludes,
+          translations: {
+            where: { languageCode },
+          },
+        }
+      : this.articleIncludes;
+
     const article = await this.prisma.article.findFirst({
       where: {
         tenantId,
@@ -288,7 +319,7 @@ export class ArticlesService {
           },
         },
       },
-      include: this.articleIncludes,
+      include: articleIncludes,
     });
 
     if (!article) {
