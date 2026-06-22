@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ContentStatus } from '@prisma/client';
 import { PagedQuery } from '@/pagination';
@@ -37,6 +37,14 @@ export class ArticleFiltersQueryDto extends PagedQuery {
   @IsOptional()
   @IsUUID()
   tagId?: string;
+
+  @ApiPropertyOptional({
+    description: 'BCP 47 language code. Returns only articles that have a translation in this language, including only that translation.',
+    example: 'en',
+  })
+  @IsOptional()
+  @IsString()
+  languageCode?: string;
 
   @ApiPropertyOptional({
     description: 'Filter to only featured (`true`) or non-featured (`false`) articles.',
