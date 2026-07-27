@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ContentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { startOfDay, subDays, endOfDay } from 'date-fns';
 
@@ -35,10 +36,10 @@ export class AnalyticsJob {
                     likesCount
                 ] = await Promise.all([
                     this.prisma.article.count({
-                        where: { tenantId, createdAt: { gte: startDate, lte: endDate } }
+                        where: { tenantId, status: ContentStatus.PUBLISHED, createdAt: { gte: startDate, lte: endDate } }
                     }),
                     this.prisma.comment.count({
-                        where: { tenantId, createdAt: { gte: startDate, lte: endDate } }
+                        where: { tenantId, status: ContentStatus.VISIBLE, createdAt: { gte: startDate, lte: endDate } }
                     }),
                     this.prisma.like.count({
                         where: { tenantId, createdAt: { gte: startDate, lte: endDate } }
