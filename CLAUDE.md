@@ -172,3 +172,13 @@ Key runtime settings:
 5. Using `TenantGuard` on admin routes (use `SessionGuard`)
 6. Throwing from audit log call sites (it's fire-and-forget by design)
 7. Hardcoding FileHarbor credentials (always read from `tenant.*` at runtime)
+
+## Docs
+
+- `docs/admin-api.md` — admin panel API reference
+- `docs/article-moderation.md` — moderation workflow dettagliato
+- `docs/comment-moderation.md` — comment moderation flow
+- `docs/guida-integrazione-be-nestjs.md` — guida integrazione per app NestJS consumatrici
+- `../docs/ARTICUNO_INTEGRATION.md` — integration guide per Claude (fonte di verità)
+- `../docs/BASTION_INTEGRATION.md` — Bastion JWT/JWKS guide
+- `../docs/CODING_STANDARDS.md` — NestJS conventions condivise
