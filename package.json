@@ -1,6 +1,6 @@
 {
   "name": "articuno",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Multi-tenant blog platform with Prisma",
   "main": "index.js",
   "scripts": {
