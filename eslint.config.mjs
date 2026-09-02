@@ -39,8 +39,7 @@ export default [
 
       parserOptions: {
         project: 'tsconfig.json',
-        tsconfigRootDir:
-          '/Users/atombolato/Documents/Repository/Personal.nosync/fileharbor',
+        tsconfigRootDir: __dirname,
       },
     },
 
