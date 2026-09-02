@@ -7,6 +7,7 @@ import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ContentStatus, Prisma } from '@prisma/client';
 import { sanitizeContent } from '@/utils/html-sanitizer';
+import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
 import { generateRandomName } from '@/utils/random-name';
 import { limit, PagedResponse } from '@/pagination';
@@ -63,6 +64,8 @@ export class ArticlesService {
         title: true,
         slug: true,
         languageCode: true,
+        excerpt: true,
+        readingTime: true,
       },
       orderBy: { languageCode: 'asc' as const },
     },
@@ -90,11 +93,12 @@ export class ArticlesService {
 
   private sanitizeTranslation<T extends { title: string; content: string; excerpt?: string }>(
     translation: T,
-  ): T & { slug: string } {
+  ): T & { slug: string; readingTime: number } {
     return {
       ...translation,
       slug: slugifySafe(translation.title),
       content: sanitizeContent(translation.content),
+      readingTime: computeReadingTime(translation.content),
       ...(translation.excerpt !== undefined ? { excerpt: sanitizeContent(translation.excerpt) } : {}),
     };
   }
@@ -268,6 +272,8 @@ export class ArticlesService {
               title: true,
               slug: true,
               languageCode: true,
+              excerpt: true,
+              readingTime: true,
             },
             where: { languageCode: query.languageCode },
           },

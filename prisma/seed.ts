@@ -16,6 +16,7 @@ import { createHash, randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, ContentStatus, UserRole, UserStatus, ReportStatus, TargetType } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { computeReadingTime } from '@/utils/reading-time';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL as string });
 const prisma = new PrismaClient({ adapter } as any);
@@ -254,6 +255,7 @@ async function main() {
           create: {
             ...translation,
             languageCode: 'it',
+            readingTime: computeReadingTime(translation.content),
             tenantId: tenant.id,
           },
         },

@@ -5,6 +5,7 @@ import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-artic
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ContentStatus, Prisma } from '@prisma/client';
 import { sanitizeContent } from '@/utils/html-sanitizer';
+import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
 
 @Injectable()
@@ -63,11 +64,12 @@ export class ArticleTranslationsService {
 
   private sanitizeTranslation<T extends { title: string; content: string; excerpt?: string }>(
     translation: T,
-  ): T & { slug: string } {
+  ): T & { slug: string; readingTime: number } {
     return {
       ...translation,
       slug: slugifySafe(translation.title),
       content: sanitizeContent(translation.content),
+      readingTime: computeReadingTime(translation.content),
       ...(translation.excerpt !== undefined ? { excerpt: sanitizeContent(translation.excerpt) } : {}),
     };
   }
@@ -114,6 +116,8 @@ export class ArticleTranslationsService {
         title: true,
         slug: true,
         languageCode: true,
+        excerpt: true,
+        readingTime: true,
       },
       orderBy: { languageCode: 'asc' },
     });
@@ -144,9 +148,15 @@ export class ArticleTranslationsService {
       ? await this.bannedWordsService.checkText(tenantId, textToCheck)
       : false;
 
-    const sanitizedDto: UpdateArticleTranslationDto & { slug?: string } = {
+    const sanitizedDto: UpdateArticleTranslationDto & {
+      slug?: string;
+      readingTime?: number;
+    } = {
       ...dto,
       ...(dto.content !== undefined ? { content: sanitizeContent(dto.content) } : {}),
+      ...(dto.content !== undefined
+        ? { readingTime: computeReadingTime(dto.content) }
+        : {}),
       ...(dto.excerpt !== undefined ? { excerpt: sanitizeContent(dto.excerpt) } : {}),
     };
 

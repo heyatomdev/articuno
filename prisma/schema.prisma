@@ -204,6 +204,7 @@ model ArticleTranslation {
   slug            String
   metaTitle       String?
   metaDescription String?
+  readingTime     Int     @default(0)
 
   articleId String
   article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
