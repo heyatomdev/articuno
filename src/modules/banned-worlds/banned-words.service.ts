@@ -61,17 +61,22 @@ export class BannedWordsService {
     ): Promise<PagedResponse<BannedWordDto>> {
         const pageSize = limit(filters);
         const offset = filters.offset ?? 0;
+        const search = filters.search?.trim();
+        const where = {
+            tenantId,
+            ...(search
+                ? { word: { contains: search, mode: 'insensitive' as const } }
+                : {}),
+        };
 
         const [items, totalCount] = await this.prisma.$transaction([
             this.prisma.bannedWord.findMany({
-                where: { tenantId },
+                where,
                 orderBy: { word: 'asc' },
                 take: pageSize,
                 skip: offset,
             }),
-            this.prisma.bannedWord.count({
-                where: { tenantId },
-            }),
+            this.prisma.bannedWord.count({ where }),
         ]);
 
         return {
