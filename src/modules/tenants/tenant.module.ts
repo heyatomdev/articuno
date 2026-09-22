@@ -8,12 +8,11 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { TenantMiddleware } from '@/modules/tenants/middleware/tenant.middleware';
 import { TenantSeedService } from '@/modules/tenants/tenant-seed.service';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
-import { BastionModule } from '@/modules/bastion/bastion.module';
 
 @Module({
   // BastionModule for BastionJwksService: TenantMiddleware accepts a Bastion
   // service-client Bearer alongside the X-API-Key.
-  imports: [PrismaModule, BannedWordsModule, BastionModule],
+  imports: [PrismaModule, BannedWordsModule],
   providers: [TenantMiddleware, TenantSeedService],
   exports: [TenantMiddleware],
 })

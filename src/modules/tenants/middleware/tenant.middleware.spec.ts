@@ -4,7 +4,8 @@ import { Test } from '@nestjs/testing';
 import { NextFunction, Request, Response } from 'express';
 import * as crypto from 'crypto';
 import { TenantMiddleware } from './tenant.middleware';
-import { BastionJwksService } from '@/modules/bastion/bastion-jwks.service';
+
+import { BastionJwksService } from '@heyatom/bastion-client/nest';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 
 const mockJwks = { verify: jest.fn() };

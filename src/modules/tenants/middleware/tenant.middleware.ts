@@ -6,7 +6,11 @@ import {
 import { Request, Response, NextFunction } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { BastionJwksService } from '@/modules/bastion/bastion-jwks.service';
+
+import {
+  BastionJwksService,
+  isServiceClientToken,
+} from '@heyatom/bastion-client/nest';
 import { Tenant } from '@prisma/client';
 import * as crypto from 'crypto';
 
@@ -73,7 +77,7 @@ export class TenantMiddleware implements NestMiddleware {
     // Exactly the opposite set to BastionUserGuard, which rejects machine tokens:
     // the public API is machine-to-machine, so a *user* token must not open it.
     // A console admin holding a user-JWT has `/admin/*`; this surface is not that.
-    if (payload.type !== 'service_client') {
+    if (!isServiceClientToken(payload)) {
       throw new UnauthorizedException('Token non di tipo service_client');
     }
 

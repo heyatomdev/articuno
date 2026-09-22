@@ -21,7 +21,7 @@ import { CommentsModule } from '@/modules/comments/comments.module';
 import { WebhooksModule } from '@/modules/webhook/webhooks.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { AnalyticsModule } from '@/modules/analytics/analytics.module';
-import { BastionModule } from '@/modules/bastion/bastion.module';
+
 import { AdminWebhooksController } from '@/modules/admin/controllers/admin-webhooks.controller';
 import { AdminNotificationsController } from '@/modules/admin/controllers/admin-notifications.controller';
 import { AdminStatsController } from '@/modules/admin/controllers/admin-stats.controller';
@@ -43,7 +43,6 @@ import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
     WebhooksModule,
     NotificationsModule,
     AnalyticsModule,
-    BastionModule,
   ],
   controllers: [
     AdminArticlesController,
@@ -61,4 +60,3 @@ import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
   providers: [AdminThrottlerGuard],
 })
 export class AdminModule {}
-
