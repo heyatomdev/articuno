@@ -13,8 +13,11 @@ export const configValidationSchema = Joi.object({
   // Database
   DATABASE_URL: Joi.string().required(),
 
-  // Bastion (admin auth) — see src/modules/bastion
+  // Bastion — see src/modules/bastion
   BASTION_URL: Joi.string().uri({ allowRelative: false }).required(),
+  // Also the expected `serviceSlug` of a service-client token on the public API
+  // (TenantMiddleware). Bastion registers the app and the service under one slug,
+  // so this is the same value on both sides — no second key for the same fact.
   BASTION_APP_SLUG: Joi.string().default('articuno'),
   BASTION_JWKS_TTL_MS: Joi.number().positive().default(3_600_000),
   // Must include `meridian`: the console forwards its own user-JWT, whose appSlug
