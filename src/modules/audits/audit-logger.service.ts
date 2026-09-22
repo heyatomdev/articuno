@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AuditAction, AuditResourceType, UserRole, Prisma } from '@prisma/client';
+import { AuditAction, AuditResourceType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 
 export interface AuditLogEntry {
   tenantId: string;
   actorUserId: string;
-  actorRole: UserRole;
+  // Plain string since the Bastion migration: Articuno UserRole values for public
+  // callers, Bastion roles (SUPER_ADMIN, ADMIN, MODERATOR, AUTHOR) for admin ones.
+  actorRole: string;
   action: AuditAction;
   resourceType: AuditResourceType;
   resourceId: string;

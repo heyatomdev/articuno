@@ -15,11 +15,14 @@ import {
   ApiOperation,
   ApiResponse,
   ApiCookieAuth,
+  ApiBearerAuth,
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
 import { CommentsService } from '@/modules/comments/comments.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
+import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
@@ -30,8 +33,9 @@ import { AuditAction, AuditResourceType } from '@prisma/client';
 
 @ApiTags('Admin / Comments')
 @ApiCookieAuth('sessionId')
+@ApiBearerAuth()
 @Controller('admin/comments')
-@UseGuards(SessionGuard)
+@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
 export class AdminCommentsController {
   constructor(
     private readonly commentsService: CommentsService,
@@ -47,7 +51,7 @@ export class AdminCommentsController {
   })
   @ApiResponse({ status: 200, description: 'Paginated list of comments.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  findAll(@GetSession() session: any, @Query() query: CommentFiltersQueryDto) {
+  findAll(@GetSession() session: AdminSession, @Query() query: CommentFiltersQueryDto) {
     return this.commentsService.findAll(session.tenantId, query, undefined, true);
   }
 
@@ -60,7 +64,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 200, description: 'Comment found.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
-  findOne(@GetSession() session: any, @Param() params: CommentParamsDto) {
+  findOne(@GetSession() session: AdminSession, @Param() params: CommentParamsDto) {
     return this.commentsService.findOne(session.tenantId, params.id, undefined, true);
   }
 
@@ -76,7 +80,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
   async update(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: CommentParamsDto,
     @Body() dto: UpdateCommentDto,
   ) {
@@ -116,7 +120,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 204, description: 'Comment deleted successfully – no content returned.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
-  async remove(@GetSession() session: any, @Param() params: CommentParamsDto) {
+  async remove(@GetSession() session: AdminSession, @Param() params: CommentParamsDto) {
     const comment = await this.prisma.comment.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { status: true, content: true },

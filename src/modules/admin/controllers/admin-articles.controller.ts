@@ -23,13 +23,16 @@ import {
   ApiOperation,
   ApiResponse,
   ApiCookieAuth,
+  ApiBearerAuth,
   ApiParam,
   ApiBody,
   ApiConsumes,
 } from '@nestjs/swagger';
 import { ArticlesService } from '@/modules/articles/articles.service';
 import { ArticleTranslationsService } from '@/modules/article-translations/article-translations.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
+import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
@@ -46,8 +49,9 @@ import { AuditAction, AuditResourceType } from '@prisma/client';
 
 @ApiTags('Admin / Articles')
 @ApiCookieAuth('sessionId')
+@ApiBearerAuth()
 @Controller('admin/articles')
-@UseGuards(SessionGuard)
+@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
 export class AdminArticlesController {
   constructor(
     private readonly articlesService: ArticlesService,
@@ -129,7 +133,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 400, description: 'Validation error, invalid JSON in `data` field, or FileHarbor not configured.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   async create(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Body('data') rawData: string,
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
@@ -171,7 +175,10 @@ export class AdminArticlesController {
   })
   @ApiResponse({ status: 200, description: 'Paginated list of articles.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  findAll(@GetSession() session: any, @Query() query: ArticleFiltersQueryDto) {
+  findAll(
+    @GetSession() session: AdminSession,
+    @Query() query: ArticleFiltersQueryDto,
+  ) {
     return this.articlesService.findAll(session.tenantId, query);
   }
 
@@ -184,7 +191,10 @@ export class AdminArticlesController {
   @ApiResponse({ status: 200, description: 'Article found.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  findOne(@GetSession() session: any, @Param() params: ArticleParamsDto) {
+  findOne(
+    @GetSession() session: AdminSession,
+    @Param() params: ArticleParamsDto,
+  ) {
     return this.articlesService.findOneById(session.tenantId, params.id);
   }
 
@@ -221,7 +231,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   async update(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: ArticleParamsDto,
     @Body('data') rawData: string,
     @Body() rawBody: object,
@@ -286,7 +296,10 @@ export class AdminArticlesController {
   @ApiResponse({ status: 204, description: 'Article deleted successfully – no content returned.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  async remove(@GetSession() session: any, @Param() params: ArticleParamsDto) {
+  async remove(
+    @GetSession() session: AdminSession,
+    @Param() params: ArticleParamsDto,
+  ) {
     const existing = await this.prisma.article.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: {
@@ -332,7 +345,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 404, description: 'Article not found.' })
   @ApiResponse({ status: 409, description: 'A translation for this language code already exists.' })
   async createTranslation(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: ArticleParamsDto,
     @Body() dto: CreateArticleTranslationDto,
   ) {
@@ -361,7 +374,10 @@ export class AdminArticlesController {
   @ApiResponse({ status: 200, description: 'List of translations.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  findTranslations(@GetSession() session: any, @Param() params: ArticleParamsDto) {
+  findTranslations(
+    @GetSession() session: AdminSession,
+    @Param() params: ArticleParamsDto,
+  ) {
     return this.articleTranslationsService.findAll(session.tenantId, params.id);
   }
 
@@ -376,7 +392,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Translation not found.' })
   findTranslation(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: ArticleTranslationParamsDto,
   ) {
     return this.articleTranslationsService.findOne(
@@ -399,7 +415,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article or translation not found.' })
   async updateTranslation(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: ArticleTranslationParamsDto,
     @Body() dto: UpdateArticleTranslationDto,
   ) {
@@ -436,7 +452,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article or translation not found.' })
   async removeTranslation(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: ArticleTranslationParamsDto,
   ) {
     await this.articleTranslationsService.remove(

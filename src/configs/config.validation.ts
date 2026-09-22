@@ -12,4 +12,15 @@ export const configValidationSchema = Joi.object({
 
   // Database
   DATABASE_URL: Joi.string().required(),
+
+  // Bastion (admin auth) — see src/modules/bastion
+  BASTION_URL: Joi.string().uri({ allowRelative: false }).required(),
+  BASTION_APP_SLUG: Joi.string().default('articuno'),
+  BASTION_JWKS_TTL_MS: Joi.number().positive().default(3_600_000),
+  // Must include `meridian`: the console forwards its own user-JWT, whose appSlug
+  // is `meridian`, not `articuno`.
+  ADMIN_ACCEPTED_APP_SLUGS: Joi.string().default('articuno,meridian'),
+  ADMIN_ACCEPTED_ROLES: Joi.string().default(
+    'SUPER_ADMIN,ADMIN,MODERATOR,AUTHOR',
+  ),
 });

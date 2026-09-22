@@ -1,5 +1,5 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
-import { AuditAction, AuditResourceType, UserRole } from '@prisma/client';
+import { AuditAction, AuditResourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBannedWordDto } from './dto/create-banned-word.dto';
 import { limit, PagedResponse } from '@/pagination';
@@ -9,7 +9,7 @@ import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 
 export interface ActorInfo {
     actorUserId: string;
-    actorRole: UserRole;
+    actorRole: string;
 }
 
 @Injectable()

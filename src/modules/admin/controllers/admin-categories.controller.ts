@@ -12,7 +12,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CategoriesService } from '@/modules/categories/categories.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
+import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
 import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
@@ -21,11 +23,12 @@ import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-que
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
-import {ApiTags} from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Admin / Categories')
+@ApiBearerAuth()
 @Controller('admin/categories')
-@UseGuards(SessionGuard)
+@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
 export class AdminCategoriesController {
   constructor(
     private readonly categoriesService: CategoriesService,
@@ -34,7 +37,7 @@ export class AdminCategoriesController {
   ) {}
 
   @Post()
-  async create(@GetSession() session: any, @Body() dto: CreateCategoryDto) {
+  async create(@GetSession() session: AdminSession, @Body() dto: CreateCategoryDto) {
     const category = await this.categoriesService.create(session.tenantId, dto);
 
     await this.auditLogger.log({
@@ -52,18 +55,18 @@ export class AdminCategoriesController {
   }
 
   @Get()
-  findAll(@GetSession() session: any, @Query() query: CategoryListQueryDto) {
+  findAll(@GetSession() session: AdminSession, @Query() query: CategoryListQueryDto) {
     return this.categoriesService.findAll(session.tenantId, query);
   }
 
   @Get(':id')
-  findOne(@GetSession() session: any, @Param() params: CategoryParamsDto) {
+  findOne(@GetSession() session: AdminSession, @Param() params: CategoryParamsDto) {
     return this.categoriesService.findOne(session.tenantId, params.id);
   }
 
   @Patch(':id')
   async update(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: CategoryParamsDto,
     @Body() dto: UpdateCategoryDto,
   ) {
@@ -85,7 +88,7 @@ export class AdminCategoriesController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@GetSession() session: any, @Param() params: CategoryParamsDto) {
+  async remove(@GetSession() session: AdminSession, @Param() params: CategoryParamsDto) {
     const category = await this.prisma.category.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { name: true },

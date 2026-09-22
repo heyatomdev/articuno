@@ -23,7 +23,7 @@ src/modules/admin/
 ### Controller
 
 Ogni controller:
-1. Usa `@UseGuards(SessionGuard)` per l'autenticazione basata su sessione
+1. Usa `@UseGuards(AdminAuthGuard, AdminThrottlerGuard)` — Bastion user-JWT con fallback sul cookie di sessione
 2. Usa `@GetSession()` decorator per estrarre i dati della sessione
 3. Estrae `session.tenantId` per mantenere l'isolamento multi-tenant
 4. Delega la logica di business ai servizi esistenti
@@ -45,7 +45,21 @@ Ogni controller:
 
 ## Autenticazione
 
-### SessionGuard
+### AdminAuthGuard
+Posizione: `src/modules/bastion/guards/admin-auth.guard.ts`
+
+Guard di transizione: se la richiesta porta un `Authorization: Bearer`, delega a
+`BastionUserGuard` (JWT RS256 Bastion, verificato via JWKS); altrimenti ricade sul
+`SessionGuard` a cookie. Entrambi popolano `request.session` con gli stessi tre campi
+(`tenantId`, `externalId`, `userRole`), quindi i controller non vedono differenza.
+Il ramo a cookie sparisce dopo il cutover della console.
+
+`BastionUserGuard` risolve il `Tenant` Articuno dal claim `tenantId` (uuid Bastion)
+via `Tenant.bastionTenantId`, e fa JIT-upsert dell'admin come riga `User` — serve
+perché `Report.reporterId` / `Report.moderatorId` sono FK reali su
+`users(externalId, tenantId)`.
+
+### SessionGuard (legacy)
 Posizione: `src/modules/auth/guards/session.guard.ts`
 
 **Funzionalità:**

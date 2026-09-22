@@ -16,11 +16,14 @@ import {
   ApiOperation,
   ApiResponse,
   ApiCookieAuth,
+  ApiBearerAuth,
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
 import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
+import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
 import { CreateBannedWordDto } from '@/modules/banned-worlds/dto/create-banned-word.dto';
 import { BannedWordListQueryDto } from '@/modules/banned-worlds/dto/banned-word-list-query.dto';
@@ -29,8 +32,9 @@ import { BannedWordDto } from '@/modules/banned-worlds/dto/banned-word.dto';
 
 @ApiTags('Admin / Banned Words')
 @ApiCookieAuth('sessionId')
+@ApiBearerAuth()
 @Controller('admin/banned-words')
-@UseGuards(SessionGuard)
+@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
 export class AdminBannedWordsController {
   constructor(private readonly bannedWordsService: BannedWordsService) {}
 
@@ -43,7 +47,7 @@ export class AdminBannedWordsController {
   @ApiResponse({ status: 201, description: 'Banned word added successfully.', type: BannedWordDto })
   @ApiResponse({ status: 400, description: 'Validation error – word is missing or out of length bounds.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  create(@GetSession() session: any, @Body() dto: CreateBannedWordDto) {
+  create(@GetSession() session: AdminSession, @Body() dto: CreateBannedWordDto) {
     return this.bannedWordsService.create(session.tenantId, dto, {
       actorUserId: session.externalId,
       actorRole: session.userRole,
@@ -58,7 +62,7 @@ export class AdminBannedWordsController {
   @ApiResponse({ status: 200, description: 'Paginated list of banned words.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Query(new ValidationPipe({ transform: true })) filters: BannedWordListQueryDto,
   ): Promise<PagedResponse<BannedWordDto>> {
     return this.bannedWordsService.findAll(session.tenantId, filters);
@@ -74,7 +78,7 @@ export class AdminBannedWordsController {
   @ApiResponse({ status: 204, description: 'Banned word removed successfully – no content returned.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Banned word not found.' })
-  async remove(@Param('id') id: string, @GetSession() session: any) {
+  async remove(@Param('id') id: string, @GetSession() session: AdminSession) {
     await this.bannedWordsService.remove(id, session.tenantId, {
       actorUserId: session.externalId,
       actorRole: session.userRole,

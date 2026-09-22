@@ -23,6 +23,11 @@ model Tenant {
   apiKey  String  @unique // Hash della chiave (tipo password)
   enabled Boolean @default(true)
 
+  // Bastion tenant uuid (NOT the slug: Articuno's `default` maps to Bastion's `dbd`
+  // in production and `dev` locally). Resolved by BastionUserGuard from the
+  // `tenantId` claim. Null = tenant unreachable from the Bastion-authenticated console.
+  bastionTenantId String? @unique
+
   users               User[]
   categories          Category[]
   tags                Tag[]
@@ -407,7 +412,7 @@ model AuditLog {
 
   // Actor (who did it)
   actorUserId String // externalId of user who performed action
-  actorRole   UserRole // cached role at time of action (for audit trail)
+  actorRole   String // cached role at time of action (Articuno UserRole or Bastion role, as a plain string)
 
   // Action details
   action       AuditAction

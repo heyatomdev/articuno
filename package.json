@@ -43,6 +43,7 @@
     "date-fns": "^4.4.0",
     "form-data": "^4.0.6",
     "joi": "^18.2.3",
+    "jose": "^6.2.12",
     "multer": "^2.2.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
@@ -97,7 +98,13 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1"
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!jose)/"
+    ]
   },
   "pnpm": {
     "onlyBuiltDependencies": [
