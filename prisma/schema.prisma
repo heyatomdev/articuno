@@ -309,35 +309,6 @@ model BannedWord {
   @@map("banned_words")
 }
 
-model ApiKey {
-  id String @id @default(uuid())
-
-  // Public identifier
-  keyId  String @unique
-  secret String
-
-  // Metadati
-  name     String // "CI/CD deploy", "External bot"
-  tenantId String
-  userId   String
-
-  // Autorizzazioni
-  scopes String[] // ["articles:write", "reports:read"]
-
-  // Audit
-  createdAt  DateTime  @default(now())
-  expiresAt  DateTime?
-  lastUsedAt DateTime?
-
-  // Soft delete
-  revokedAt DateTime?
-
-  @@unique([tenantId, keyId])
-  @@index([tenantId])
-  @@index([keyId])
-  @@map("api_keys")
-}
-
 model AuditLog {
   // Primary key
   id String @id @default(uuid())
