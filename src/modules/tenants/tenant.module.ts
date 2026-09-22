@@ -13,8 +13,14 @@ export class TenantModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer
             .apply(TenantMiddleware)
+            // Le probe di health e /status devono restare pubbliche: la voce
+            // `health` da sola copriva solo il path nudo, non /health/live né
+            // /health/ready, che rispondevano 401 "API Key mancante" a ogni
+            // orchestratore e alla dashboard di Meridian.
             .exclude(
               { path: 'health', method: RequestMethod.GET },
+              { path: 'health/{*path}', method: RequestMethod.GET },
+              { path: 'status', method: RequestMethod.GET },
               { path: 'admin', method: RequestMethod.ALL },
               { path: 'admin/(.*)', method: RequestMethod.ALL },
             )

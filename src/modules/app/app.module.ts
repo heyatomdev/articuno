@@ -23,6 +23,7 @@ import { WebhooksModule } from '@/modules/webhook/webhooks.module';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { AdminModule } from '@/modules/admin/admin.module';
 import {NotificationsModule} from "@/modules/notifications/notifications.module";
+import {HealthModule} from "@/modules/health/health.module";
 
 @Module({
     controllers: [StatusController],
@@ -68,6 +69,7 @@ import {NotificationsModule} from "@/modules/notifications/notifications.module"
         TagsModule,
         TenantModule,
         UsersModule,
+        HealthModule,
 
         // Admin only module
         AdminModule,

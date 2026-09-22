@@ -4,6 +4,7 @@ import { HealthCheck, HealthCheckService, PrismaHealthIndicator } from '@nestjs/
 import { PrismaService } from '../prisma/prisma.service';
 import { Public } from '@/decorators/public.decorator';
 
+
 @ApiTags('health')
 @Controller('health')
 export class HealthController {

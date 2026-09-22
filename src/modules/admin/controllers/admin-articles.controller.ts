@@ -17,7 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
+import { isUUID, validate } from 'class-validator';
 import {
   ApiTags,
   ApiOperation,
@@ -36,7 +36,7 @@ import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
-import { ArticleParamsDto } from '@/modules/articles/dto/article-params.dto';
+import { ArticleKeyParamsDto, ArticleParamsDto } from '@/modules/articles/dto/article-params.dto';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
@@ -182,20 +182,24 @@ export class AdminArticlesController {
     return this.articlesService.findAll(session.tenantId, query);
   }
 
-  @Get(':id')
+  @Get(':key')
   @ApiOperation({
-    summary: 'Get an article by ID',
-    description: 'Returns a single article identified by its UUID, including all translations.',
+    summary: 'Get an article by ID or slug',
+    description:
+      'Returns a single article, including all translations. The key is either the article UUID ' +
+      'or the slug of any of its translations (slugs are unique per tenant).',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({ name: 'key', description: 'UUID of the article, or a translation slug', example: 'getting-started-with-nestjs' })
   @ApiResponse({ status: 200, description: 'Article found.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   findOne(
     @GetSession() session: AdminSession,
-    @Param() params: ArticleParamsDto,
+    @Param() params: ArticleKeyParamsDto,
   ) {
-    return this.articlesService.findOneById(session.tenantId, params.id);
+    return isUUID(params.key)
+      ? this.articlesService.findOneById(session.tenantId, params.key)
+      : this.articlesService.findOne(session.tenantId, params.key);
   }
 
   /**
