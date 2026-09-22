@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditListQueryDto } from '@/modules/audits/dto/audit-list-query.dto';
-import { limit, PagedResponse } from '@/pagination';
+import { PaginatedResult, paginate } from '@/common/pagination';
 
 @Injectable()
 export class AuditsService {
@@ -10,7 +10,7 @@ export class AuditsService {
   async findAll(
     tenantId: string,
     query: AuditListQueryDto,
-  ): Promise<PagedResponse<any>> {
+  ): Promise<PaginatedResult<any>> {
     const where = {
       tenantId,
       ...(query.action && { action: query.action }),
@@ -18,28 +18,17 @@ export class AuditsService {
       ...(query.actorUserId && { actorUserId: query.actorUserId }),
     };
 
-    const [items, totalCount] = await this.prisma.$transaction([
+    const [items, total] = await this.prisma.$transaction([
       this.prisma.auditLog.findMany({
         where,
         orderBy: { timestamp: 'desc' },
-        take: limit(query),
-        skip: query.offset,
+        take: query.limit,
+        skip: query.skip,
       }),
       this.prisma.auditLog.count({ where }),
     ]);
 
-    const pageSize = query.limit ?? 20;
-    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
-
-    return {
-      items,
-      pagination: {
-        totalCount,
-        currentPage,
-        pageSize,
-        totalPages: Math.ceil(totalCount / pageSize),
-      },
-    };
+    return paginate(items, total, query);
   }
 
   async findOne(id: string, tenantId: string) {

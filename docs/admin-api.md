@@ -51,7 +51,7 @@ Content-Type: application/json
 
 ### 2. Ottenere tutti gli Articoli
 ```http
-GET /admin/articles?status=PUBLISHED&categoryId=cat-123&limit=20&offset=0
+GET /admin/articles?status=PUBLISHED&categoryId=cat-123&page=1&limit=20
 Authorization: Bearer <bastion-user-jwt>
 ```
 
@@ -60,8 +60,8 @@ Authorization: Bearer <bastion-user-jwt>
 - `categoryId`: ID della categoria
 - `featured`: true | false
 - `tagId`: ID del tag
-- `limit`: numero di risultati (default: 20, max: 100)
-- `offset`: paginazione offset
+- `page`: numero di pagina, 1-based (default: 1)
+- `limit`: numero di risultati per pagina (default: 20, max: 100)
 
 ### 3. Ottenere un Articolo per Slug
 ```http

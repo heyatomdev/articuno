@@ -6,7 +6,7 @@ import { ContentStatus, ReportStatus, TargetType, UserStatus } from '@prisma/cli
 import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto';
-import { limit, PagedResponse } from '@/pagination';
+import { PaginatedResult, paginate } from '@/common/pagination';
 
 /**
  * Internal extension of CreateReportDto used by the admin path only.
@@ -318,7 +318,7 @@ export class ReportsService {
         }));
     }
 
-    async findAll(tenantId: string, query: ReportListQueryDto): Promise<PagedResponse<any>> {
+    async findAll(tenantId: string, query: ReportListQueryDto): Promise<PaginatedResult<any>> {
         const where = {
             tenantId,
             ...(query.status     && { status: query.status }),
@@ -329,29 +329,18 @@ export class ReportsService {
             ...(query.reason     && { reason: { contains: query.reason, mode: 'insensitive' as const } }),
         };
 
-        const [items, totalCount] = await this.prisma.$transaction([
+        const [items, total] = await this.prisma.$transaction([
             this.prisma.report.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
-                take: limit(query),
-                skip: query.offset,
+                take: query.limit,
+                skip: query.skip,
                 include: reportUserIncludes,
             }),
             this.prisma.report.count({ where }),
         ]);
 
-        const pageSize = query.limit ?? 20;
-        const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
-
-        return {
-            items: await this.withTargets(tenantId, items),
-            pagination: {
-                totalCount,
-                currentPage,
-                pageSize,
-                totalPages: Math.ceil(totalCount / pageSize),
-            },
-        };
+        return paginate(await this.withTargets(tenantId, items), total, query);
     }
 
     async findOne(id: string, tenantId: string) {

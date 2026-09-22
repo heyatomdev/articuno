@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { UpsertUserDto } from '@/modules/users/dto/upsert-user.dto';
-import { limit, PagedResponse } from '@/pagination';
+import { PaginatedResult, paginate } from '@/common/pagination';
 import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
 import { UserRole, UserStatus } from '@prisma/client';
@@ -56,37 +56,30 @@ export class UsersService {
   async findAll(
     tenantId: string,
     query: UserListQueryDto,
-  ): Promise<PagedResponse<UserListItemDto>> {
+  ): Promise<PaginatedResult<UserListItemDto>> {
     const where: Parameters<typeof this.prisma.user.findMany>[0]['where'] = {
       tenantId,
       ...(query.username ? { username: { contains: query.username, mode: 'insensitive' } } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.role ? { role: query.role } : {}),
     };
-    const pageSize = limit(query);
 
-    const [items, totalCount] = await this.prisma.$transaction([
+    const [items, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: pageSize,
-        skip: query.offset,
+        take: query.limit,
+        skip: query.skip,
         select: this.userListSelect,
       }),
       this.prisma.user.count({ where }),
     ]);
 
-    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
-
-    return {
-      items: items.map((user) => this.mapUserListItem(user)),
-      pagination: {
-        totalCount,
-        currentPage,
-        pageSize,
-        totalPages: Math.ceil(totalCount / pageSize),
-      },
-    };
+    return paginate(
+      items.map((user) => this.mapUserListItem(user)),
+      total,
+      query,
+    );
   }
 
   async findOne(tenantId: string, id: string): Promise<UserListItemDto> {

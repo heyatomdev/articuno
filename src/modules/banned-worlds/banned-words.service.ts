@@ -2,7 +2,7 @@ import { Injectable, ConflictException, NotFoundException } from '@nestjs/common
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBannedWordDto } from './dto/create-banned-word.dto';
-import { limit, PagedResponse } from '@/pagination';
+import { PaginatedResult, paginate } from '@/common/pagination';
 import { BannedWordListQueryDto } from './dto/banned-word-list-query.dto';
 import { BannedWordDto } from './dto/banned-word.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
@@ -58,9 +58,7 @@ export class BannedWordsService {
     async findAll(
         tenantId: string,
         filters: BannedWordListQueryDto,
-    ): Promise<PagedResponse<BannedWordDto>> {
-        const pageSize = limit(filters);
-        const offset = filters.offset ?? 0;
+    ): Promise<PaginatedResult<BannedWordDto>> {
         const search = filters.search?.trim();
         const where = {
             tenantId,
@@ -69,25 +67,17 @@ export class BannedWordsService {
                 : {}),
         };
 
-        const [items, totalCount] = await this.prisma.$transaction([
+        const [items, total] = await this.prisma.$transaction([
             this.prisma.bannedWord.findMany({
                 where,
                 orderBy: { word: 'asc' },
-                take: pageSize,
-                skip: offset,
+                take: filters.limit,
+                skip: filters.skip,
             }),
             this.prisma.bannedWord.count({ where }),
         ]);
 
-        return {
-            items,
-            pagination: {
-                totalCount,
-                currentPage: Math.floor(offset / pageSize) + 1,
-                pageSize,
-                totalPages: Math.ceil(totalCount / pageSize),
-            },
-        };
+        return paginate(items, total, filters);
     }
 
     private async findAllForTenant(tenantId: string) {

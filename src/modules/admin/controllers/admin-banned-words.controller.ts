@@ -26,7 +26,7 @@ import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateBannedWordDto } from '@/modules/banned-worlds/dto/create-banned-word.dto';
 import { BannedWordListQueryDto } from '@/modules/banned-worlds/dto/banned-word-list-query.dto';
-import { PagedResponse } from '@/pagination';
+import { PaginatedResult } from '@/common/pagination';
 import { BannedWordDto } from '@/modules/banned-worlds/dto/banned-word.dto';
 
 @ApiTags('Admin / Banned Words')
@@ -62,7 +62,7 @@ export class AdminBannedWordsController {
   findAll(
     @GetSession() session: AdminSession,
     @Query(new ValidationPipe({ transform: true })) filters: BannedWordListQueryDto,
-  ): Promise<PagedResponse<BannedWordDto>> {
+  ): Promise<PaginatedResult<BannedWordDto>> {
     return this.bannedWordsService.findAll(session.tenantId, filters);
   }
 

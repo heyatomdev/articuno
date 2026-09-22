@@ -27,7 +27,7 @@ import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
 import { UserParamsDto } from '@/modules/users/dto/user-params.dto';
 import { UpdateUserStatusDto } from '@/modules/users/dto/update-user-status.dto';
 import { UpdateUserRoleDto } from '@/modules/users/dto/update-user-role.dto';
-import { PagedResponse } from '@/pagination';
+import { PaginatedResult } from '@/common/pagination';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 
@@ -51,7 +51,7 @@ export class AdminUsersController {
   findAll(
     @GetSession() session: AdminSession,
     @Query() query: UserListQueryDto,
-  ): Promise<PagedResponse<UserListItemDto>> {
+  ): Promise<PaginatedResult<UserListItemDto>> {
     return this.usersService.findAll(session.tenantId, query);
   }
 

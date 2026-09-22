@@ -26,7 +26,7 @@ import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
 import { TagParamsDto } from '@/modules/tags/dto/tag-params.dto';
 import { TagSlugParamsDto } from '@/modules/tags/dto/tag-slug-params.dto';
 import { TagsListQuery } from "@/modules/tags/queries/tags.query";
-import { PagedResponse } from "@/pagination";
+import { PaginatedResult } from "@/common/pagination";
 import { TagDto } from "@/modules/tags/dto/tags.dto";
 
 @ApiTags('Tags')
@@ -57,7 +57,7 @@ export class TagsController {
   })
   @ApiResponse({ status: 200, description: 'Paginated list of tags.', type: TagDto, isArray: true })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  findAll(@GetTenant() tenant: any, @Query(new ValidationPipe({ transform: true })) filters: TagsListQuery): Promise<PagedResponse<TagDto>> {
+  findAll(@GetTenant() tenant: any, @Query(new ValidationPipe({ transform: true })) filters: TagsListQuery): Promise<PaginatedResult<TagDto>> {
     return this.tagsService.findAll(tenant.id, filters);
   }
 

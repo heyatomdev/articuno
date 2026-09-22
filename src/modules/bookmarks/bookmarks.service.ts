@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { PagedQuery, limit } from '@/pagination';
+import { PageParams, PaginatedResult, paginate } from '@/common/pagination';
 
 @Injectable()
 export class BookmarksService {
@@ -58,34 +58,29 @@ export class BookmarksService {
     return { bookmarked: true };
   }
 
-  async findAll(tenantId: string, externalUserId: string, query: PagedQuery) {
+  async findAll(
+    tenantId: string,
+    externalUserId: string,
+    query: PageParams,
+  ): Promise<PaginatedResult<unknown>> {
     const user = await this.prisma.user.findFirst({
       where: { externalId: externalUserId, tenantId },
       select: { id: true },
     });
 
     if (!user) {
-      return {
-        items: [],
-        pagination: {
-          totalCount: 0,
-          currentPage: 0,
-          pageSize: limit(query),
-          totalPages: 0,
-        },
-      };
+      return paginate([], 0, query);
     }
 
-    const pageSize = limit(query);
     const where = { userId: user.id, tenantId };
 
-    const [totalCount, items] = await this.prisma.$transaction([
+    const [total, items] = await this.prisma.$transaction([
       this.prisma.bookmark.count({ where }),
       this.prisma.bookmark.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: query.offset,
-        take: pageSize,
+        skip: query.skip,
+        take: query.limit,
         include: {
           article: {
             include: {
@@ -100,15 +95,7 @@ export class BookmarksService {
       }),
     ]);
 
-    return {
-      items,
-      pagination: {
-        totalCount,
-        currentPage: Math.floor(query.offset / pageSize),
-        pageSize,
-        totalPages: Math.ceil(totalCount / pageSize),
-      },
-    };
+    return paginate(items, total, query);
   }
 }
 

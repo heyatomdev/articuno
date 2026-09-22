@@ -20,7 +20,7 @@ import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BookmarksService } from '@/modules/bookmarks/bookmarks.service';
 import { BookmarkParamsDto } from '@/modules/bookmarks/dto/bookmark-params.dto';
-import { PagedQuery } from '@/pagination';
+import { PageParams } from '@/common/pagination';
 
 @ApiTags('Bookmarks')
 @ApiSecurity('api-key')
@@ -83,7 +83,7 @@ export class BookmarksController {
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   findAll(
     @GetTenant() tenant: any,
-    @Query() query: PagedQuery,
+    @Query() query: PageParams,
     @Headers('x-user-id') externalUserId?: string,
   ) {
     return this.bookmarksService.findAll(

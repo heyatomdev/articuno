@@ -24,7 +24,7 @@ import { CreateBannedWordDto } from './dto/create-banned-word.dto';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BannedWordListQueryDto } from './dto/banned-word-list-query.dto';
-import { PagedResponse } from '@/pagination';
+import { PaginatedResult } from '@/common/pagination';
 import { BannedWordDto } from './dto/banned-word.dto';
 
 @ApiTags('Banned Words')
@@ -60,7 +60,7 @@ export class BannedWordsController {
     findAll(
         @GetTenant() tenant: any,
         @Query(new ValidationPipe({ transform: true })) filters: BannedWordListQueryDto,
-    ): Promise<PagedResponse<BannedWordDto>> {
+    ): Promise<PaginatedResult<BannedWordDto>> {
         return this.bannedWordsService.findAll(tenant.id, filters);
     }
 

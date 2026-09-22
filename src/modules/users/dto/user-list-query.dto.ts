@@ -1,9 +1,9 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole, UserStatus } from '@prisma/client';
-import { PagedQuery } from '@/pagination';
+import { PageParams } from '@/common/pagination';
 
-export class UserListQueryDto extends PagedQuery {
+export class UserListQueryDto extends PageParams {
   @ApiPropertyOptional({
     description: 'Filter by username (case-insensitive partial match)',
     example: 'john',

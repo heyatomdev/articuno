@@ -1,9 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { PagedQuery } from '@/pagination';
+import { PageParams } from '@/common/pagination';
 
-export class WebhookEventListQueryDto extends PagedQuery {
+export class WebhookEventListQueryDto extends PageParams {
   @ApiPropertyOptional({
     description: 'Filter by event type (e.g. comment.moderated, article.flagged)',
     example: 'comment.moderated',

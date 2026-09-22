@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { ContentStatus } from '@prisma/client';
-import { PagedQuery } from '@/pagination';
+import { PageParams } from '@/common/pagination';
 
-export class CommentFiltersQueryDto extends PagedQuery {
+export class CommentFiltersQueryDto extends PageParams {
   @ApiProperty({
     description: 'Filter comments by article id',
     required: false,
