@@ -12,10 +12,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CategoriesService } from '@/modules/categories/categories.service';
-import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
 import { CategoryParamsDto } from '@/modules/categories/dto/category-params.dto';
@@ -28,7 +28,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 @ApiTags('Admin / Categories')
 @ApiBearerAuth()
 @Controller('admin/categories')
-@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminCategoriesController {
   constructor(
     private readonly categoriesService: CategoriesService,

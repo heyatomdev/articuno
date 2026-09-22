@@ -13,10 +13,10 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { TagsService } from '@/modules/tags/tags.service';
-import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateTagDto } from '@/modules/tags/dto/create-tag.dto';
 import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
 import { TagParamsDto } from '@/modules/tags/dto/tag-params.dto';
@@ -31,7 +31,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 @ApiTags('Admin / Tags')
 @ApiBearerAuth()
 @Controller('admin/tags')
-@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminTagsController {
   constructor(
     private readonly tagsService: TagsService,

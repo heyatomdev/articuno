@@ -22,7 +22,6 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
   ApiBearerAuth,
   ApiParam,
   ApiBody,
@@ -30,10 +29,10 @@ import {
 } from '@nestjs/swagger';
 import { ArticlesService } from '@/modules/articles/articles.service';
 import { ArticleTranslationsService } from '@/modules/article-translations/article-translations.service';
-import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { ArticleKeyParamsDto, ArticleParamsDto } from '@/modules/articles/dto/article-params.dto';
@@ -48,10 +47,9 @@ import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 
 @ApiTags('Admin / Articles')
-@ApiCookieAuth('sessionId')
 @ApiBearerAuth()
 @Controller('admin/articles')
-@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminArticlesController {
   constructor(
     private readonly articlesService: ArticlesService,

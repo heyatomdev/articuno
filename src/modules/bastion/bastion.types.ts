@@ -24,10 +24,9 @@ export interface JwtPayload {
 /**
  * Shape attached to `request.session` and read by `@GetSession()`.
  *
- * Deliberately the three fields every `/admin/*` handler actually uses, so the
- * Bastion guard and the legacy cookie `SessionGuard` are interchangeable without
- * touching a single controller. The cookie guard attaches a full `SessionStorage`
- * row, which is a superset of this.
+ * Deliberately the three fields every `/admin/*` handler actually uses. It was
+ * shaped this way so the Bastion guard could replace the old cookie `SessionGuard`
+ * without touching a single controller; the cookie path is gone, the shape stays.
  */
 export interface AdminSession {
   tenantId: string;

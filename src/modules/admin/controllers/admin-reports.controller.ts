@@ -3,16 +3,15 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
   ApiBearerAuth,
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
 import { ReportsService } from '@/modules/reports/reports.service';
-import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AdminCreateReportDto } from '@/modules/reports/dto/admin-create-report.dto';
 import { AdminUpdateReportDto } from '@/modules/reports/dto/admin-update-report.dto';
 import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto';
@@ -22,10 +21,9 @@ import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 
 @ApiTags('Admin / Reports')
-@ApiCookieAuth('sessionId')
 @ApiBearerAuth()
 @Controller('admin/reports')
-@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminReportsController {
   constructor(
     private readonly reportsService: ReportsService,

@@ -61,8 +61,8 @@ modules/{domain}/
 
 Key module groups:
 - **tenants/** — Multi-tenancy middleware, guard, and `@GetTenant()` decorator
-- **auth/** — Admin session auth, `SessionGuard`, `@GetSession()` decorator, `AuthJob` cleanup
-- **admin/controllers/** — Admin panel routes (reuse existing services behind `SessionGuard`)
+- **bastion/** — Admin auth against Bastion: `BastionUserGuard`, `BastionJwksService`, `@GetSession()` decorator
+- **admin/controllers/** — Admin panel routes (reuse existing services behind `BastionUserGuard`)
 - **articles/** + **article-translations/** — Content with multilingual support
 - **moderation/** — `ModerationPolicyService` (central policy) + `WebhookEventPublisher` (outbox)
 - **reports/** — Polymorphic reports; thresholds trigger auto-moderation
@@ -74,10 +74,15 @@ Key module groups:
 | | Public API | Admin Panel |
 |---|---|---|
 | Path prefix | `/articles`, `/tags`, … | `/admin/articles`, … |
-| Auth | `X-API-Key` header | `sessionId` HTTP-only cookie |
-| Guard | `TenantGuard` | `SessionGuard` |
+| Auth | `X-API-Key` header | `Authorization: Bearer` — Bastion user-JWT (RS256) |
+| Guard | `TenantGuard` | `BastionUserGuard` |
 | Decorator | `@GetTenant()` | `@GetSession()` |
-| Tenant source | SHA-256 hashed key lookup | Session record |
+| Tenant source | SHA-256 hashed key lookup | `Tenant.bastionTenantId` ← JWT `tenantId` claim |
+
+The admin path is stateless: the token is verified against Bastion's cached JWKS, so
+there is no session table, no cookie and no login endpoint in Articuno. The guard
+JIT-upserts the admin as a `User` row because `Report.reporterId` / `Report.moderatorId`
+are real foreign keys onto `users(externalId, tenantId)`.
 
 `TenantMiddleware` runs globally except `/health` (GET) and `/admin/*` routes.
 
@@ -139,7 +144,6 @@ Supported types: JPEG, PNG, GIF, WebP (max 10 MB). `deleteImageSafely()` silentl
 | Job | Schedule | Purpose |
 |---|---|---|
 | `WebhooksJob` | Every 30s | Deliver pending webhook events |
-| `AuthJob` | Hourly + 3 AM daily | Expire sessions; purge inactive (30d+) sessions |
 | `AnalyticsJob` | Midnight UTC | Aggregate `DailyStats` per tenant |
 
 ## Configuration
@@ -169,7 +173,7 @@ Key runtime settings:
 2. Storing plain API keys in the database
 3. Bypassing `ModerationPolicyService` for content mutations
 4. Skipping webhook enqueue after moderation actions
-5. Using `TenantGuard` on admin routes (use `SessionGuard`)
+5. Using `TenantGuard` on admin routes (use `BastionUserGuard`)
 6. Throwing from audit log call sites (it's fire-and-forget by design)
 7. Hardcoding FileHarbor credentials (always read from `tenant.*` at runtime)
 

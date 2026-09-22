@@ -13,8 +13,7 @@
  */
 import 'dotenv/config';
 import { createHash, randomBytes } from 'crypto';
-import * as bcrypt from 'bcrypt';
-import { PrismaClient, ContentStatus, UserRole, UserStatus, ReportStatus, TargetType } from '@prisma/client';
+import { PrismaClient, ContentStatus, UserStatus, ReportStatus, TargetType } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { computeReadingTime } from '@/utils/reading-time';
 
@@ -119,43 +118,6 @@ async function main() {
    console.log(`✅  ${additionalUsers.length} utenti aggiuntivi creati`);
    additionalUsers.forEach((u) => console.log(`    • [${u.id}] ${u.username} (status: ${u.status})`));
    console.log();
-
-   // ── 3b. ADMIN USER ────────────────────────────────────────────────────────────
-  const rawAdminPassword = `Admin@${randomBytes(6).toString('hex')}1!`;
-  const hashedAdminPassword = await bcrypt.hash(rawAdminPassword, 12);
-  const adminEmail = `admin@${tenant.slug}.dev`;
-
-  const existingAdmin = await prisma.adminCredentials.findUnique({ where: { email: adminEmail } });
-
-  if (!existingAdmin) {
-    const adminUser = await prisma.user.upsert({
-      where: { externalId_tenantId: { externalId: 'user-admin', tenantId: tenant.id } },
-      update: {},
-      create: {
-        externalId: 'user-admin',
-        username: 'admin',
-        tenantId: tenant.id,
-        language: 'it',
-        role: UserRole.TENANT_ADMIN,
-      },
-    });
-
-    await prisma.adminCredentials.create({
-      data: {
-        userId: adminUser.id,
-        email: adminEmail,
-        password: hashedAdminPassword,
-      },
-    });
-
-    console.log('✅  Admin creato');
-    console.log(`    Email    : ${adminEmail}`);
-    console.log(`    Password : ${rawAdminPassword}   ← usa questa per il login admin`);
-  } else {
-    console.log('ℹ️   Admin già esistente, skip.');
-    console.log(`    Email    : ${adminEmail}`);
-  }
-  console.log();
 
   // ── 4. ARTICOLI ──────────────────────────────────────────────────────────────
   const articlesData = [
@@ -385,7 +347,7 @@ async function main() {
    console.log();
    console.log('📊 DATA CREATI:');
    console.log(`    • 1 Tenant con ${categories.length} categorie`);
-   console.log(`    • ${users.length + additionalUsers.length + 1} Utenti (base + aggiuntivi con status vari + admin)`);
+   console.log(`    • ${users.length + additionalUsers.length} Utenti (base + aggiuntivi con status vari)`);
    console.log(`    • ${articleCount} Articoli (DBD content)`);
    console.log(`    • ${reportCount} Report (ARTICLE, COMMENT, USER - stati vari)`);
    console.log(`    • ${statsCount} Daily Stats (ultimi 7 giorni con contatori realistici)`);
@@ -393,13 +355,7 @@ async function main() {
    console.log('  Header da usare nelle richieste HTTP:');
    console.log(`    x-api-key: ${rawApiKey}`);
    console.log();
-   console.log('  Login admin panel:');
-   console.log(`    Email    : ${adminEmail}`);
-   if (!existingAdmin) {
-     console.log(`    Password : ${rawAdminPassword}`);
-   } else {
-     console.log('    Password : (già impostata in precedenza)');
-   }
+   console.log('  Admin panel: login via Bastion (nessuna credenziale locale).');
    console.log();
    console.log('  Esempio curl:');
    console.log(`    curl -H "x-api-key: ${rawApiKey}" http://localhost:3000/categories`);

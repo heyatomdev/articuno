@@ -7,10 +7,9 @@ import { AppModule } from './app.module';
  * `compile()` resolves every provider and every controller-scoped enhancer without
  * running lifecycle hooks, so this needs no database and still catches what neither
  * `tsc` nor the guard specs can: a guard whose constructor argument is not
- * resolvable from the module that declares the controller using it. That is how
- * `AdminAuthGuard` shipped needing `SessionGuard` while `BastionModule` exported
- * only the guard itself — green build, green specs, UnknownDependenciesException on
- * boot.
+ * resolvable from the module that declares the controller using it. That shipped
+ * once — a guard needing a provider that `BastionModule` did not export — as a
+ * green build, green specs, and an UnknownDependenciesException on boot.
  */
 describe('AppModule', () => {
   const ENV = {

@@ -14,16 +14,15 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
   ApiBearerAuth,
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
 import { CommentsService } from '@/modules/comments/comments.service';
-import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
 import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
@@ -32,10 +31,9 @@ import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 
 @ApiTags('Admin / Comments')
-@ApiCookieAuth('sessionId')
 @ApiBearerAuth()
 @Controller('admin/comments')
-@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminCommentsController {
   constructor(
     private readonly commentsService: CommentsService,

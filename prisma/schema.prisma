@@ -91,9 +91,6 @@ model User {
   likes         Like[]
   bookmarks     Bookmark[]
   notifications Notification[]
-  sessions      SessionStorage[]
-
-  adminCredentials AdminCredentials?
 
   reportsFiled     Report[] @relation("ReporterReports")
   reportsModerated Report[] @relation("ModeratorReports")
@@ -102,38 +99,6 @@ model User {
 
   @@unique([externalId, tenantId])
   @@map("users")
-}
-
-model AdminCredentials {
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Email admin (potrebbe essere diversa dall'email dell'app)
-  email String @unique
-
-  // Password hash (bcrypt)
-  password String
-
-  // Autenticazione multi-factor (opzionale)
-  totpSecret  String?
-  totpEnabled Boolean @default(false)
-
-  // Audit
-  lastLoginAt          DateTime?
-  lastPasswordChangeAt DateTime  @default(now())
-  loginAttempts        Int       @default(0)
-  isLockedOut          Boolean   @default(false)
-  lockedUntil          DateTime?
-
-  // Soft delete per disattivare senza cancellare
-  disabledAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-  @@map("admin_credentials")
 }
 
 model Category {
@@ -320,9 +285,9 @@ model Report {
   targetId   String // L'ID dell'entità segnalata
 
   reporterId    String
-  reporter      User     @relation("ReporterReports", fields: [reporterId, tenantId], references: [externalId, tenantId], onDelete: Cascade)
+  reporter      User    @relation("ReporterReports", fields: [reporterId, tenantId], references: [externalId, tenantId], onDelete: Cascade)
   moderatorId   String?
-  moderator     User?    @relation("ModeratorReports", fields: [moderatorId, tenantId], references: [externalId, tenantId], onDelete: SetNull)
+  moderator     User?   @relation("ModeratorReports", fields: [moderatorId, tenantId], references: [externalId, tenantId], onDelete: SetNull)
   moderatorNote String?
 
   tenantId String
@@ -342,33 +307,6 @@ model BannedWord {
 
   @@unique([word, tenantId])
   @@map("banned_words")
-}
-
-model SessionStorage {
-  id String @id @default(cuid())
-
-  // Chi ha effettuato il login
-  userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenantId String
-
-  // User snapshot (per performance, non per autorizzazione)
-  userRole   UserRole
-  externalId String
-
-  // Timing
-  createdAt      DateTime @default(now())
-  expiresAt      DateTime
-  lastAccessedAt DateTime @default(now())
-
-  // Sicurezza
-  ipAddress String?
-  userAgent String?
-
-  @@index([id])
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("sessions")
 }
 
 model ApiKey {
@@ -394,9 +332,9 @@ model ApiKey {
   // Soft delete
   revokedAt DateTime?
 
+  @@unique([tenantId, keyId])
   @@index([tenantId])
   @@index([keyId])
-  @@unique([tenantId, keyId])
   @@map("api_keys")
 }
 

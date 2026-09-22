@@ -15,26 +15,24 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
   ApiBearerAuth,
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
 import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
-import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateBannedWordDto } from '@/modules/banned-worlds/dto/create-banned-word.dto';
 import { BannedWordListQueryDto } from '@/modules/banned-worlds/dto/banned-word-list-query.dto';
 import { PagedResponse } from '@/pagination';
 import { BannedWordDto } from '@/modules/banned-worlds/dto/banned-word.dto';
 
 @ApiTags('Admin / Banned Words')
-@ApiCookieAuth('sessionId')
 @ApiBearerAuth()
 @Controller('admin/banned-words')
-@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminBannedWordsController {
   constructor(private readonly bannedWordsService: BannedWordsService) {}
 

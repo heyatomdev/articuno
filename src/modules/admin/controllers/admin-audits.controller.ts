@@ -3,22 +3,20 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
 import { AuditsService } from '@/modules/audits/audits.service';
-import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AuditListQueryDto } from '@/modules/audits/dto/audit-list-query.dto';
 
 @ApiTags('Admin / Audits')
-@ApiCookieAuth('sessionId')
 @ApiBearerAuth()
 @Controller('admin/audits')
-@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminAuditsController {
   constructor(private readonly auditsService: AuditsService) {}
 

@@ -20,7 +20,6 @@ import { BookmarksModule } from '@/modules/bookmarks/bookmarks.module';
 import { CommentsModule } from '@/modules/comments/comments.module';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
 import { WebhooksModule } from '@/modules/webhook/webhooks.module';
-import { AuthModule } from '@/modules/auth/auth.module';
 import { AdminModule } from '@/modules/admin/admin.module';
 import {NotificationsModule} from "@/modules/notifications/notifications.module";
 import {HealthModule} from "@/modules/health/health.module";
@@ -74,7 +73,6 @@ import {HealthModule} from "@/modules/health/health.module";
         // Admin only module
         AdminModule,
         AnalyticsModule,
-        AuthModule,
         NotificationsModule,
         WebhooksModule,
     ],

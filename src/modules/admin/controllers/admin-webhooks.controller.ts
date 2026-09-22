@@ -12,23 +12,21 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
-import { AdminAuthGuard } from '@/modules/bastion/guards/admin-auth.guard';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-list-query.dto';
 import { WebhookEventParamsDto } from '@/modules/webhook/dto/webhook-event-params.dto';
 import { WebhooksService } from '@/modules/webhook/webhooks.service';
 
 @ApiTags('Admin / Webhooks')
-@ApiCookieAuth('sessionId')
 @ApiBearerAuth()
 @Controller('admin/webhooks')
-@UseGuards(AdminAuthGuard, AdminThrottlerGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminWebhooksController {
   constructor(private readonly webhookEventsService: WebhooksService) {}
 

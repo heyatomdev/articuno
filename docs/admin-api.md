@@ -5,44 +5,29 @@
 
 ## Autenticazione
 
-### Login
-Prima di utilizzare le API admin, l'amministratore deve effettuare il login:
+### Token Bastion
+
+Articuno non ha un login proprio: l'amministratore si autentica su **Bastion** (di norma
+attraverso la console Meridian) e inoltra il proprio user-JWT a ogni richiesta.
 
 ```http
-POST /admin/auth/login
-Content-Type: application/json
-
-{
-  "email": "admin@example.com",
-  "password": "your-password"
-}
+Authorization: Bearer <bastion-user-jwt>
 ```
 
-**Risposta:**
-```json
-{
-  "ok": true
-}
-```
+`BastionUserGuard` verifica firma RS256 contro la JWKS di Bastion (in cache), scadenza,
+`appSlug` fra `ADMIN_ACCEPTED_APP_SLUGS` e ruolo fra `ADMIN_ACCEPTED_ROLES`. Il tenant
+Articuno è risolto dal claim `tenantId` (uuid Bastion) via `Tenant.bastionTenantId`.
 
-Il server imposta un cookie `sessionId` che viene utilizzato automaticamente nelle richieste successive.
-
-### Cookie di Sessione
-- **Nome:** `sessionId`
-- **HttpOnly:** true
-- **SameSite:** lax
-- **Secure:** true (in produzione)
-- **Path:** /
-- **Durata:** 7 giorni
+Nessuna sessione lato server: niente cookie, niente scadenza da gestire in Articuno.
 
 ## Endpoints
 
-Tutte le rotte sono sotto `/admin/articles` e richiedono il cookie di sessione valido.
+Tutte le rotte sono sotto `/admin/articles` e richiedono un token Bastion valido.
 
 ### 1. Creare un Articolo
 ```http
 POST /admin/articles
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 Content-Type: application/json
 
 {
@@ -67,7 +52,7 @@ Content-Type: application/json
 ### 2. Ottenere tutti gli Articoli
 ```http
 GET /admin/articles?status=PUBLISHED&categoryId=cat-123&limit=20&offset=0
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 ```
 
 **Query Parameters:**
@@ -81,13 +66,13 @@ Cookie: sessionId=<session-id>
 ### 3. Ottenere un Articolo per Slug
 ```http
 GET /admin/articles/:slug
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 ```
 
 ### 4. Aggiornare un Articolo
 ```http
 PATCH /admin/articles/:id
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 Content-Type: application/json
 
 {
@@ -100,7 +85,7 @@ Content-Type: application/json
 ### 5. Eliminare un Articolo
 ```http
 DELETE /admin/articles/:id
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 ```
 
 **Risposta:** `204 No Content`
@@ -110,7 +95,7 @@ Cookie: sessionId=<session-id>
 #### Creare una traduzione
 ```http
 POST /admin/articles/:id/translations
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 Content-Type: application/json
 
 {
@@ -125,19 +110,19 @@ Content-Type: application/json
 #### Ottenere tutte le traduzioni
 ```http
 GET /admin/articles/:id/translations
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 ```
 
 #### Ottenere una traduzione specifica
 ```http
 GET /admin/articles/:id/translations/:languageCode
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 ```
 
 #### Aggiornare una traduzione
 ```http
 PATCH /admin/articles/:id/translations/:languageCode
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 Content-Type: application/json
 
 {
@@ -149,49 +134,47 @@ Content-Type: application/json
 #### Eliminare una traduzione
 ```http
 DELETE /admin/articles/:id/translations/:languageCode
-Cookie: sessionId=<session-id>
+Authorization: Bearer <bastion-user-jwt>
 ```
 
 ## Differenze con le API Pubbliche
 
 | Aspetto | API Pubbliche (`/articles`) | API Admin (`/admin/articles`) |
 |---------|----------------------------|-------------------------------|
-| Autenticazione | Header `X-API-Key` | Cookie `sessionId` |
-| Tenant Isolation | Automatica tramite API Key | Automatica tramite sessione |
-| Middleware | `TenantMiddleware` + `TenantGuard` | `SessionGuard` |
+| Autenticazione | Header `X-API-Key` | Header `Authorization: Bearer` |
+| Tenant Isolation | Automatica tramite API Key | Automatica tramite claim `tenantId` |
+| Middleware | `TenantMiddleware` + `TenantGuard` | `BastionUserGuard` |
 | Service | `ArticlesService` (riusato) | `ArticlesService` (riusato) |
 
 ## Sicurezza
 
-### SessionGuard
-Il `SessionGuard` verifica che:
-1. Il cookie `sessionId` sia presente
-2. La sessione esista nel database
-3. La sessione non sia scaduta
-4. Aggiorna `lastAccessedAt` ad ogni richiesta
+### BastionUserGuard
+Il `BastionUserGuard` verifica che:
+1. L'header `Authorization: Bearer` sia presente
+2. La firma RS256 sia valida contro la JWKS di Bastion e il token non sia scaduto
+3. Il token sia di un utente, non un `service_client`
+4. `appSlug` e ruolo siano fra quelli accettati
+5. Esista un tenant Articuno con quel `bastionTenantId`
 
 ### Gestione Errori
-- **401 Unauthorized:** Sessione non trovata, non valida o scaduta
+- **401 Unauthorized:** token assente, non valido, scaduto, o tenant non mappato
 - **404 Not Found:** Risorsa non trovata
 - **409 Conflict:** Slug duplicato o violazione di unicità
 
 ## Esempio di Utilizzo con cURL
 
 ```bash
-# 1. Login
-curl -X POST http://localhost:3000/admin/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"yourpassword"}' \
-  -c cookies.txt
+# 1. Ottenere un token: login su Bastion (o riuso di quello della console)
+TOKEN=<bastion-user-jwt>
 
 # 2. Ottenere gli articoli
 curl -X GET http://localhost:3000/admin/articles \
-  -b cookies.txt
+  -H "Authorization: Bearer $TOKEN"
 
 # 3. Creare un articolo
 curl -X POST http://localhost:3000/admin/articles \
   -H "Content-Type: application/json" \
-  -b cookies.txt \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "categoryId": "cat-123",
     "translations": [
@@ -207,7 +190,7 @@ curl -X POST http://localhost:3000/admin/articles \
 
 ## Note Importanti
 
-1. **Tenant Isolation:** Ogni sessione è legata ad un tenant specifico. Tutti i contenuti (articoli, tag, categorie, banned words, reports) sono automaticamente filtrati per `tenantId`.
+1. **Tenant Isolation:** Ogni token è legato a un tenant specifico. Tutti i contenuti (articoli, tag, categorie, banned words, reports) sono automaticamente filtrati per `tenantId`.
 2. **Banned Words:** Il sistema controlla automaticamente le parole bannate nelle traduzioni degli articoli e nei commenti. I contenuti con parole bannate vengono impostati su `HIDDEN`.
 3. **Slug Uniqueness:** 
    - Gli slug degli articoli devono essere unici per tenant e lingua (`@@unique([tenantId, slug])`)
