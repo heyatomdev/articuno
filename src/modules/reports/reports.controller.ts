@@ -17,6 +17,7 @@ import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto'
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType, UserRole } from '@prisma/client';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Reports')
 @ApiSecurity('api-key')
@@ -60,7 +61,7 @@ export class ReportsController {
     summary: 'List reports',
     description: 'Returns a paginated list of reports for the current tenant. Optionally filter by status.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of reports.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of reports.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   findAll(@GetTenant() tenant: any, @Query() query: ReportListQueryDto) {
     return this.reportsService.findAll(tenant.id, query);

@@ -2,7 +2,7 @@ import {ConflictException, Injectable, InternalServerErrorException, Logger, Not
 import {PrismaService} from '@/modules/prisma/prisma.service';
 import {CreateTagDto} from '@/modules/tags/dto/create-tag.dto';
 import {UpdateTagDto} from '@/modules/tags/dto/update-tag.dto';
-import {limit, PagedResponse} from "@/pagination";
+import {PaginatedResult, paginate} from "@/common/pagination";
 import {TagsListQuery} from "@/modules/tags/queries/tags.query";
 import {TagDto} from "@/modules/tags/dto/tags.dto";
 import {plainToInstance} from "class-transformer";
@@ -33,7 +33,7 @@ export class TagsService {
     }
   }
 
-  async findAll(tenantId: string, filters?: TagsListQuery): Promise<PagedResponse<TagDto>> {
+  async findAll(tenantId: string, filters?: TagsListQuery): Promise<PaginatedResult<TagDto>> {
     try {
       this.logger.debug('Fetching all tags from the database');
       this.logger.debug(`Filters received from ${tenantId}: ${JSON.stringify(filters)}`);
@@ -45,8 +45,8 @@ export class TagsService {
             tenantId: tenantId,
           },
           orderBy: { name: 'asc' },
-          take: limit(filters),
-          skip: filters.offset,
+          take: filters.limit,
+          skip: filters.skip,
           include: {
             tenant: {
               select: {
@@ -67,22 +67,15 @@ export class TagsService {
         }),
       ]);
 
-      const pageSize = filters.limit ?? 10;
-      const currentPage = Math.floor((filters.offset ?? 0) / pageSize) + 1;
-
       this.logger.debug(`Found ${count} tags matching the criteria`);
 
-      return {
-        items: plainToInstance(TagDto, items,  {
+      return paginate(
+        plainToInstance(TagDto, items,  {
           excludeExtraneousValues: false
         }),
-        pagination: {
-          totalCount: count,
-          currentPage,
-          pageSize,
-          totalPages: Math.ceil(count / pageSize),
-        }
-      };
+        count,
+        filters,
+      );
 
     } catch (error) {
       this.logger.error('Failed to fetch tags', error.stack);

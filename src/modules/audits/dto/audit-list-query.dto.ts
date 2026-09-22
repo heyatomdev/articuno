@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { IsEnum, IsOptional } from 'class-validator';
-import { PagedQuery } from '@/pagination';
+import { PageParams } from '@/common/pagination';
 
-export class AuditListQueryDto extends PagedQuery {
+export class AuditListQueryDto extends PageParams {
   @ApiProperty({
     description: 'Filter audit logs by action',
     enum: AuditAction,

@@ -4,7 +4,7 @@ import { createHmac } from 'crypto';
 import { lastValueFrom } from 'rxjs';
 import {Prisma, WebhookEvent} from '@prisma/client';
 import {WebhookEventListQueryDto} from "@/modules/webhook/dto/webhook-event-list-query.dto";
-import {limit, PagedResponse} from "@/pagination";
+import {PaginatedResult, paginate} from "@/common/pagination";
 import {PrismaService} from "@/modules/prisma/prisma.service";
 
 @Injectable()
@@ -19,9 +19,7 @@ export class WebhooksService {
     async findAll(
         tenantId: string,
         query: WebhookEventListQueryDto,
-    ): Promise<PagedResponse<WebhookEvent>> {
-        const pageSize = limit(query);
-
+    ): Promise<PaginatedResult<WebhookEvent>> {
         const where = {
             tenantId,
             ...(query.event !== undefined && { event: query.event }),
@@ -29,27 +27,17 @@ export class WebhooksService {
             ...(query.sent === false && { sentAt: null }),
         };
 
-        const [items, totalCount] = await this.prisma.$transaction([
+        const [items, total] = await this.prisma.$transaction([
             this.prisma.webhookEvent.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
-                take: pageSize,
-                skip: query.offset,
+                take: query.limit,
+                skip: query.skip,
             }),
             this.prisma.webhookEvent.count({ where }),
         ]);
 
-        const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
-
-        return {
-            items,
-            pagination: {
-                totalCount,
-                currentPage,
-                pageSize,
-                totalPages: Math.ceil(totalCount / pageSize),
-            },
-        };
+        return paginate(items, total, query);
     }
 
     async findOne(tenantId: string, id: string): Promise<WebhookEvent> {

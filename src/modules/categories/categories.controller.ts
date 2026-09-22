@@ -28,6 +28,7 @@ import { CategoryParamsDto } from '@/modules/categories/dto/category-params.dto'
 import { CategorySlugParamsDto } from '@/modules/categories/dto/category-slug-params.dto';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
 import { CategoryDto, CategoryListItemDto } from '@/modules/categories/dto/category.dto';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Categories')
 @ApiSecurity('x-api-key')
@@ -55,7 +56,7 @@ export class CategoriesController {
     summary: 'List categories',
     description: 'Returns a paginated list of categories belonging to the current tenant. Each item includes the article count.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of categories.', type: CategoryListItemDto, isArray: true })
+  @ApiPaginatedResponse(CategoryListItemDto, 'Paginated list of categories.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   findAll(@GetTenant() tenant: any, @Query() query: CategoryListQueryDto) {
     return this.categoriesService.findAll(tenant.id, query);

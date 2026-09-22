@@ -23,6 +23,11 @@ model Tenant {
   apiKey  String  @unique // Hash della chiave (tipo password)
   enabled Boolean @default(true)
 
+  // Bastion tenant uuid (NOT the slug: Articuno's `default` maps to Bastion's `dbd`
+  // in production and `dev` locally). Resolved by BastionUserGuard from the
+  // `tenantId` claim. Null = tenant unreachable from the Bastion-authenticated console.
+  bastionTenantId String? @unique
+
   users               User[]
   categories          Category[]
   tags                Tag[]
@@ -86,9 +91,6 @@ model User {
   likes         Like[]
   bookmarks     Bookmark[]
   notifications Notification[]
-  sessions      SessionStorage[]
-
-  adminCredentials AdminCredentials?
 
   reportsFiled     Report[] @relation("ReporterReports")
   reportsModerated Report[] @relation("ModeratorReports")
@@ -97,38 +99,6 @@ model User {
 
   @@unique([externalId, tenantId])
   @@map("users")
-}
-
-model AdminCredentials {
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Email admin (potrebbe essere diversa dall'email dell'app)
-  email String @unique
-
-  // Password hash (bcrypt)
-  password String
-
-  // Autenticazione multi-factor (opzionale)
-  totpSecret  String?
-  totpEnabled Boolean @default(false)
-
-  // Audit
-  lastLoginAt          DateTime?
-  lastPasswordChangeAt DateTime  @default(now())
-  loginAttempts        Int       @default(0)
-  isLockedOut          Boolean   @default(false)
-  lockedUntil          DateTime?
-
-  // Soft delete per disattivare senza cancellare
-  disabledAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-  @@map("admin_credentials")
 }
 
 model Category {
@@ -315,9 +285,9 @@ model Report {
   targetId   String // L'ID dell'entità segnalata
 
   reporterId    String
-  reporter      User     @relation("ReporterReports", fields: [reporterId, tenantId], references: [externalId, tenantId], onDelete: Cascade)
+  reporter      User    @relation("ReporterReports", fields: [reporterId, tenantId], references: [externalId, tenantId], onDelete: Cascade)
   moderatorId   String?
-  moderator     User?    @relation("ModeratorReports", fields: [moderatorId, tenantId], references: [externalId, tenantId], onDelete: SetNull)
+  moderator     User?   @relation("ModeratorReports", fields: [moderatorId, tenantId], references: [externalId, tenantId], onDelete: SetNull)
   moderatorNote String?
 
   tenantId String
@@ -339,62 +309,6 @@ model BannedWord {
   @@map("banned_words")
 }
 
-model SessionStorage {
-  id String @id @default(cuid())
-
-  // Chi ha effettuato il login
-  userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenantId String
-
-  // User snapshot (per performance, non per autorizzazione)
-  userRole   UserRole
-  externalId String
-
-  // Timing
-  createdAt      DateTime @default(now())
-  expiresAt      DateTime
-  lastAccessedAt DateTime @default(now())
-
-  // Sicurezza
-  ipAddress String?
-  userAgent String?
-
-  @@index([id])
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("sessions")
-}
-
-model ApiKey {
-  id String @id @default(uuid())
-
-  // Public identifier
-  keyId  String @unique
-  secret String
-
-  // Metadati
-  name     String // "CI/CD deploy", "External bot"
-  tenantId String
-  userId   String
-
-  // Autorizzazioni
-  scopes String[] // ["articles:write", "reports:read"]
-
-  // Audit
-  createdAt  DateTime  @default(now())
-  expiresAt  DateTime?
-  lastUsedAt DateTime?
-
-  // Soft delete
-  revokedAt DateTime?
-
-  @@index([tenantId])
-  @@index([keyId])
-  @@unique([tenantId, keyId])
-  @@map("api_keys")
-}
-
 model AuditLog {
   // Primary key
   id String @id @default(uuid())
@@ -407,7 +321,7 @@ model AuditLog {
 
   // Actor (who did it)
   actorUserId String // externalId of user who performed action
-  actorRole   UserRole // cached role at time of action (for audit trail)
+  actorRole   String // cached role at time of action (Articuno UserRole or Bastion role, as a plain string)
 
   // Action details
   action       AuditAction

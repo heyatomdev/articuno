@@ -13,3 +13,10 @@ export class ArticleSlugParamsDto {
   @IsNotEmpty()
   slug: string;
 }
+
+export class ArticleKeyParamsDto {
+  @ApiProperty({ description: 'UUID of the article, or the slug of one of its translations', example: 'getting-started-with-nestjs' })
+  @IsString()
+  @IsNotEmpty()
+  key: string;
+}

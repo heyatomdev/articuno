@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { StatusController } from './status.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from "@nestjs/throttler";
-import { ScheduleModule } from "@nestjs/schedule";
-import { PrismaModule } from "@/modules/prisma/prisma.module";
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
+import { PrismaModule } from '@/modules/prisma/prisma.module';
 import config from '../../configs/config.schema';
 import { configValidationSchema } from '@/configs/config.validation';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
-import {AnalyticsModule} from "@/modules/analytics/analytics.module";
-import {ReportsModule} from "@/modules/reports/reports.module";
+import { AnalyticsModule } from '@/modules/analytics/analytics.module';
+import { ReportsModule } from '@/modules/reports/reports.module';
 import { UsersModule } from '@/modules/users/users.module';
 import { TenantModule } from '@/modules/tenants/tenant.module';
 import { CategoriesModule } from '@/modules/categories/categories.module';
@@ -20,61 +20,85 @@ import { BookmarksModule } from '@/modules/bookmarks/bookmarks.module';
 import { CommentsModule } from '@/modules/comments/comments.module';
 import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
 import { WebhooksModule } from '@/modules/webhook/webhooks.module';
-import { AuthModule } from '@/modules/auth/auth.module';
 import { AdminModule } from '@/modules/admin/admin.module';
-import {NotificationsModule} from "@/modules/notifications/notifications.module";
+import { NotificationsModule } from '@/modules/notifications/notifications.module';
+import { HealthModule } from '@/modules/health/health.module';
+import { BastionModule } from '@heyatom/bastion-client/nest';
+
+/** Comma-separated env list → array; undefined keeps the package default. */
+const splitList = (raw?: string): string[] | undefined =>
+  raw === undefined
+    ? undefined
+    : raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
 
 @Module({
-    controllers: [StatusController],
-    imports: [
-        // Configuration
-        ConfigModule.forRoot({
-            load: [config],
-            isGlobal: true,
-            cache: true,
-            validationSchema: configValidationSchema,
-        }),
+  controllers: [StatusController],
+  imports: [
+    // Configuration
+    ConfigModule.forRoot({
+      load: [config],
+      isGlobal: true,
+      cache: true,
+      validationSchema: configValidationSchema,
+    }),
 
-        // Prometheus configuration
-        PrometheusModule.register({
-            defaultLabels: {
-                app: 'articuno',
-            },
-        }),
+    // Prometheus configuration
+    PrometheusModule.register({
+      defaultLabels: {
+        app: 'articuno',
+      },
+    }),
 
-        // Rate limiting
-        ThrottlerModule.forRootAsync({
-            imports: [ConfigModule],
-            useFactory: (configService: ConfigService) => [{
-                ttl: configService.get('throttle.ttl') * 1000,
-                limit: configService.get('throttle.limit'),
-            }],
-            inject: [ConfigService],
-        }),
+    // Rate limiting
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => [
+        {
+          ttl: configService.get('throttle.ttl') * 1000,
+          limit: configService.get('throttle.limit'),
+        },
+      ],
+      inject: [ConfigService],
+    }),
 
-        // Scheduling for jobs
-        ScheduleModule.forRoot(),
+    // Scheduling for jobs
+    ScheduleModule.forRoot(),
 
-        // Core modules
-        ArticlesModule,
-        ArticleTranslationsModule,
-        BannedWordsModule,
-        BookmarksModule,
-        CategoriesModule,
-        CommentsModule,
-        InteractionsModule,
-        PrismaModule,
-        ReportsModule,
-        TagsModule,
-        TenantModule,
-        UsersModule,
+    // Core modules
+    ArticlesModule,
+    ArticleTranslationsModule,
+    BannedWordsModule,
+    BookmarksModule,
+    CategoriesModule,
+    CommentsModule,
+    InteractionsModule,
+    BastionModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        baseUrl: config.getOrThrow<string>('BASTION_URL'),
+        serviceSlug: config.getOrThrow<string>('BASTION_APP_SLUG'),
+        jwksTtlMs: config.get<number>('BASTION_JWKS_TTL_MS'),
+        acceptedAppSlugs: splitList(
+          config.get<string>('ADMIN_ACCEPTED_APP_SLUGS'),
+        ),
+        acceptedRoles: splitList(config.get<string>('ADMIN_ACCEPTED_ROLES')),
+      }),
+    }),
+    PrismaModule,
+    ReportsModule,
+    TagsModule,
+    TenantModule,
+    UsersModule,
+    HealthModule,
 
-        // Admin only module
-        AdminModule,
-        AnalyticsModule,
-        AuthModule,
-        NotificationsModule,
-        WebhooksModule,
-    ],
+    // Admin only module
+    AdminModule,
+    AnalyticsModule,
+    NotificationsModule,
+    WebhooksModule,
+  ],
 })
 export class AppModule {}

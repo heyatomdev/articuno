@@ -13,22 +13,25 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { TagsService } from '@/modules/tags/tags.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateTagDto } from '@/modules/tags/dto/create-tag.dto';
 import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
 import { TagParamsDto } from '@/modules/tags/dto/tag-params.dto';
 import { TagsListQuery } from '@/modules/tags/queries/tags.query';
-import { PagedResponse } from '@/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
 import { TagDto } from '@/modules/tags/dto/tags.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
-import {ApiTags} from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Admin / Tags')
+@ApiBearerAuth()
 @Controller('admin/tags')
-@UseGuards(SessionGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminTagsController {
   constructor(
     private readonly tagsService: TagsService,
@@ -37,7 +40,7 @@ export class AdminTagsController {
   ) {}
 
   @Post()
-  async create(@GetSession() session: any, @Body() dto: CreateTagDto) {
+  async create(@GetSession() session: AdminSession, @Body() dto: CreateTagDto) {
     const tag = await this.tagsService.create(session.tenantId, dto);
 
     await this.auditLogger.log({
@@ -55,21 +58,22 @@ export class AdminTagsController {
   }
 
   @Get()
+  @ApiPaginatedResponse(TagDto, 'Paginated list of tags.')
   findAll(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Query(new ValidationPipe({ transform: true })) filters: TagsListQuery,
-  ): Promise<PagedResponse<TagDto>> {
+  ): Promise<PaginatedResult<TagDto>> {
     return this.tagsService.findAll(session.tenantId, filters);
   }
 
   @Get(':id')
-  findOne(@GetSession() session: any, @Param() params: TagParamsDto) {
+  findOne(@GetSession() session: AdminSession, @Param() params: TagParamsDto) {
     return this.tagsService.findOne(session.tenantId, params.id);
   }
 
   @Patch(':id')
   async update(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: TagParamsDto,
     @Body() dto: UpdateTagDto,
   ) {
@@ -91,7 +95,7 @@ export class AdminTagsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@GetSession() session: any, @Param() params: TagParamsDto) {
+  async remove(@GetSession() session: AdminSession, @Param() params: TagParamsDto) {
     const tag = await this.prisma.tag.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { name: true },

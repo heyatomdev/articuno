@@ -10,7 +10,7 @@ import { sanitizeContent } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
 import { generateRandomName } from '@/utils/random-name';
-import { limit, PagedResponse } from '@/pagination';
+import { PaginatedResult, paginate } from '@/common/pagination';
 
 @Injectable()
 export class ArticlesService {
@@ -238,7 +238,7 @@ export class ArticlesService {
     }
   }
 
-  async findAll(tenantId: string, query: ArticleFiltersQueryDto): Promise<PagedResponse<any>> {
+  async findAll(tenantId: string, query: ArticleFiltersQueryDto): Promise<PaginatedResult<any>> {
     const where: any = {
       tenantId,
       ...(query.status ? { status: query.status } : {}),
@@ -280,29 +280,18 @@ export class ArticlesService {
         }
       : this.articleListIncludes;
 
-    const [items, totalCount] = await this.prisma.$transaction([
+    const [items, total] = await this.prisma.$transaction([
       this.prisma.article.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: limit(query),
-        skip: query.offset,
+        take: query.limit,
+        skip: query.skip,
         include: listIncludes,
       }),
       this.prisma.article.count({ where }),
     ]);
 
-    const pageSize = query.limit ?? 20;
-    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
-
-    return {
-      items,
-      pagination: {
-        totalCount,
-        currentPage,
-        pageSize,
-        totalPages: Math.ceil(totalCount / pageSize),
-      },
-    };
+    return paginate(items, total, query);
   }
 
   async findOne(tenantId: string, slug: string, languageCode?: string) {

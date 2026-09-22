@@ -2,7 +2,7 @@ import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ContentStatus } from '@prisma/client';
-import { PagedQuery } from '@/pagination';
+import { PageParams } from '@/common/pagination';
 
 const ARTICLE_STATUSES: ContentStatus[] = [
   ContentStatus.DRAFT,
@@ -12,7 +12,7 @@ const ARTICLE_STATUSES: ContentStatus[] = [
   ContentStatus.BANNED,
 ];
 
-export class ArticleFiltersQueryDto extends PagedQuery {
+export class ArticleFiltersQueryDto extends PageParams {
   @ApiPropertyOptional({
     description: 'Filter articles by moderation status.',
     enum: ARTICLE_STATUSES,
