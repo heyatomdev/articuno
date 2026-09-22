@@ -13,6 +13,7 @@ import { AdminSession } from '@/modules/bastion/bastion.types';
 import { NotificationsService } from '@/modules/notifications/notifications.service';
 import { NotificationListQueryDto } from '@/modules/notifications/dto/notification-list-query.dto';
 import { NotificationParamsDto } from '@/modules/notifications/dto/notification-params.dto';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Admin / Notifications')
 @ApiBearerAuth()
@@ -27,7 +28,7 @@ export class AdminNotificationsController {
     description:
       'Returns a paginated list of all notifications for the session tenant. Supports filtering by type, sentToClient and userId.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of notifications.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of notifications.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',

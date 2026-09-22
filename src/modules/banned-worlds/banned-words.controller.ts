@@ -24,7 +24,7 @@ import { CreateBannedWordDto } from './dto/create-banned-word.dto';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BannedWordListQueryDto } from './dto/banned-word-list-query.dto';
-import { PaginatedResult } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
 import { BannedWordDto } from './dto/banned-word.dto';
 
 @ApiTags('Banned Words')
@@ -55,7 +55,7 @@ export class BannedWordsController {
         summary: 'List banned words',
         description: 'Returns a paginated list of banned words for the current tenant.',
     })
-    @ApiResponse({ status: 200, description: 'Paginated list of banned words.', type: BannedWordDto, isArray: true })
+    @ApiPaginatedResponse(BannedWordDto, 'Paginated list of banned words.')
     @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
     findAll(
         @GetTenant() tenant: any,

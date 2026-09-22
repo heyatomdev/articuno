@@ -27,7 +27,7 @@ import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
 import { UserParamsDto } from '@/modules/users/dto/user-params.dto';
 import { UpdateUserStatusDto } from '@/modules/users/dto/update-user-status.dto';
 import { UpdateUserRoleDto } from '@/modules/users/dto/update-user-role.dto';
-import { PaginatedResult } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 
@@ -46,7 +46,7 @@ export class AdminUsersController {
     summary: 'List users',
     description: 'Returns a paginated list of all users belonging to the session tenant.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of users.', type: UserListItemDto, isArray: true })
+  @ApiPaginatedResponse(UserListItemDto, 'Paginated list of users.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(
     @GetSession() session: AdminSession,

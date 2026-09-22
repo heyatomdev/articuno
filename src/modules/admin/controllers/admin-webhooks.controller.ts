@@ -22,6 +22,7 @@ import { AdminSession } from '@/modules/bastion/bastion.types';
 import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-list-query.dto';
 import { WebhookEventParamsDto } from '@/modules/webhook/dto/webhook-event-params.dto';
 import { WebhooksService } from '@/modules/webhook/webhooks.service';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Admin / Webhooks')
 @ApiBearerAuth()
@@ -36,10 +37,7 @@ export class AdminWebhooksController {
     description:
       'Returns a paginated list of all webhook events (outbox) for the session tenant. Supports filtering by event type and delivery status.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Paginated list of webhook events.',
-  })
+  @ApiPaginatedResponse(undefined, 'Paginated list of webhook events.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',

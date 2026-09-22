@@ -19,6 +19,7 @@ import { ReportParamsDto } from '@/modules/reports/dto/report-params.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Admin / Reports')
 @ApiBearerAuth()
@@ -68,7 +69,7 @@ export class AdminReportsController {
     summary: 'List reports (admin)',
     description: 'Returns a paginated list of all reports for the session tenant. Optionally filter by status.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of reports.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of reports.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(@GetSession() session: AdminSession, @Query() query: ReportListQueryDto) {
     return this.reportsService.findAll(session.tenantId, query);

@@ -20,7 +20,7 @@ import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BookmarksService } from '@/modules/bookmarks/bookmarks.service';
 import { BookmarkParamsDto } from '@/modules/bookmarks/dto/bookmark-params.dto';
-import { PageParams } from '@/common/pagination';
+import { PageParams, ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Bookmarks')
 @ApiSecurity('api-key')
@@ -75,10 +75,7 @@ export class BookmarksController {
     description:
       'Returns a paginated list of articles bookmarked by the current user within the tenant.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Paginated list of bookmarked articles returned successfully.',
-  })
+  @ApiPaginatedResponse(undefined, 'Paginated list of bookmarked articles returned successfully.')
   @ApiResponse({ status: 400, description: 'Missing X-User-Id header.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   findAll(

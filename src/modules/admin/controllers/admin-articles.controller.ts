@@ -40,6 +40,7 @@ import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-artic
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
+import { ApiPaginatedResponse } from '@/common/pagination';
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { FileHarborConfig } from '@/modules/fileharbor/interfaces/fileharbor-config.interface';
 import { PrismaService } from '@/modules/prisma/prisma.service';
@@ -171,7 +172,7 @@ export class AdminArticlesController {
     summary: 'List articles',
     description: 'Returns a paginated list of articles for the session tenant. Supports filtering by status, category, tag, and featured flag.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of articles.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of articles.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(
     @GetSession() session: AdminSession,

@@ -20,6 +20,8 @@ import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto'
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
 import { CategoryParamsDto } from '@/modules/categories/dto/category-params.dto';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
+import { CategoryListItemDto } from '@/modules/categories/dto/category.dto';
+import { ApiPaginatedResponse } from '@/common/pagination';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
@@ -55,6 +57,7 @@ export class AdminCategoriesController {
   }
 
   @Get()
+  @ApiPaginatedResponse(CategoryListItemDto, 'Paginated list of categories.')
   findAll(@GetSession() session: AdminSession, @Query() query: CategoryListQueryDto) {
     return this.categoriesService.findAll(session.tenantId, query);
   }

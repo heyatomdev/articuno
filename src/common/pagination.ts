@@ -1,4 +1,11 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { applyDecorators, Type as ClassType } from '@nestjs/common';
+import {
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiProperty,
+  ApiPropertyOptional,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
@@ -60,4 +67,31 @@ export class PageMetaDto {
   @ApiProperty() page: number;
   @ApiProperty() limit: number;
   @ApiProperty() totalPages: number;
+}
+
+/**
+ * Swagger 200 response for a list endpoint returning `PaginatedResult<T>`.
+ * Pass the item DTO when one exists; without it `data` is documented as
+ * `object[]` (still truthful, just untyped).
+ */
+export function ApiPaginatedResponse(
+  item?: ClassType<unknown>,
+  description = 'Paginated list.',
+) {
+  return applyDecorators(
+    ApiExtraModels(PageMetaDto, ...(item ? [item] : [])),
+    ApiOkResponse({
+      description,
+      schema: {
+        required: ['data', 'meta'],
+        properties: {
+          data: {
+            type: 'array',
+            items: item ? { $ref: getSchemaPath(item) } : { type: 'object' },
+          },
+          meta: { $ref: getSchemaPath(PageMetaDto) },
+        },
+      },
+    }),
+  );
 }

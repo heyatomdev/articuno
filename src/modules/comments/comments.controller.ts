@@ -22,6 +22,7 @@ import { ContentStatus, UserRole } from '@prisma/client';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @Controller('comments')
 @UseGuards(TenantGuard)
@@ -50,6 +51,7 @@ export class CommentsController {
   }
 
   @Get()
+  @ApiPaginatedResponse(undefined, 'Paginated list of comments.')
   findAll(@GetTenant() tenant: any, @Query() query: CommentFiltersQueryDto) {
     return this.commentsService.findAll(tenant.id, query, [
       ContentStatus.VISIBLE,

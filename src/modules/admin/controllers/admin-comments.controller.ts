@@ -29,6 +29,7 @@ import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-q
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Admin / Comments')
 @ApiBearerAuth()
@@ -47,7 +48,7 @@ export class AdminCommentsController {
     description:
       'Returns a paginated list of all comments for the session tenant. Without `status` every comment is returned regardless of moderation state. Supports filtering by articleId and status.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of comments.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of comments.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(@GetSession() session: AdminSession, @Query() query: CommentFiltersQueryDto) {
     return this.commentsService.findAll(session.tenantId, query, query.status, true);

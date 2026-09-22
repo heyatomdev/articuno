@@ -12,6 +12,7 @@ import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AuditListQueryDto } from '@/modules/audits/dto/audit-list-query.dto';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Admin / Audits')
 @ApiBearerAuth()
@@ -27,7 +28,7 @@ export class AdminAuditsController {
       'Returns a paginated list of audit log entries for the session tenant. ' +
       'Supports optional filtering by action, resource type, and actor user ID.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of audit log entries.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of audit log entries.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(
     @GetSession() session: AdminSession,

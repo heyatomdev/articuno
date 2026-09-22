@@ -26,7 +26,7 @@ import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateBannedWordDto } from '@/modules/banned-worlds/dto/create-banned-word.dto';
 import { BannedWordListQueryDto } from '@/modules/banned-worlds/dto/banned-word-list-query.dto';
-import { PaginatedResult } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
 import { BannedWordDto } from '@/modules/banned-worlds/dto/banned-word.dto';
 
 @ApiTags('Admin / Banned Words')
@@ -57,7 +57,7 @@ export class AdminBannedWordsController {
     summary: 'List banned words',
     description: 'Returns a paginated list of banned words for the session tenant.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of banned words.' })
+  @ApiPaginatedResponse(BannedWordDto, 'Paginated list of banned words.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(
     @GetSession() session: AdminSession,
