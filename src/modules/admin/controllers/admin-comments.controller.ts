@@ -47,12 +47,12 @@ export class AdminCommentsController {
   @ApiOperation({
     summary: 'List all comments (admin)',
     description:
-      'Returns a paginated list of all comments for the session tenant, regardless of status. Supports filtering by articleId.',
+      'Returns a paginated list of all comments for the session tenant. Without `status` every comment is returned regardless of moderation state. Supports filtering by articleId and status.',
   })
   @ApiResponse({ status: 200, description: 'Paginated list of comments.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(@GetSession() session: AdminSession, @Query() query: CommentFiltersQueryDto) {
-    return this.commentsService.findAll(session.tenantId, query, undefined, true);
+    return this.commentsService.findAll(session.tenantId, query, query.status, true);
   }
 
   @Get(':id')

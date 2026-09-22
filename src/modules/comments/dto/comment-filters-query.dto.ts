@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { ContentStatus } from '@prisma/client';
 import { PagedQuery } from '@/pagination';
 
 export class CommentFiltersQueryDto extends PagedQuery {
@@ -10,5 +11,14 @@ export class CommentFiltersQueryDto extends PagedQuery {
   @IsOptional()
   @IsUUID()
   articleId?: string;
+
+  @ApiProperty({
+    description: 'Filter comments by moderation status',
+    required: false,
+    enum: ContentStatus,
+  })
+  @IsOptional()
+  @IsEnum(ContentStatus)
+  status?: ContentStatus;
 }
 
