@@ -23,4 +23,9 @@ export const configValidationSchema = Joi.object({
   ADMIN_ACCEPTED_ROLES: Joi.string().default(
     'SUPER_ADMIN,ADMIN,MODERATOR,AUTHOR',
   ),
+
+  // Rate limiting — validated so a typo fails at startup rather than turning
+  // into a NaN window that never blocks.
+  THROTTLE_TTL_SECONDS: Joi.number().positive().default(60),
+  THROTTLE_LIMIT: Joi.number().positive().default(100),
 });

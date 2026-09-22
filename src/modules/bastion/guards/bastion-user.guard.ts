@@ -10,16 +10,10 @@ import { BastionJwksService } from '../bastion-jwks.service';
 import { AdminSession, JwtPayload } from '../bastion.types';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 
-// How long a just-provisioned admin stays "known" before we upsert again.
-// ponytail: per-process in-memory map, bounded by (admins x tenants). If Articuno
-// ever runs enough replicas for the duplicated upserts to matter, move it to Redis.
-const USER_PROVISION_TTL_MS = 60_000;
-
 @Injectable()
 export class BastionUserGuard implements CanActivate {
   private readonly acceptedAppSlugs: string[];
   private readonly acceptedRoles: string[];
-  private readonly provisionedAt = new Map<string, number>();
 
   constructor(
     private readonly jwks: BastionJwksService,
@@ -110,28 +104,37 @@ export class BastionUserGuard implements CanActivate {
    *
    * `role` is intentionally not written — the `UserRole` enum is on its way out and
    * the Bastion role does not map onto it. New rows keep the schema default.
+   *
+   * `createMany` rather than `upsert`, and with no in-process "already provisioned"
+   * cache, for two reasons that turned out to be the same reason:
+   *
+   * - Prisma compiles this `createMany` to a single `INSERT ... ON CONFLICT DO
+   *   NOTHING`, while `upsert` on this model emits SELECT-then-INSERT in a
+   *   transaction. That is not atomic, and the console opens a page with several
+   *   parallel fetches: on the first request after a restart they all miss, all
+   *   insert, and every one but the winner takes a P2002 and answers 500.
+   * - A cache keyed on time also lies when the row goes away — deleting the admin
+   *   from `GET /admin/users` (where they now show up) left this guard convinced
+   *   the row existed, and report moderation failed on the foreign key until the
+   *   entry aged out.
+   *
+   * `skipDuplicates` gives exactly the intended semantics: the row only has to
+   * exist. It never updates, so `username` stays the site's to own — it arrives
+   * through `POST /users/sync` from the consuming app, and a read path must not
+   * rewrite it. One no-op insert per admin request is cheaper than either bug.
    */
   private async ensureLocalUser(
     payload: JwtPayload,
     tenantId: string,
   ): Promise<void> {
-    const cacheKey = `${tenantId}:${payload.sub}`;
-    const last = this.provisionedAt.get(cacheKey);
-    if (last && Date.now() - last < USER_PROVISION_TTL_MS) return;
-
-    await this.prisma.user.upsert({
-      where: { externalId_tenantId: { externalId: payload.sub, tenantId } },
-      // No-op update: the row only has to exist. `username` is the site's to own —
-      // it arrives through `POST /users/sync` from the consuming app — so a read
-      // path must not rewrite it on every request.
-      update: {},
-      create: {
+    await this.prisma.user.createMany({
+      data: {
         externalId: payload.sub,
         tenantId,
         username: payload.username ?? payload.email,
         status: 'ACTIVE',
       },
+      skipDuplicates: true,
     });
-    this.provisionedAt.set(cacheKey, Date.now());
   }
 }

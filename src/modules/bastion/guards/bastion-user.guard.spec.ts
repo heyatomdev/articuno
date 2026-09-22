@@ -12,7 +12,7 @@ import { PrismaService } from '@/modules/prisma/prisma.service';
 const mockJwks = { verify: jest.fn() };
 const mockPrisma = {
   tenant: { findUnique: jest.fn() },
-  user: { upsert: jest.fn() },
+  user: { createMany: jest.fn() },
 };
 const mockConfig = {
   get: jest.fn((key: string) =>
@@ -72,7 +72,7 @@ describe('BastionUserGuard', () => {
 
     guard = module.get(BastionUserGuard);
     jest.clearAllMocks();
-    mockPrisma.user.upsert.mockResolvedValue({});
+    mockPrisma.user.createMany.mockResolvedValue({ count: 1 });
   });
 
   it('throws 401 when Authorization header missing', async () => {
@@ -194,22 +194,16 @@ describe('BastionUserGuard', () => {
 
     await guard.canActivate(makeCtx({ authorization: 'Bearer tok' }));
 
-    expect(mockPrisma.user.upsert).toHaveBeenCalledWith({
-      where: {
-        externalId_tenantId: {
-          externalId: validPayload.sub,
-          tenantId: articunoTenant.id,
-        },
-      },
-      update: {},
-      create: {
+    expect(mockPrisma.user.createMany).toHaveBeenCalledWith({
+      data: {
         externalId: validPayload.sub,
         tenantId: articunoTenant.id,
         username: 'admin',
         status: 'ACTIVE',
       },
+      skipDuplicates: true,
     });
-    expect(mockPrisma.user.upsert.mock.calls[0][0].create).not.toHaveProperty(
+    expect(mockPrisma.user.createMany.mock.calls[0][0].data).not.toHaveProperty(
       'role',
     );
   });
@@ -220,12 +214,15 @@ describe('BastionUserGuard', () => {
 
     await guard.canActivate(makeCtx({ authorization: 'Bearer tok' }));
 
-    expect(mockPrisma.user.upsert.mock.calls[0][0].create.username).toBe(
+    expect(mockPrisma.user.createMany.mock.calls[0][0].data.username).toBe(
       validPayload.email,
     );
   });
 
-  it('upserts once per admin within the cache window, not once per request', async () => {
+  // Deliberately once per request, not once per cache window. `skipDuplicates`
+  // makes the insert a no-op when the row is there, which is both atomic under the
+  // console's parallel fetches and honest when the row is deleted underneath us.
+  it('provisions on every request, letting the database deduplicate', async () => {
     mockJwks.verify.mockResolvedValue(validPayload);
     mockPrisma.tenant.findUnique.mockResolvedValue(articunoTenant);
 
@@ -233,21 +230,25 @@ describe('BastionUserGuard', () => {
     await guard.canActivate(makeCtx({ authorization: 'Bearer tok' }));
     await guard.canActivate(makeCtx({ authorization: 'Bearer tok' }));
 
-    expect(mockPrisma.user.upsert).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.tenant.findUnique).toHaveBeenCalledTimes(3);
+    expect(mockPrisma.user.createMany).toHaveBeenCalledTimes(3);
+    expect(
+      mockPrisma.user.createMany.mock.calls.every(
+        (call) => call[0].skipDuplicates === true,
+      ),
+    ).toBe(true);
   });
 
-  it('upserts again for a different admin', async () => {
+  it('provisions into the resolved tenant, never the tenant claimed by the token', async () => {
+    mockJwks.verify.mockResolvedValue(validPayload);
     mockPrisma.tenant.findUnique.mockResolvedValue(articunoTenant);
 
-    mockJwks.verify.mockResolvedValue(validPayload);
     await guard.canActivate(makeCtx({ authorization: 'Bearer tok' }));
-    mockJwks.verify.mockResolvedValue({
-      ...validPayload,
-      sub: 'bastion-user-2',
-    });
-    await guard.canActivate(makeCtx({ authorization: 'Bearer tok2' }));
 
-    expect(mockPrisma.user.upsert).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.user.createMany.mock.calls[0][0].data.tenantId).toBe(
+      articunoTenant.id,
+    );
+    expect(mockPrisma.user.createMany.mock.calls[0][0].data.tenantId).not.toBe(
+      validPayload.tenantId,
+    );
   });
 });

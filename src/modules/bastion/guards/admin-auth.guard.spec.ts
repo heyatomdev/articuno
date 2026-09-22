@@ -57,4 +57,18 @@ describe('AdminAuthGuard', () => {
       guard.canActivate(makeCtx({ authorization: 'Bearer tok' })),
     ).rejects.toThrow('nope');
   });
+
+  // The security property of this guard. A Bearer that fails must NOT get a second
+  // chance at the cookie: falling back on failure would turn the transition window
+  // into a bypass, where presenting a junk token reverts you to the legacy path.
+  it('does not fall back to the cookie when the Bearer branch rejects', async () => {
+    mockBastion.canActivate.mockRejectedValueOnce(new Error('expired'));
+
+    await expect(
+      guard.canActivate(
+        makeCtx({ authorization: 'Bearer expired', cookie: 'sessionId=valid' }),
+      ),
+    ).rejects.toThrow('expired');
+    expect(mockSession.canActivate).not.toHaveBeenCalled();
+  });
 });
