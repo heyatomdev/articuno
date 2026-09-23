@@ -24,7 +24,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@heyatom/bastion-client": "^0.2.0",
+    "@heyatom/bastion-client": "^0.3.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.2.5",
     "@nestjs/config": "^4.0.4",
