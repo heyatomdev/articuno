@@ -2,7 +2,7 @@
 
 ## Struttura
 
-Il modulo Admin fornisce API per la gestione dei contenuti (articoli, tag, categorie) da parte degli amministratori autenticati tramite sessione, bypassando il sistema di API Key multi-tenant.
+Il modulo Admin fornisce API per la gestione dei contenuti (articoli, tag, categorie) da parte degli amministratori autenticati con un user-JWT Bastion, bypassando il sistema di API Key multi-tenant.
 
 ```
 src/modules/admin/
@@ -16,14 +16,14 @@ src/modules/admin/
 ## Componenti
 
 ### AdminModule
-- **Import:** PrismaModule, ArticlesModule, TagsModule, CategoriesModule, AuthModule
+- **Import:** PrismaModule, ArticlesModule, TagsModule, CategoriesModule, BastionModule
 - **Controllers:** AdminArticlesController, AdminTagsController, AdminCategoriesController
 - **Pattern:** Riusa i servizi esistenti (ArticlesService, TagsService, CategoriesService)
 
 ### Controller
 
 Ogni controller:
-1. Usa `@UseGuards(SessionGuard)` per l'autenticazione basata su sessione
+1. Usa `@UseGuards(BastionUserGuard, AdminThrottlerGuard)` — Bastion user-JWT (RS256, verificato via JWKS)
 2. Usa `@GetSession()` decorator per estrarre i dati della sessione
 3. Estrae `session.tenantId` per mantenere l'isolamento multi-tenant
 4. Delega la logica di business ai servizi esistenti
@@ -45,57 +45,53 @@ Ogni controller:
 
 ## Autenticazione
 
-### SessionGuard
-Posizione: `src/modules/auth/guards/session.guard.ts`
+### BastionUserGuard
+Posizione: `src/modules/bastion/guards/bastion-user.guard.ts`
 
-**Funzionalità:**
-1. Estrae il cookie `sessionId` dalla richiesta
-2. Verifica l'esistenza della sessione nel database
-3. Verifica che la sessione non sia scaduta
-4. Aggiorna `lastAccessedAt` ad ogni richiesta
-5. Allega i dati della sessione a `request.session`
+Unico guard di `/admin/*`. Verifica la firma RS256 del token contro la JWKS di Bastion
+(in cache, nessuna chiamata per request), rifiuta i token `service_client`, e controlla
+`appSlug` e ruolo contro `ADMIN_ACCEPTED_APP_SLUGS` / `ADMIN_ACCEPTED_ROLES`.
+
+Risolve il `Tenant` Articuno dal claim `tenantId` (uuid Bastion) via
+`Tenant.bastionTenantId`, e fa JIT-upsert dell'admin come riga `User` — serve perché
+`Report.reporterId` / `Report.moderatorId` sono FK reali su `users(externalId, tenantId)`.
 
 **Eccezioni:**
-- `401 Unauthorized`: Sessione non trovata, non valida o scaduta
+- `401 Unauthorized`: token assente, firma non valida, scaduto, `appSlug` o ruolo non accettati
+- `401 Unauthorized`: nessun tenant Articuno con quel `bastionTenantId`
 
 ### GetSession Decorator
-Posizione: `src/modules/auth/decorators/get-session.decorator.ts`
+Posizione: `src/modules/bastion/decorators/get-session.decorator.ts`
 
-Estrae i dati della sessione dalla richiesta (aggiunta da SessionGuard).
+Estrae da `request.session` i dati che `BastionUserGuard` ci ha allegato.
 
-**Dati disponibili:**
+**Dati disponibili** (`AdminSession` in `src/modules/bastion/bastion.types.ts`):
 ```typescript
 {
-  id: string;           // Session ID
-  userId: string;       // Admin User ID
-  tenantId: string;     // Tenant ID (per isolamento)
-  userRole: UserRole;   // Ruolo utente
-  externalId: string;   // External ID utente
-  expiresAt: Date;      // Scadenza sessione
-  // ... altri campi
+  tenantId: string;     // Tenant Articuno (per isolamento)
+  externalId: string;   // `sub` Bastion dell'admin
+  userRole: string;     // Ruolo Bastion, stringa libera (non l'enum UserRole)
 }
 ```
 
 ## Flusso di Autenticazione
 
 ```
-1. Admin effettua login: POST /admin/auth/login
+1. L'admin fa login su Meridian, che parla con Bastion
    ↓
-2. AuthService crea sessione in SessionStorage
+2. Meridian inoltra il proprio user-JWT: Authorization: Bearer <token>
    ↓
-3. Cookie sessionId impostato nel browser
+3. BastionUserGuard verifica firma/scadenza/appSlug/ruolo via JWKS in cache
    ↓
-4. Admin chiama API: GET /admin/articles
+4. Risolve il tenant su Tenant.bastionTenantId e fa JIT-upsert della riga User
    ↓
-5. SessionGuard valida sessione
+5. AdminSession allegata a request.session
    ↓
-6. Dati sessione allegati a request
+6. Controller estrae tenantId tramite @GetSession()
    ↓
-7. Controller estrae tenantId tramite @GetSession()
+7. Service esegue query filtrata per tenantId
    ↓
-8. Service esegue query filtrata per tenantId
-   ↓
-9. Risposta al client
+8. Risposta al client
 ```
 
 ## Differenze con API Pubbliche
@@ -103,29 +99,29 @@ Estrae i dati della sessione dalla richiesta (aggiunta da SessionGuard).
 | Aspetto               | API Pubbliche                       | API Admin                                             |
 |-----------------------|-------------------------------------|-------------------------------------------------------|
 | **Path**              | `/articles`, `/tags`, `/categories` | `/admin/articles`, `/admin/tags`, `/admin/categories` |
-| **Autenticazione**    | Header `X-API-Key`                  | Cookie `sessionId`                                    |
-| **Guard**             | `TenantGuard`                       | `SessionGuard`                                        |
-| **Middleware**        | `TenantMiddleware`                  | Nessuno (SessionGuard gestisce)                       |
-| **Tenant Extraction** | Da API Key hashata                  | Da sessione                                           |
-| **User Context**      | Header `X-User-Id` (opzionale)      | Da sessione (sempre presente)                         |
+| **Autenticazione**    | Header `X-API-Key`                  | Header `Authorization: Bearer` (JWT Bastion)          |
+| **Guard**             | `TenantGuard`                       | `BastionUserGuard`                                    |
+| **Middleware**        | `TenantMiddleware`                  | Nessuno (il guard gestisce)                           |
+| **Tenant Extraction** | Da API Key hashata                  | Da `Tenant.bastionTenantId` + claim `tenantId`        |
+| **User Context**      | Header `X-User-Id` (opzionale)      | Dal claim `sub` (sempre presente)                     |
 | **Use Case**          | Client esterni (frontend pubblico)  | Admin panel/dashboard                                 |
 
 ## Vantaggi
 
 1. **Riuso del Codice:** I servizi esistenti vengono riutilizzati senza duplicazione di logica
-2. **Sicurezza:** Sessioni gestite server-side con scadenza automatica
+2. **Sicurezza:** Nessuna credenziale admin in Articuno — l'IdP è Bastion
 3. **Isolamento Tenant:** Mantenuto anche per gli admin tramite `session.tenantId`
 4. **Consistenza:** Stesse validazioni, sanitizzazione e moderazione delle API pubbliche
-5. **Tracciabilità:** `lastAccessedAt` aggiornato automaticamente
+5. **Tracciabilità:** `AuditLog` su ogni operazione che cambia stato
 6. **Moderation Tools:** Accesso completo a banned words, reports e analytics
 
 ## Note di Implementazione
 
-1. **Cookie de-serializer:** `cookie-parser` middleware già configurato in `main.ts`
-2. **CORS:** Configurato con `credentials: true` per permettere cookies cross-origin
-3. **SessionStorage:** Modello Prisma con indici su `id`, `userId`, `expiresAt`
-4. **TTL Sessione:** 7 giorni (configurabile in `AuthService`)
-5. **Cleanup Sessioni:** Job schedulato implementato in `AuthJob` (elimina sessioni scadute ogni ora + sessioni inattive ogni giorno)
+1. **Stateless:** nessuna sessione in DB, quindi niente cookie, niente cleanup schedulato
+2. **CORS:** solo header (`Authorization`), nessun `credentials: true`
+3. **JWKS:** chiave pubblica Bastion in cache (`BASTION_JWKS_TTL_MS`, default 1h)
+4. **TTL:** deciso da Bastion, Articuno legge solo `exp`
+5. **Rate limit:** `AdminThrottlerGuard` bucketta sul `sub` Bastion, non sull'IP
 
 ## Estensibilità
 
@@ -134,7 +130,7 @@ Per aggiungere nuove risorse admin:
 ```typescript
 // 1. Creare controller in src/modules/admin/controllers/
 @Controller('admin/resource')
-@UseGuards(SessionGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminResourceController {
   constructor(private readonly resourceService: ResourceService) {}
 
@@ -155,10 +151,7 @@ export class AdminModule {}
 
 ## TODO
 
-- [x] Implementare job schedulato per cleanup sessioni scadute (✅ Implementato in `AuthJob`)
-- [x] Aggiungere logout endpoint: `DELETE /admin/auth/logout` (✅ Implementato)
-- [x] Implementare refresh sessione: `POST /admin/auth/refresh` (✅ Implementato)
-- [ ] Aggiungere validazione role-based per operazioni critiche
-- [ ] Implementare audit log per operazioni admin
-- [ ] Aggiungere rate limiting specifico per endpoint admin
+- [x] Rate limiting specifico per endpoint admin (`AdminThrottlerGuard`)
+- [x] Audit log per operazioni admin (`AuditLoggerService`)
+- [ ] Enforcement dei permessi fine lato servizio: oggi vive solo nel BFF di Meridian
 

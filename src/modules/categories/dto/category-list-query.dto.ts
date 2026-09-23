@@ -1,4 +1,4 @@
-import { PagedQuery } from '@/pagination';
+import { PageParams } from '@/common/pagination';
 
-export class CategoryListQueryDto extends PagedQuery {}
+export class CategoryListQueryDto extends PageParams {}
 

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { limit, PagedResponse } from '@/pagination';
+import { PaginatedResult, paginate } from '@/common/pagination';
 import { NotificationListQueryDto } from './dto/notification-list-query.dto';
 import { Notification } from '@prisma/client';
 
@@ -11,9 +11,7 @@ export class NotificationsService {
   async findAll(
     tenantId: string,
     query: NotificationListQueryDto,
-  ): Promise<PagedResponse<Notification>> {
-    const pageSize = limit(query);
-
+  ): Promise<PaginatedResult<Notification>> {
     const where = {
       tenantId,
       ...(query.type !== undefined && { type: query.type }),
@@ -21,12 +19,12 @@ export class NotificationsService {
       ...(query.userId !== undefined && { userId: query.userId }),
     };
 
-    const [items, totalCount] = await this.prisma.$transaction([
+    const [items, total] = await this.prisma.$transaction([
       this.prisma.notification.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: pageSize,
-        skip: query.offset,
+        take: query.limit,
+        skip: query.skip,
         include: {
           user: {
             select: {
@@ -41,17 +39,7 @@ export class NotificationsService {
       this.prisma.notification.count({ where }),
     ]);
 
-    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
-
-    return {
-      items,
-      pagination: {
-        totalCount,
-        currentPage,
-        pageSize,
-        totalPages: Math.ceil(totalCount / pageSize),
-      },
-    };
+    return paginate(items, total, query);
   }
 
   async findOne(tenantId: string, id: string): Promise<Notification> {

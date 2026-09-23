@@ -14,24 +14,27 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
+  ApiBearerAuth,
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
 import { CommentsService } from '@/modules/comments/comments.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
 import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Admin / Comments')
-@ApiCookieAuth('sessionId')
+@ApiBearerAuth()
 @Controller('admin/comments')
-@UseGuards(SessionGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminCommentsController {
   constructor(
     private readonly commentsService: CommentsService,
@@ -43,12 +46,12 @@ export class AdminCommentsController {
   @ApiOperation({
     summary: 'List all comments (admin)',
     description:
-      'Returns a paginated list of all comments for the session tenant, regardless of status. Supports filtering by articleId.',
+      'Returns a paginated list of all comments for the session tenant. Without `status` every comment is returned regardless of moderation state. Supports filtering by articleId and status.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of comments.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of comments.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  findAll(@GetSession() session: any, @Query() query: CommentFiltersQueryDto) {
-    return this.commentsService.findAll(session.tenantId, query, undefined, true);
+  findAll(@GetSession() session: AdminSession, @Query() query: CommentFiltersQueryDto) {
+    return this.commentsService.findAll(session.tenantId, query, query.status, true);
   }
 
   @Get(':id')
@@ -60,7 +63,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 200, description: 'Comment found.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
-  findOne(@GetSession() session: any, @Param() params: CommentParamsDto) {
+  findOne(@GetSession() session: AdminSession, @Param() params: CommentParamsDto) {
     return this.commentsService.findOne(session.tenantId, params.id, undefined, true);
   }
 
@@ -76,7 +79,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
   async update(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: CommentParamsDto,
     @Body() dto: UpdateCommentDto,
   ) {
@@ -116,7 +119,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 204, description: 'Comment deleted successfully – no content returned.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
-  async remove(@GetSession() session: any, @Param() params: CommentParamsDto) {
+  async remove(@GetSession() session: AdminSession, @Param() params: CommentParamsDto) {
     const comment = await this.prisma.comment.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { status: true, content: true },

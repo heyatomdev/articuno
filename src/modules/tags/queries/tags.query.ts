@@ -1,8 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
-import { PagedQuery } from "@/pagination";
+import { PageParams } from "@/common/pagination";
 
-export class TagsListQuery extends PagedQuery {
+export class TagsListQuery extends PageParams {
   @ApiPropertyOptional({
     description: 'Filter tags by name (case-insensitive partial match)',
     example: 'tech',

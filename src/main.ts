@@ -4,7 +4,6 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './modules/app/app.module';
 import { HttpExceptionFilter } from '@/filters/http-exception.filter';
-import * as cookieParser from 'cookie-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap(): Promise<void> {
@@ -46,7 +45,6 @@ async function bootstrap(): Promise<void> {
       origin: corsOrigins.length > 0 ? corsOrigins : !isProduction,
       methods: ['GET', 'POST', 'PATCH', 'DELETE'],
       allowedHeaders: ['Content-Type', 'X-API-Key', 'X-User-Id', 'Authorization'],
-      credentials: true,
     });
     if (isProduction && corsOrigins.length === 0) {
       bootstrapLogger.warn('CORS_ORIGIN is not set in production: browser cross-origin requests are disabled');
@@ -58,8 +56,6 @@ async function bootstrap(): Promise<void> {
     app.useBodyParser('json', { limit: '1mb' });
     app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
 
-    app.use(cookieParser());
-
     // Swagger documentation
     const config = new DocumentBuilder()
         .setTitle('Articuno')
@@ -67,7 +63,6 @@ async function bootstrap(): Promise<void> {
         .setVersion(process?.env?.npm_package_version || '2.0.0')
         .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
         .addBearerAuth()
-        .addCookieAuth('sessionId', { type: 'apiKey', in: 'cookie', name: 'sessionId', description: 'Admin session cookie (HTTP-only, 7-day TTL)' }, 'sessionId')
         .setLicense(
             'MIT',
             'https://github.com/heyatomdev/articuno/blob/main/README.md',

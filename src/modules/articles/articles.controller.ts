@@ -27,6 +27,7 @@ import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { ArticleParamsDto, ArticleSlugParamsDto } from '@/modules/articles/dto/article-params.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ArticleShowQueryDto } from '@/modules/articles/dto/article-show-query.dto';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Articles')
 @ApiSecurity('x-api-key')
@@ -57,7 +58,7 @@ export class ArticlesController {
       'Returns a paginated list of articles belonging to the current tenant. ' +
       'Supports optional filtering by status, category, tag, and featured flag.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of articles.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of articles.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   findAll(@GetTenant() tenant: any, @Query() query: ArticleFiltersQueryDto) {
     return this.articlesService.findAll(tenant.id, query);

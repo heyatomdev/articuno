@@ -10,7 +10,7 @@ import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-q
 import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ContentStatus, TargetType } from '@prisma/client';
-import { limit, PagedResponse } from '@/pagination';
+import { PaginatedResult, paginate } from '@/common/pagination';
 
 @Injectable()
 export class CommentsService {
@@ -158,7 +158,7 @@ export class CommentsService {
     query: CommentFiltersQueryDto,
     statusFilter?: ContentStatus | ContentStatus[],
     skipSanitize = false,
-  ): Promise<PagedResponse<any>> {
+  ): Promise<PaginatedResult<any>> {
     const statusCondition = statusFilter
       ? Array.isArray(statusFilter)
         ? { in: statusFilter }
@@ -171,12 +171,12 @@ export class CommentsService {
       ...(statusCondition && { status: statusCondition }),
     };
 
-    const [items, totalCount] = await this.prisma.$transaction([
+    const [items, total] = await this.prisma.$transaction([
       this.prisma.comment.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: limit(query),
-        skip: query.offset,
+        take: query.limit,
+        skip: query.skip,
         include: {
           tenant: {
             select: {
@@ -199,18 +199,11 @@ export class CommentsService {
       this.prisma.comment.count({ where }),
     ]);
 
-    const pageSize = query.limit ?? 20;
-    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
-
-    return {
-      items: items.map((c) => skipSanitize ? c : this.sanitizeForPublicApi(c)),
-      pagination: {
-        totalCount,
-        currentPage,
-        pageSize,
-        totalPages: Math.ceil(totalCount / pageSize),
-      },
-    };
+    return paginate(
+      items.map((c) => skipSanitize ? c : this.sanitizeForPublicApi(c)),
+      total,
+      query,
+    );
   }
 
   async findOne(tenantId: string, id: string, statusFilter?: ContentStatus | ContentStatus[], skipSanitize = false) {

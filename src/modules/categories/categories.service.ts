@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
-import { limit, PagedResponse } from '@/pagination';
+import { PaginatedResult, paginate } from '@/common/pagination';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
 import { slugifySafe } from '@/utils/slugify';
 
@@ -30,15 +30,15 @@ export class CategoriesService {
   async findAll(
     tenantId: string,
     query: CategoryListQueryDto,
-  ): Promise<PagedResponse<any>> {
+  ): Promise<PaginatedResult<any>> {
     const where = { tenantId };
 
-    const [items, totalCount] = await this.prisma.$transaction([
+    const [items, total] = await this.prisma.$transaction([
       this.prisma.category.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: limit(query),
-        skip: query.offset,
+        take: query.limit,
+        skip: query.skip,
         include: {
           _count: {
             select: { articles: true },
@@ -48,21 +48,14 @@ export class CategoriesService {
       this.prisma.category.count({ where }),
     ]);
 
-    const pageSize = query.limit ?? 20;
-    const currentPage = Math.floor((query.offset ?? 0) / pageSize) + 1;
-
-    return {
-      items: items.map(({ _count, ...category }) => ({
+    return paginate(
+      items.map(({ _count, ...category }) => ({
         ...category,
         articlesCount: _count.articles,
       })),
-      pagination: {
-        totalCount,
-        currentPage,
-        pageSize,
-        totalPages: Math.ceil(totalCount / pageSize),
-      },
-    };
+      total,
+      query,
+    );
   }
 
   async findOne(tenantId: string, id: string) {

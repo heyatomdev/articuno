@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ReportStatus, TargetType } from '@prisma/client';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { PagedQuery } from '@/pagination';
+import { PageParams } from '@/common/pagination';
 
-export class ReportListQueryDto extends PagedQuery {
+export class ReportListQueryDto extends PageParams {
   @ApiProperty({
     description: 'Filter reports by status',
     enum: ReportStatus,

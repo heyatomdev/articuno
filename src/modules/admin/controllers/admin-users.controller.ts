@@ -14,25 +14,27 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
+  ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
 import { UsersService } from '@/modules/users/users.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
 import { UserParamsDto } from '@/modules/users/dto/user-params.dto';
 import { UpdateUserStatusDto } from '@/modules/users/dto/update-user-status.dto';
 import { UpdateUserRoleDto } from '@/modules/users/dto/update-user-role.dto';
-import { PagedResponse } from '@/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 
 @ApiTags('Admin / Users')
-@ApiCookieAuth('sessionId')
+@ApiBearerAuth()
 @Controller('admin/users')
-@UseGuards(SessionGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminUsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -44,12 +46,12 @@ export class AdminUsersController {
     summary: 'List users',
     description: 'Returns a paginated list of all users belonging to the session tenant.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of users.', type: UserListItemDto, isArray: true })
+  @ApiPaginatedResponse(UserListItemDto, 'Paginated list of users.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Query() query: UserListQueryDto,
-  ): Promise<PagedResponse<UserListItemDto>> {
+  ): Promise<PaginatedResult<UserListItemDto>> {
     return this.usersService.findAll(session.tenantId, query);
   }
 
@@ -63,7 +65,7 @@ export class AdminUsersController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   findOne(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: UserParamsDto,
   ): Promise<UserListItemDto> {
     return this.usersService.findOne(session.tenantId, params.id);
@@ -79,7 +81,7 @@ export class AdminUsersController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async updateStatus(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: UserParamsDto,
     @Body() dto: UpdateUserStatusDto,
   ): Promise<UserListItemDto> {
@@ -112,7 +114,7 @@ export class AdminUsersController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async updateRole(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: UserParamsDto,
     @Body() dto: UpdateUserRoleDto,
   ): Promise<UserListItemDto> {
@@ -146,7 +148,7 @@ export class AdminUsersController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async remove(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param() params: UserParamsDto,
   ): Promise<void> {
     const user = await this.usersService.findOne(session.tenantId, params.id);

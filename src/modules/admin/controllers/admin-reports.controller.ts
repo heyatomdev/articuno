@@ -3,13 +3,15 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
+  ApiBearerAuth,
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
 import { ReportsService } from '@/modules/reports/reports.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AdminCreateReportDto } from '@/modules/reports/dto/admin-create-report.dto';
 import { AdminUpdateReportDto } from '@/modules/reports/dto/admin-update-report.dto';
 import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto';
@@ -17,11 +19,12 @@ import { ReportParamsDto } from '@/modules/reports/dto/report-params.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Admin / Reports')
-@ApiCookieAuth('sessionId')
+@ApiBearerAuth()
 @Controller('admin/reports')
-@UseGuards(SessionGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminReportsController {
   constructor(
     private readonly reportsService: ReportsService,
@@ -41,7 +44,7 @@ export class AdminReportsController {
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Reported target not found.' })
-  async create(@GetSession() session: any, @Body() dto: AdminCreateReportDto) {
+  async create(@GetSession() session: AdminSession, @Body() dto: AdminCreateReportDto) {
     const report = await this.reportsService.create(session.tenantId, {
       ...dto,
       reporterId: session.externalId,
@@ -66,9 +69,9 @@ export class AdminReportsController {
     summary: 'List reports (admin)',
     description: 'Returns a paginated list of all reports for the session tenant. Optionally filter by status.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of reports.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of reports.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  findAll(@GetSession() session: any, @Query() query: ReportListQueryDto) {
+  findAll(@GetSession() session: AdminSession, @Query() query: ReportListQueryDto) {
     return this.reportsService.findAll(session.tenantId, query);
   }
 
@@ -81,7 +84,7 @@ export class AdminReportsController {
   @ApiResponse({ status: 200, description: 'Report found.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Report not found.' })
-  findOne(@GetSession() session: any, @Param() params: ReportParamsDto) {
+  findOne(@GetSession() session: AdminSession, @Param() params: ReportParamsDto) {
     return this.reportsService.findOne(params.id, session.tenantId);
   }
 
@@ -98,7 +101,7 @@ export class AdminReportsController {
   @ApiResponse({ status: 404, description: 'Report not found.' })
   async updateStatus(
     @Param('id') id: string,
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Body() dto: AdminUpdateReportDto,
   ) {
     const before = await this.prisma.report.findFirst({

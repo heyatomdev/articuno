@@ -3,18 +3,21 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiCookieAuth,
+  ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
 import { AuditsService } from '@/modules/audits/audits.service';
-import { SessionGuard } from '@/modules/auth/guards/session.guard';
-import { GetSession } from '@/modules/auth/decorators/get-session.decorator';
+import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
+import { AdminSession } from '@/modules/bastion/bastion.types';
+import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AuditListQueryDto } from '@/modules/audits/dto/audit-list-query.dto';
+import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Admin / Audits')
-@ApiCookieAuth('sessionId')
+@ApiBearerAuth()
 @Controller('admin/audits')
-@UseGuards(SessionGuard)
+@UseGuards(BastionUserGuard, AdminThrottlerGuard)
 export class AdminAuditsController {
   constructor(private readonly auditsService: AuditsService) {}
 
@@ -25,10 +28,10 @@ export class AdminAuditsController {
       'Returns a paginated list of audit log entries for the session tenant. ' +
       'Supports optional filtering by action, resource type, and actor user ID.',
   })
-  @ApiResponse({ status: 200, description: 'Paginated list of audit log entries.' })
+  @ApiPaginatedResponse(undefined, 'Paginated list of audit log entries.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Query() query: AuditListQueryDto,
   ) {
     return this.auditsService.findAll(session.tenantId, query);
@@ -44,7 +47,7 @@ export class AdminAuditsController {
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Audit log entry not found.' })
   findOne(
-    @GetSession() session: any,
+    @GetSession() session: AdminSession,
     @Param('id') id: string,
   ) {
     return this.auditsService.findOne(id, session.tenantId);
