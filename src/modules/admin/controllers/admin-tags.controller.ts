@@ -27,6 +27,7 @@ import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 
 @ApiTags('Admin / Tags')
 @ApiBearerAuth()
@@ -40,6 +41,7 @@ export class AdminTagsController {
   ) {}
 
   @Post()
+  @ApiCreatedResponse({ type: TagDto })
   async create(@GetSession() session: AdminSession, @Body() dto: CreateTagDto) {
     const tag = await this.tagsService.create(session.tenantId, dto);
 
@@ -67,11 +69,13 @@ export class AdminTagsController {
   }
 
   @Get(':id')
+  @ApiOkResponse({ type: TagDto })
   findOne(@GetSession() session: AdminSession, @Param() params: TagParamsDto) {
     return this.tagsService.findOne(session.tenantId, params.id);
   }
 
   @Patch(':id')
+  @ApiOkResponse({ type: TagDto })
   async update(
     @GetSession() session: AdminSession,
     @Param() params: TagParamsDto,

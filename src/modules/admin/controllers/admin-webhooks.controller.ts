@@ -23,6 +23,10 @@ import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-li
 import { WebhookEventParamsDto } from '@/modules/webhook/dto/webhook-event-params.dto';
 import { WebhooksService } from '@/modules/webhook/webhooks.service';
 import { ApiPaginatedResponse } from '@/common/pagination';
+import {
+  WebhookEventDto,
+  WebhookResendAllResultDto,
+} from '@/modules/webhook/dto/webhook-event.dto';
 
 @ApiTags('Admin / Webhooks')
 @ApiBearerAuth()
@@ -37,7 +41,7 @@ export class AdminWebhooksController {
     description:
       'Returns a paginated list of all webhook events (outbox) for the session tenant. Supports filtering by event type and delivery status.',
   })
-  @ApiPaginatedResponse(undefined, 'Paginated list of webhook events.')
+  @ApiPaginatedResponse(WebhookEventDto, 'Paginated list of webhook events.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -56,7 +60,11 @@ export class AdminWebhooksController {
       'Returns the full detail of a single webhook event (payload, attempts, sentAt, lastError, nextRetryAt).',
   })
   @ApiParam({ name: 'id', description: 'Internal UUID of the webhook event' })
-  @ApiResponse({ status: 200, description: 'Webhook event found.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook event found.',
+    type: WebhookEventDto,
+  })
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -80,6 +88,7 @@ export class AdminWebhooksController {
   @ApiResponse({
     status: 200,
     description: 'Webhook event reset — will be retried shortly.',
+    type: WebhookEventDto,
   })
   @ApiResponse({
     status: 400,
@@ -107,7 +116,7 @@ export class AdminWebhooksController {
   @ApiResponse({
     status: 200,
     description: 'Number of events reset.',
-    schema: { example: { reset: 12 } },
+    type: WebhookResendAllResultDto,
   })
   @ApiResponse({
     status: 401,

@@ -24,10 +24,17 @@ import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
-import { ArticleParamsDto, ArticleSlugParamsDto } from '@/modules/articles/dto/article-params.dto';
+import {
+  ArticleParamsDto,
+  ArticleSlugParamsDto,
+} from '@/modules/articles/dto/article-params.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ArticleShowQueryDto } from '@/modules/articles/dto/article-show-query.dto';
 import { ApiPaginatedResponse } from '@/common/pagination';
+import {
+  ArticleDto,
+  ArticleListItemDto,
+} from '@/modules/articles/dto/article-response.dto';
 
 @ApiTags('Articles')
 @ApiSecurity('x-api-key')
@@ -44,7 +51,11 @@ export class ArticlesController {
       'Content is automatically checked for banned words; matching content will be created with a HIDDEN status.',
   })
   @ApiBody({ type: CreateArticleDto })
-  @ApiResponse({ status: 201, description: 'Article created successfully.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Article created successfully.',
+    type: ArticleDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   create(@GetTenant() tenant: any, @Body() dto: CreateArticleDto) {
@@ -58,7 +69,7 @@ export class ArticlesController {
       'Returns a paginated list of articles belonging to the current tenant. ' +
       'Supports optional filtering by status, category, tag, and featured flag.',
   })
-  @ApiPaginatedResponse(undefined, 'Paginated list of articles.')
+  @ApiPaginatedResponse(ArticleListItemDto, 'Paginated list of articles.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   findAll(@GetTenant() tenant: any, @Query() query: ArticleFiltersQueryDto) {
     return this.articlesService.findAll(tenant.id, query);
@@ -74,7 +85,7 @@ export class ArticlesController {
     description: 'URL-friendly slug of the article',
     example: 'getting-started-with-nestjs',
   })
-  @ApiResponse({ status: 200, description: 'Article found.' })
+  @ApiResponse({ status: 200, description: 'Article found.', type: ArticleDto })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   findOne(@GetTenant() tenant: any, @Param() params: ArticleSlugParamsDto, @Query() query: ArticleShowQueryDto) {
@@ -90,7 +101,11 @@ export class ArticlesController {
   })
   @ApiParam({ name: 'id', description: 'UUID of the article to update', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiBody({ type: UpdateArticleDto })
-  @ApiResponse({ status: 200, description: 'Article updated successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Article updated successfully.',
+    type: ArticleDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error or invalid status transition.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })

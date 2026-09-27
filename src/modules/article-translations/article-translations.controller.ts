@@ -25,6 +25,10 @@ import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-artic
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleParamsDto } from '@/modules/articles/dto/article-params.dto';
 import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
+import {
+  ArticleTranslationDto,
+  ArticleTranslationSummaryDto,
+} from '@/modules/articles/dto/article-response.dto';
 
 @ApiTags('Article Translations')
 @ApiSecurity('x-api-key')
@@ -40,7 +44,11 @@ export class ArticleTranslationsController {
   })
   @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiBody({ type: CreateArticleTranslationDto })
-  @ApiResponse({ status: 201, description: 'Translation created successfully.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Translation created successfully.',
+    type: ArticleTranslationDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
@@ -59,7 +67,11 @@ export class ArticleTranslationsController {
     description: 'Returns all translations for an article, ordered by language code.',
   })
   @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 200, description: 'List of translations.' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of translations.',
+    type: [ArticleTranslationSummaryDto],
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   findAll(@GetTenant() tenant: any, @Param() params: ArticleParamsDto) {
@@ -73,7 +85,11 @@ export class ArticleTranslationsController {
   })
   @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiParam({ name: 'languageCode', description: 'BCP 47 language code', example: 'en' })
-  @ApiResponse({ status: 200, description: 'Translation found.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Translation found.',
+    type: ArticleTranslationDto,
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Translation not found.' })
   findOne(
@@ -91,7 +107,11 @@ export class ArticleTranslationsController {
   @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiParam({ name: 'languageCode', description: 'BCP 47 language code of the translation to update', example: 'en' })
   @ApiBody({ type: UpdateArticleTranslationDto })
-  @ApiResponse({ status: 200, description: 'Translation updated successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Translation updated successfully.',
+    type: ArticleTranslationDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article or translation not found.' })
