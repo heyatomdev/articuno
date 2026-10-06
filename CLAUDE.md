@@ -160,7 +160,7 @@ Key runtime settings:
 
 ### Metrics
 
-`src/modules/metrics/`, `prom-client` directly (own `Registry`, default label `app=articuno`). `MetricsServer` serves `GET /metrics` with `node:http` on `METRICS_PORT` (default 9091), outside the Nest app: no guards, no TenantMiddleware, no CORS — and nothing on the API port (404 there). Isolation is the network's job: never publish 9091 on the host, nginx never proxies it; Prometheus scrapes `articuno:9091` on the internal Docker network. `MetricsMiddleware` (registered in `AppModule.configure`, all routes) records `http_request_duration_seconds` labelled by route pattern, never the raw URL; `/health*` and `/status` are skipped.
+`src/modules/metrics/`, `@prometheus-io/client` directly (own `Registry`, default label `app=articuno`). `MetricsServer` serves `GET /metrics` with `node:http` on `METRICS_PORT` (default 9091), outside the Nest app: no guards, no TenantMiddleware, no CORS — and nothing on the API port (404 there). Isolation is the network's job: never publish 9091 on the host, nginx never proxies it; Prometheus scrapes `articuno:9091` on the internal Docker network. `MetricsMiddleware` (registered in `AppModule.configure`, all routes) records `http_request_duration_seconds` labelled by route pattern, never the raw URL; `/health*` and `/status` are skipped.
 
 ## Code Conventions
 
