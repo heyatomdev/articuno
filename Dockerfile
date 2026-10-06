@@ -6,16 +6,16 @@ ENV NODE_ENV=build
 WORKDIR /usr/src/app
 
 # Install pnpm and build dependencies
-RUN npm install -g pnpm@8.15.0
+RUN npm install -g pnpm@10.14.0
 
 # Install build deps needed for native modules and prisma generation
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential python3 curl ca-certificates gcc g++ make && \
+    apt-get install -y --no-install-recommends build-essential python3 ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # Install app dependencies (including dev dependencies) for the build
-COPY package.json pnpm-lock.yaml .npmrc ./
-RUN pnpm install --no-frozen-lockfile
+COPY package.json pnpm-lock.yaml .npmrc pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # Bundle app source
 COPY . .
@@ -39,13 +39,14 @@ WORKDIR /usr/src/app
 # Create a non-root user and group with specific UID/GID to match host user
 RUN groupadd -g 1001 app && useradd -u 1001 -g app -m app
 
-# Install runtime dependencies for Sharp image processing
+# Install runtime dependencies and remove npm (not needed at runtime, reduces attack surface)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libvips-dev && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends libvips42 && \
+    rm -rf /var/lib/apt/lists/* && \
+    npm uninstall -g npm corepack
 
 # Copy built artifacts and dependencies from builder with ownership set during copy
-COPY --chown=app:app package.json pnpm-lock.yaml ./
+COPY --chown=app:app package.json ./
 COPY --from=builder --chown=app:app /usr/src/app/prisma ./prisma
 COPY --from=builder --chown=app:app /usr/src/app/dist ./dist
 COPY --from=builder --chown=app:app /usr/src/app/node_modules ./node_modules

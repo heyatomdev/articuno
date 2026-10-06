@@ -1,6 +1,6 @@
 {
   "name": "articuno",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Multi-tenant blog platform with Prisma",
   "main": "index.js",
   "scripts": {
@@ -107,12 +107,6 @@
     },
     "transformIgnorePatterns": [
       "/node_modules/(?!jose)/"
-    ]
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@nestjs/core",
-      "@swc/core"
     ]
   },
   "prisma": {

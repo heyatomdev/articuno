@@ -108,7 +108,7 @@ export class FileHarborService {
     this.validateImageFile(file);
 
     try {
-      const form = this.createFormData(file, { description, userId: externalId });
+      const form = this.createFormData(file, { description, creatorId: externalId });
 
       const response = await firstValueFrom(
         this.httpService.post<FileHarborImageDto>(`${config.endpoint}/images`, form, {
@@ -128,7 +128,12 @@ export class FileHarborService {
       return response.data;
 
     } catch (error) {
-      this.logger.error(`Upload failed: ${error.message}`, error.stack);
+      // Status and a slice of the body tell FileHarbor errors apart from a proxy in front of it
+      const body = error.response?.data;
+      this.logger.error(
+        `Upload failed: ${error.message} (${config.endpoint}/images, status ${error.response?.status ?? 'n/a'}, body ${String(typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 500)})`,
+        error.stack,
+      );
       throw new InternalServerErrorException(`Upload failed: ${error.message}`);
     }
   }
