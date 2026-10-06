@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { StatusController } from './status.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -6,7 +11,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '@/modules/prisma/prisma.module';
 import config from '../../configs/config.schema';
 import { configValidationSchema } from '@/configs/config.validation';
-import { PrometheusModule } from '@willsoto/nestjs-prometheus';
+import { MetricsModule } from '@/modules/metrics/metrics.module';
+import { MetricsMiddleware } from '@/modules/metrics/metrics.middleware';
 import { AnalyticsModule } from '@/modules/analytics/analytics.module';
 import { ReportsModule } from '@/modules/reports/reports.module';
 import { UsersModule } from '@/modules/users/users.module';
@@ -45,12 +51,8 @@ const splitList = (raw?: string): string[] | undefined =>
       validationSchema: configValidationSchema,
     }),
 
-    // Prometheus configuration
-    PrometheusModule.register({
-      defaultLabels: {
-        app: 'articuno',
-      },
-    }),
+    // Prometheus metrics, served on METRICS_PORT — not on the API port
+    MetricsModule,
 
     // Rate limiting
     ThrottlerModule.forRootAsync({
@@ -101,4 +103,13 @@ const splitList = (raw?: string): string[] | undefined =>
     WebhooksModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // MetricsMiddleware is a middleware and not an APP_INTERCEPTOR on purpose:
+    // interceptors run after guards and TenantMiddleware, so 401s and 429s
+    // would never be counted.
+    consumer
+      .apply(MetricsMiddleware)
+      .forRoutes({ path: '{*splat}', method: RequestMethod.ALL });
+  }
+}

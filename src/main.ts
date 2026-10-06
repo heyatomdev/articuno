@@ -77,7 +77,6 @@ async function bootstrap(): Promise<void> {
 
     bootstrapLogger.log(`🚀 Articuno started successfully`);
     bootstrapLogger.log(`📚 API Documentation: http://localhost:${port}/docs`);
-    bootstrapLogger.log(`📈 Metrics endpoint: http://localhost:${port}/metrics`);
     bootstrapLogger.log(`📝 Logging enabled for: log, error, warn, debug, verbose`);
     bootstrapLogger.log(`Current BASE_URL is set to: ${baseUrl}`);
 

@@ -9,6 +9,8 @@ export const configValidationSchema = Joi.object({
   CORS_ORIGIN: Joi.string().allow('').optional(),
   TRUST_PROXY: Joi.boolean().truthy('true').falsy('false').default(false),
   BASE_URL: Joi.string().uri({ allowRelative: false }).allow('').optional(),
+  // Prometheus scrape port (src/modules/metrics) — internal network only.
+  METRICS_PORT: Joi.number().port().default(9091),
 
   // Database
   DATABASE_URL: Joi.string().required(),
