@@ -14,6 +14,16 @@ export const configValidationSchema = Joi.object({
   // Prometheus scrape port (src/modules/metrics) — internal network only.
   METRICS_PORT: Joi.number().port().default(9091),
 
+  // pino levels; unset → debug in development, info in production
+  LOG_LEVEL: Joi.string().valid(
+    'fatal',
+    'error',
+    'warn',
+    'info',
+    'debug',
+    'trace',
+  ),
+
   // Database
   DATABASE_URL: Joi.string().required(),
 

@@ -8,6 +8,9 @@ import { StatusController } from './status.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
+import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'crypto';
+import type { Request } from 'express';
 import { PrismaModule } from '@/modules/prisma/prisma.module';
 import config from '../../configs/config.schema';
 import { configValidationSchema } from '@/configs/config.validation';
@@ -49,6 +52,59 @@ const splitList = (raw?: string): string[] | undefined =>
       isGlobal: true,
       cache: true,
       validationSchema: configValidationSchema,
+    }),
+
+    // Same pino setup as Bastion: one JSON line per request in production,
+    // pino-pretty single-line in development.
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const production = config.get('NODE_ENV') === 'production';
+        return {
+          pinoHttp: {
+            level:
+              config.get<string>('LOG_LEVEL') ??
+              (production ? 'info' : 'debug'),
+            transport: production
+              ? undefined
+              : {
+                  target: 'pino-pretty',
+                  options: { singleLine: true, colorize: true },
+                },
+            redact: {
+              paths: [
+                'req.headers.authorization',
+                'req.headers.cookie',
+                'req.headers["x-api-key"]',
+                'res.headers["set-cookie"]',
+              ],
+              remove: true,
+            },
+            genReqId: () => randomUUID(),
+            serializers: {
+              // `raw.ip` honours TRUST_PROXY (`trust proxy` in main.ts).
+              req: (req: {
+                id: string;
+                method: string;
+                url: string;
+                raw: Request;
+              }) => ({
+                id: req.id,
+                method: req.method,
+                url: req.url,
+                ip: req.raw.ip,
+              }),
+              res: (res: { statusCode: number }) => ({
+                statusCode: res.statusCode,
+              }),
+            },
+            customProps: () => ({ service: 'articuno' }),
+            autoLogging: {
+              ignore: (req) => (req.url ?? '').startsWith('/health'),
+            },
+          },
+        };
+      },
     }),
 
     // Prometheus metrics, served on METRICS_PORT — not on the API port

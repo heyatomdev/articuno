@@ -34,13 +34,13 @@ export class TenantSeedService implements OnModuleInit {
       });
 
       if (existingTenant) {
-        this.logger.log('✅ Default tenant already exists, skipping seed.');
+        this.logger.log('Default tenant already exists, skipping seed.');
       } else {
         // Generate a production-ready random API key (64 hex characters)
         const plainApiKey = this.generateApiKey();
 
         // Log the plain API key BEFORE hashing it
-        this.logger.log('🔑 Generated API Key (save this securely):');
+        this.logger.log('Generated API Key (save this securely):');
         this.logger.log(`   ${plainApiKey}`);
 
         // Hash the API key (SHA-256)
@@ -61,11 +61,11 @@ export class TenantSeedService implements OnModuleInit {
           },
         });
 
-        this.logger.log(`🌱 Default tenant seeded successfully!`);
+        this.logger.log(`Default tenant seeded successfully!`);
         this.logger.log(`   Tenant ID: ${defaultTenant.id}`);
         this.logger.log(`   Slug: ${defaultTenant.slug}`);
         this.logger.log(`   Domain: ${defaultTenant.domain}`);
-        this.logger.log(`   ⚠️  Header to use: x-api-key: ${plainApiKey}`);
+        this.logger.log(`   Header to use: x-api-key: ${plainApiKey}`);
 
         // Seed default banned words for the new tenant
         await this.bannedWordsSeed.seedDefaultBannedWords(defaultTenant.id);

@@ -154,9 +154,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    this.logger.error(
-      exception.message + ' exception raised on: ' + request.url,
-    );
+    // Method and URL come from pino-http's `req` on the same line.
+    this.logger.error(`${status} ${exception.message}`);
 
     response.status(status).json({
       statusCode: status,
