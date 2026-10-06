@@ -2,13 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { WebhooksService } from './webhooks.service';
+import { DEAD_LETTER_DATE } from './webhook.constants';
 
 /** Numero massimo di tentativi prima di mettere l'evento in dead-letter. */
 const MAX_ATTEMPTS = 10;
-
-/** Data sentinella usata come "dead-letter": l'evento non verrà più ripreso dal cron. */
-export const DEAD_LETTER_DATE = new Date('9999-12-31T23:59:59.000Z');
 
 /** Rows claimed per tick — see `claimDue`. */
 export const CLAIM_BATCH_SIZE = 20;
@@ -32,6 +31,7 @@ export class WebhooksJob {
     private prisma: PrismaService,
     private webhookService: WebhooksService,
     private config: ConfigService,
+    private metrics: MetricsService,
   ) {}
 
   /**
@@ -95,6 +95,7 @@ export class WebhooksJob {
             claimedUntil: null,
           },
         });
+        this.metrics.webhookDeliveryAttempts.inc({ result: 'dead_lettered' });
         continue;
       }
 
@@ -108,6 +109,7 @@ export class WebhooksJob {
             claimedUntil: null,
           },
         });
+        this.metrics.webhookDeliveryAttempts.inc({ result: 'unconfigured' });
         continue;
       }
 
@@ -126,6 +128,7 @@ export class WebhooksJob {
             claimedUntil: null,
           },
         });
+        this.metrics.webhookDeliveryAttempts.inc({ result: 'success' });
         continue;
       }
 
@@ -146,6 +149,7 @@ export class WebhooksJob {
           claimedUntil: null,
         },
       });
+      this.metrics.webhookDeliveryAttempts.inc({ result: 'failure' });
     }
   }
 

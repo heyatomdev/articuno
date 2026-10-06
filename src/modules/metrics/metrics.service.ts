@@ -3,9 +3,11 @@ import {
   Registry,
   Histogram,
   Gauge,
+  Counter,
   collectDefaultMetrics,
 } from '@prometheus-io/client';
 import { PrismaService } from '@/modules/prisma/prisma.service';
+import { DEAD_LETTER_DATE } from '@/modules/webhook/webhook.constants';
 
 /**
  * Prometheus metrics for articuno. Uses its own `Registry` rather than the
@@ -23,6 +25,7 @@ export class MetricsService {
   private readonly logger = new Logger(MetricsService.name);
   readonly registry = new Registry();
   readonly httpRequestDuration: Histogram<'method' | 'route' | 'status'>;
+  readonly webhookDeliveryAttempts: Counter<'result'>;
 
   constructor(private readonly prisma: PrismaService) {
     this.registry.setDefaultLabels({ app: 'articuno' });
@@ -36,6 +39,21 @@ export class MetricsService {
       registers: [this.registry],
     });
 
+    this.webhookDeliveryAttempts = new Counter({
+      name: 'articuno_webhook_delivery_attempts_total',
+      help: 'Webhook outbox delivery attempts by outcome, counted after the outcome is persisted',
+      labelNames: ['result'],
+      registers: [this.registry],
+    });
+    for (const result of [
+      'success',
+      'failure',
+      'unconfigured',
+      'dead_lettered',
+    ]) {
+      this.webhookDeliveryAttempts.inc({ result }, 0);
+    }
+
     this.registerWebhookOutboxGauge();
   }
 
@@ -48,8 +66,7 @@ export class MetricsService {
       collect: async () => {
         try {
           // Columns are camelCase (no @map) and `timestamp(3)` holding UTC,
-          // hence `now() AT TIME ZONE 'UTC'`. The sentinel must match
-          // DEAD_LETTER_DATE in webhooks.job.ts. Dead-lettered and leased
+          // hence `now() AT TIME ZONE 'UTC'`. Dead-lettered and leased
           // rows have nextRetryAt in the future, so `overdue` excludes them
           // by construction.
           const [row] = await this.prisma.$queryRaw<
@@ -60,7 +77,7 @@ export class MetricsService {
                 WHERE COALESCE("nextRetryAt", "createdAt") < (now() AT TIME ZONE 'UTC') - interval '2 minutes'
               ) AS overdue,
               count(*) FILTER (
-                WHERE "nextRetryAt" = '9999-12-31 23:59:59'::timestamp
+                WHERE "nextRetryAt" = ${DEAD_LETTER_DATE}
               ) AS dead
             FROM webhook_events
             WHERE "sentAt" IS NULL`;

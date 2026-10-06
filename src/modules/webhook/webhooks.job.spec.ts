@@ -1,10 +1,10 @@
 import {
   CLAIM_BATCH_SIZE,
   CLAIM_LEASE_MINUTES,
-  DEAD_LETTER_DATE,
   RETENTION_BATCH_SIZE,
   WebhooksJob,
 } from './webhooks.job';
+import { DEAD_LETTER_DATE } from './webhook.constants';
 
 /** Flattens a Prisma.sql tagged-template call into one comparable string. */
 const sqlOf = (call: any[]) =>
@@ -18,7 +18,14 @@ describe('WebhooksJob', () => {
   };
   const webhooks = { send: jest.fn() };
   const config = { getOrThrow: jest.fn().mockReturnValue(30) };
-  const job = new WebhooksJob(prisma as any, webhooks as any, config as any);
+  const metrics = { webhookDeliveryAttempts: { inc: jest.fn() } };
+  const job = new WebhooksJob(
+    prisma as any,
+    webhooks as any,
+    config as any,
+    metrics as any,
+  );
+  const inc = metrics.webhookDeliveryAttempts.inc;
 
   const tenant = { webhookUrl: 'https://t.test/hook', webhookSecret: 's' };
   const row = (over: object = {}) => ({
@@ -108,6 +115,8 @@ describe('WebhooksJob', () => {
         where: { id: 'e1' },
         data: { sentAt: expect.any(Date), lastError: null, claimedUntil: null },
       });
+      expect(inc).toHaveBeenCalledTimes(1);
+      expect(inc).toHaveBeenCalledWith({ result: 'success' });
     });
 
     it('records a failed attempt with backoff, replacing the lease', async () => {
@@ -126,6 +135,8 @@ describe('WebhooksJob', () => {
       const delay = data.nextRetryAt.getTime() - before;
       expect(delay).toBeGreaterThanOrEqual(8000);
       expect(delay).toBeLessThan(9000);
+      expect(inc).toHaveBeenCalledTimes(1);
+      expect(inc).toHaveBeenCalledWith({ result: 'failure' });
     });
 
     it('dead-letters at MAX_ATTEMPTS without sending', async () => {
@@ -138,6 +149,29 @@ describe('WebhooksJob', () => {
         nextRetryAt: DEAD_LETTER_DATE,
         claimedUntil: null,
       });
+      expect(inc).toHaveBeenCalledTimes(1);
+      expect(inc).toHaveBeenCalledWith({ result: 'dead_lettered' });
+    });
+
+    it('counts an unconfigured tenant without sending', async () => {
+      prisma.webhookEvent.findMany.mockResolvedValue([
+        row({ tenant: { webhookUrl: null, webhookSecret: null } }),
+      ]);
+
+      await job.processPendingWebhooks();
+
+      expect(webhooks.send).not.toHaveBeenCalled();
+      expect(inc).toHaveBeenCalledTimes(1);
+      expect(inc).toHaveBeenCalledWith({ result: 'unconfigured' });
+    });
+
+    it('does not count an outcome whose update failed', async () => {
+      prisma.webhookEvent.findMany.mockResolvedValue([row()]);
+      webhooks.send.mockResolvedValue(true);
+      prisma.webhookEvent.update.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(job.processPendingWebhooks()).rejects.toThrow('db down');
+      expect(inc).not.toHaveBeenCalled();
     });
   });
 
