@@ -23,6 +23,11 @@ import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
+import {
+  CommentDto,
+  CommentListItemDto,
+} from '@/modules/comments/dto/comment-response.dto';
 
 @Controller('comments')
 @UseGuards(TenantGuard)
@@ -34,6 +39,7 @@ export class CommentsController {
   ) {}
 
   @Post()
+  @ApiCreatedResponse({ type: CommentDto })
   async create(@GetTenant() tenant: any, @Body() dto: CreateCommentDto) {
     const comment = await this.commentsService.create(tenant.id, dto);
 
@@ -51,7 +57,7 @@ export class CommentsController {
   }
 
   @Get()
-  @ApiPaginatedResponse(undefined, 'Paginated list of comments.')
+  @ApiPaginatedResponse(CommentListItemDto, 'Paginated list of comments.')
   findAll(@GetTenant() tenant: any, @Query() query: CommentFiltersQueryDto) {
     return this.commentsService.findAll(tenant.id, query, [
       ContentStatus.VISIBLE,
@@ -60,6 +66,10 @@ export class CommentsController {
   }
 
   @Get(':id')
+  @ApiOkResponse({
+    type: CommentDto,
+    description: 'content is null while the comment is not VISIBLE',
+  })
   findOne(@GetTenant() tenant: any, @Param() params: CommentParamsDto) {
     return this.commentsService.findOne(tenant.id, params.id, [
       ContentStatus.VISIBLE,
@@ -68,6 +78,7 @@ export class CommentsController {
   }
 
   @Patch(':id')
+  @ApiOkResponse({ type: CommentDto })
   async update(
     @GetTenant() tenant: any,
     @Param() params: CommentParamsDto,

@@ -66,10 +66,16 @@ model WebhookEvent {
   attempts    Int       @default(0)
   lastError   String?
   nextRetryAt DateTime?
+  // Set by WebhooksJob.claimDue while a worker owns the row, cleared when the
+  // attempt is recorded. Resend endpoints skip rows whose lease is still live.
+  claimedUntil DateTime?
 
   createdAt DateTime @default(now())
 
   @@index([tenantId, sentAt, nextRetryAt])
+  // The due-rows index used by the claim query is a partial index
+  // (`nextRetryAt` WHERE `sentAt` IS NULL) that Prisma cannot express — it
+  // lives in migration 20261006120000_webhook_outbox_claim_and_retention.
   @@map("webhook_events")
 }
 

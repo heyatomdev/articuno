@@ -30,6 +30,10 @@ import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { ApiPaginatedResponse } from '@/common/pagination';
+import {
+  CommentDto,
+  CommentListItemDto,
+} from '@/modules/comments/dto/comment-response.dto';
 
 @ApiTags('Admin / Comments')
 @ApiBearerAuth()
@@ -48,7 +52,7 @@ export class AdminCommentsController {
     description:
       'Returns a paginated list of all comments for the session tenant. Without `status` every comment is returned regardless of moderation state. Supports filtering by articleId and status.',
   })
-  @ApiPaginatedResponse(undefined, 'Paginated list of comments.')
+  @ApiPaginatedResponse(CommentListItemDto, 'Paginated list of comments.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(@GetSession() session: AdminSession, @Query() query: CommentFiltersQueryDto) {
     return this.commentsService.findAll(session.tenantId, query, query.status, true);
@@ -60,7 +64,7 @@ export class AdminCommentsController {
     description: 'Returns a single comment identified by its UUID, regardless of status.',
   })
   @ApiParam({ name: 'id', description: 'UUID of the comment', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 200, description: 'Comment found.' })
+  @ApiResponse({ status: 200, description: 'Comment found.', type: CommentDto })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
   findOne(@GetSession() session: AdminSession, @Param() params: CommentParamsDto) {
@@ -74,7 +78,11 @@ export class AdminCommentsController {
   })
   @ApiParam({ name: 'id', description: 'UUID of the comment to update', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiBody({ type: UpdateCommentDto })
-  @ApiResponse({ status: 200, description: 'Comment updated successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Comment updated successfully.',
+    type: CommentDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Comment not found.' })

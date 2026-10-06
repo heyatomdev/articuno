@@ -128,6 +128,12 @@ await this.auditLogger.log({ tenantId, actorUserId: session.externalId, ... });
 
 `WebhookEventPublisher` writes `WebhookEvent` records to the database. `WebhooksJob` (cron every 30s) delivers them with exponential backoff (`min(2^attempts, 300)` seconds), max 10 attempts. Dead-lettered events use sentinel date `9999-12-31`.
 
+- **Claim before send**: `WebhooksJob.claimDue()` takes up to 20 due rows with `UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) RETURNING id` and leases them for 5 min (`nextRetryAt` and `claimedUntil` pushed forward). Replicas and overlapping ticks get disjoint rows; a crashed worker's rows become due again when the lease expires. Every outcome update clears `claimedUntil`. Never read due rows with a plain `findMany`.
+- **Resend respects the lease**: `resendOne` (409 if leased) and `resendAllFailed` (skips leased rows) never clear `nextRetryAt` on a row being delivered.
+- **Due-rows index**: partial `webhook_events_due_idx ON ("nextRetryAt") WHERE "sentAt" IS NULL`, hand-written in migration `20261006120000_webhook_outbox_claim_and_retention` (Prisma can't express it — don't remove it from the DB).
+- **Retention**: `WebhooksJob.retention()` (03:00) deletes delivered rows (`sentAt` older than `WEBHOOK_EVENT_RETENTION_DAYS`, default 30) in 5000-row `SKIP LOCKED` batches. Unsent and dead-lettered rows are never deleted.
+- The job is a global worker across tenants; tenant-facing queries (`findAll`, `findOne`, resend) always filter by `tenantId`.
+
 ### FileHarbor (Image Uploads)
 
 `FileHarborService` is stateless — pass `FileHarborConfig` on every call using per-tenant values:
@@ -143,7 +149,8 @@ Supported types: JPEG, PNG, GIF, WebP (max 10 MB). `deleteImageSafely()` silentl
 
 | Job | Schedule | Purpose |
 |---|---|---|
-| `WebhooksJob` | Every 30s | Deliver pending webhook events |
+| `WebhooksJob` | Every 30s | Claim and deliver due webhook events |
+| `WebhooksJob.retention` | 03:00 | Purge delivered webhook events past retention |
 | `AnalyticsJob` | Midnight UTC | Aggregate `DailyStats` per tenant |
 
 ## Configuration
@@ -154,9 +161,17 @@ Validation runs at startup via Joi (`src/configs/config.validation.ts`) — the 
 
 Key runtime settings:
 - API docs: `GET /docs` (Swagger)
-- Metrics: `GET /metrics` (Prometheus)
+- Metrics: `GET /metrics` on `METRICS_PORT` (default 9091), not on the API port — see below
 - Health: `GET /health`
 - Global validation pipe: `whitelist: true, forbidNonWhitelisted: true`
+
+### Metrics
+
+`src/modules/metrics/`, `@prometheus-io/client` directly (own `Registry`, default label `app=articuno`). `MetricsServer` serves `GET /metrics` with `node:http` on `METRICS_PORT` (default 9091), outside the Nest app: no guards, no TenantMiddleware, no CORS — and nothing on the API port (404 there). Isolation is the network's job: never publish 9091 on the host, nginx never proxies it; Prometheus scrapes `articuno:9091` on the internal Docker network. `MetricsMiddleware` (registered in `AppModule.configure`, all routes) records `http_request_duration_seconds` labelled by route pattern, never the raw URL; `/health*` and `/status` are skipped.
+
+`articuno_webhook_outbox_events{state}` (gauge, `state` = `overdue` | `dead`, both always emitted) — one `$queryRaw` on `webhook_events` with `sentAt IS NULL`, computed lazily in `collect()` (no query until scraped; a DB error logs `warn` and keeps the previous value). `overdue` = `COALESCE(nextRetryAt, createdAt)` more than 2 minutes in the past (the job runs every 30s; dead-lettered and leased rows have `nextRetryAt` in the future, so they never count). `dead` = `nextRetryAt` equal to the dead-letter sentinel `9999-12-31T23:59:59Z` (`DEAD_LETTER_DATE` in `src/modules/webhook/webhook.constants.ts`, bound as a query parameter — its own file because `WebhooksJob` depends on `MetricsService`). Alerts: `articuno_webhook_outbox_events{state="overdue"} > 0 for 10m`; `increase(articuno_webhook_outbox_events{state="dead"}[1h]) > 0` — `dead` only drops via manual resend, so alert on its increase, not its level.
+
+`articuno_webhook_delivery_attempts_total{result}` (counter, `result` = `success` | `failure` | `unconfigured` | `dead_lettered`, all four initialised to 0) — incremented by `WebhooksJob.processPendingWebhooks` once per claimed row, right **after** the outcome's `webhookEvent.update` resolves (a failed update counts nothing). `unconfigured` = tenant without `webhookUrl`/`webhookSecret` (rescheduled +1h, attempts still incremented); `dead_lettered` = row reached `MAX_ATTEMPTS` and got the sentinel, no send. Alert: `sum(rate(articuno_webhook_delivery_attempts_total{result="failure"}[15m])) / sum(rate(articuno_webhook_delivery_attempts_total[15m])) > 0.5 and sum(rate(articuno_webhook_delivery_attempts_total[15m])) > 0`.
 
 ## Code Conventions
 

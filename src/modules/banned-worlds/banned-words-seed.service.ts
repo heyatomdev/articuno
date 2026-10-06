@@ -129,7 +129,7 @@ export class BannedWordsSeedService {
     });
 
     this.logger.log(
-      `🚫 Seeded ${result.count} default banned words for tenant ${tenantId}.`,
+      `Seeded ${result.count} default banned words for tenant ${tenantId}.`,
     );
   }
 }

@@ -21,6 +21,7 @@ import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { UpsertUserDto } from '@/modules/users/dto/upsert-user.dto';
 import { DeleteUserParamsDto } from '@/modules/users/dto/delete-user-params.dto';
+import { UserDto } from '@/modules/users/dto/user.dto';
 
 @ApiTags('Users')
 @ApiSecurity('api-key')
@@ -35,7 +36,11 @@ export class UsersController {
     description: 'Creates or updates a user record for the current tenant based on their external ID. Use this endpoint to keep the CMS user data in sync with your identity provider.',
   })
   @ApiBody({ type: UpsertUserDto })
-  @ApiResponse({ status: 201, description: 'User created or updated successfully.' })
+  @ApiResponse({
+    status: 201,
+    description: 'User created or updated successfully.',
+    type: UserDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   upsert(@GetTenant() tenant: any, @Body() dto: UpsertUserDto) {

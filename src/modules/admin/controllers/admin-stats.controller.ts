@@ -5,7 +5,8 @@ import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
+import { DashboardStatsDto } from '@/modules/analytics/dto/dashboard-stats.dto';
 
 @ApiTags('Admin / Analytics')
 @ApiBearerAuth()
@@ -15,6 +16,7 @@ export class AdminStatsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('dashboard')
+  @ApiOkResponse({ type: DashboardStatsDto })
   getDashboard(
     @GetSession() session: AdminSession,
     @Query('days') days?: string,

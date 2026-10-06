@@ -2,13 +2,27 @@ import * as Joi from 'joi';
 
 export const configValidationSchema = Joi.object({
   // Environment
-  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+  NODE_ENV: Joi.string()
+    .valid('development', 'production', 'test')
+    .default('development'),
 
   // Server
   PORT: Joi.number().positive().default(3000),
   CORS_ORIGIN: Joi.string().allow('').optional(),
   TRUST_PROXY: Joi.boolean().truthy('true').falsy('false').default(false),
   BASE_URL: Joi.string().uri({ allowRelative: false }).allow('').optional(),
+  // Prometheus scrape port (src/modules/metrics) — internal network only.
+  METRICS_PORT: Joi.number().port().default(9091),
+
+  // pino levels; unset → debug in development, info in production
+  LOG_LEVEL: Joi.string().valid(
+    'fatal',
+    'error',
+    'warn',
+    'info',
+    'debug',
+    'trace',
+  ),
 
   // Database
   DATABASE_URL: Joi.string().required(),
@@ -31,4 +45,8 @@ export const configValidationSchema = Joi.object({
   // into a NaN window that never blocks.
   THROTTLE_TTL_SECONDS: Joi.number().positive().default(60),
   THROTTLE_LIMIT: Joi.number().positive().default(100),
+
+  // Delivered webhook_events rows older than this are purged nightly.
+  // Unsent and dead-lettered rows are never purged.
+  WEBHOOK_EVENT_RETENTION_DAYS: Joi.number().integer().positive().default(30),
 });

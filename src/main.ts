@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './modules/app/app.module';
 import { HttpExceptionFilter } from '@/filters/http-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -12,8 +13,8 @@ async function bootstrap(): Promise<void> {
 
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bufferLogs: true,
-      logger: ['log', 'error', 'warn', 'debug', 'verbose'],
     });
+    app.useLogger(app.get(PinoLogger));
 
     const configService = app.get(ConfigService);
     const environment = configService.get<string>('environment') ?? 'development';
@@ -56,36 +57,39 @@ async function bootstrap(): Promise<void> {
     app.useBodyParser('json', { limit: '1mb' });
     app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
 
-    // Swagger documentation
-    const config = new DocumentBuilder()
-        .setTitle('Articuno')
-        .setDescription('Multi-tenant CMS management system built with NestJS, Prisma ORM, and PostgreSQL.')
-        .setVersion(process?.env?.npm_package_version || '2.0.0')
-        .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
-        .addBearerAuth()
-        .setLicense(
-            'MIT',
-            'https://github.com/heyatomdev/articuno/blob/main/README.md',
-        )
-        .setContact('Andrea Tombolato', 'https://heyatom.dev', 'hey@heyatom.dev')
-        .build();
+    // /docs enumerates the whole API surface, admin routes included:
+    // development only, as in Bastion, Herald, Beacon and Gatherly.
+    if (!isProduction) {
+      const config = new DocumentBuilder()
+          .setTitle('Articuno')
+          .setDescription('Multi-tenant CMS management system built with NestJS, Prisma ORM, and PostgreSQL.')
+          .setVersion(process?.env?.npm_package_version || '2.0.0')
+          .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
+          .addBearerAuth()
+          .setLicense(
+              'MIT',
+              'https://github.com/heyatomdev/articuno/blob/main/README.md',
+          )
+          .setContact('Andrea Tombolato', 'https://heyatom.dev', 'hey@heyatom.dev')
+          .build();
 
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('/docs', app, document);
+      const document = SwaggerModule.createDocument(app, config);
+      SwaggerModule.setup('/docs', app, document);
+    }
 
     await app.listen(port);
 
-    bootstrapLogger.log(`🚀 Articuno started successfully`);
-    bootstrapLogger.log(`📚 API Documentation: http://localhost:${port}/docs`);
-    bootstrapLogger.log(`📈 Metrics endpoint: http://localhost:${port}/metrics`);
-    bootstrapLogger.log(`📝 Logging enabled for: log, error, warn, debug, verbose`);
+    bootstrapLogger.log(`Articuno started successfully`);
+    if (!isProduction) {
+      bootstrapLogger.log(`API Documentation: http://localhost:${port}/docs`);
+    }
     bootstrapLogger.log(`Current BASE_URL is set to: ${baseUrl}`);
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     const stack = error instanceof Error ? error.stack : undefined;
 
-    Logger.error('❌ Failed to start the application', 'Bootstrap');
+    Logger.error('Failed to start the application', 'Bootstrap');
 
     if (message.includes('Database connection failed')) {
       Logger.error('Database connection issue detected', 'Bootstrap');
@@ -104,13 +108,13 @@ async function bootstrap(): Promise<void> {
 
 bootstrap()
     .then(() => {
-      Logger.log('🎉 App running now', 'Bootstrap');
+      Logger.log('App running now', 'Bootstrap');
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Unknown error';
 
-      Logger.error('💥 Critical error during application startup:', 'Bootstrap');
+      Logger.error('Critical error during application startup:', 'Bootstrap');
       Logger.error(message, 'Bootstrap');
-      Logger.error('🔄 Please fix the issues above and try again', 'Bootstrap');
+      Logger.error('Please fix the issues above and try again', 'Bootstrap');
       process.exit(1);
     });

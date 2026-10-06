@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -20,6 +29,7 @@ import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { ApiPaginatedResponse } from '@/common/pagination';
+import { ReportDto } from '@/modules/reports/dto/report-response.dto';
 
 @ApiTags('Admin / Reports')
 @ApiBearerAuth()
@@ -40,7 +50,11 @@ export class AdminReportsController {
       '`reporterId` is automatically set to the session user\'s external ID.',
   })
   @ApiBody({ type: AdminCreateReportDto })
-  @ApiResponse({ status: 201, description: 'Report submitted successfully.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Report submitted successfully.',
+    type: ReportDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Reported target not found.' })
@@ -69,7 +83,7 @@ export class AdminReportsController {
     summary: 'List reports (admin)',
     description: 'Returns a paginated list of all reports for the session tenant. Optionally filter by status.',
   })
-  @ApiPaginatedResponse(undefined, 'Paginated list of reports.')
+  @ApiPaginatedResponse(ReportDto, 'Paginated list of reports.')
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   findAll(@GetSession() session: AdminSession, @Query() query: ReportListQueryDto) {
     return this.reportsService.findAll(session.tenantId, query);
@@ -81,7 +95,7 @@ export class AdminReportsController {
     description: 'Returns the full details of a single report identified by its UUID.',
   })
   @ApiParam({ name: 'id', description: 'UUID of the report', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 200, description: 'Report found.' })
+  @ApiResponse({ status: 200, description: 'Report found.', type: ReportDto })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Report not found.' })
   findOne(@GetSession() session: AdminSession, @Param() params: ReportParamsDto) {
@@ -95,7 +109,11 @@ export class AdminReportsController {
   })
   @ApiParam({ name: 'id', description: 'UUID of the report to update', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiBody({ type: AdminUpdateReportDto })
-  @ApiResponse({ status: 200, description: 'Report status updated successfully.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Report status updated successfully.',
+    type: ReportDto,
+  })
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
   @ApiResponse({ status: 404, description: 'Report not found.' })

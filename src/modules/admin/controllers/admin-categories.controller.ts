@@ -20,12 +20,16 @@ import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto'
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
 import { CategoryParamsDto } from '@/modules/categories/dto/category-params.dto';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
-import { CategoryListItemDto } from '@/modules/categories/dto/category.dto';
+import {
+  CategoryDto,
+  CategoryListItemDto,
+} from '@/modules/categories/dto/category.dto';
 import { ApiPaginatedResponse } from '@/common/pagination';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 
 @ApiTags('Admin / Categories')
 @ApiBearerAuth()
@@ -39,6 +43,7 @@ export class AdminCategoriesController {
   ) {}
 
   @Post()
+  @ApiCreatedResponse({ type: CategoryDto })
   async create(@GetSession() session: AdminSession, @Body() dto: CreateCategoryDto) {
     const category = await this.categoriesService.create(session.tenantId, dto);
 
@@ -63,11 +68,13 @@ export class AdminCategoriesController {
   }
 
   @Get(':id')
+  @ApiOkResponse({ type: CategoryDto })
   findOne(@GetSession() session: AdminSession, @Param() params: CategoryParamsDto) {
     return this.categoriesService.findOne(session.tenantId, params.id);
   }
 
   @Patch(':id')
+  @ApiOkResponse({ type: CategoryDto })
   async update(
     @GetSession() session: AdminSession,
     @Param() params: CategoryParamsDto,
