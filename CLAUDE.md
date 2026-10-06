@@ -128,6 +128,12 @@ await this.auditLogger.log({ tenantId, actorUserId: session.externalId, ... });
 
 `WebhookEventPublisher` writes `WebhookEvent` records to the database. `WebhooksJob` (cron every 30s) delivers them with exponential backoff (`min(2^attempts, 300)` seconds), max 10 attempts. Dead-lettered events use sentinel date `9999-12-31`.
 
+- **Claim before send**: `WebhooksJob.claimDue()` takes up to 20 due rows with `UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) RETURNING id` and leases them for 5 min (`nextRetryAt` and `claimedUntil` pushed forward). Replicas and overlapping ticks get disjoint rows; a crashed worker's rows become due again when the lease expires. Every outcome update clears `claimedUntil`. Never read due rows with a plain `findMany`.
+- **Resend respects the lease**: `resendOne` (409 if leased) and `resendAllFailed` (skips leased rows) never clear `nextRetryAt` on a row being delivered.
+- **Due-rows index**: partial `webhook_events_due_idx ON ("nextRetryAt") WHERE "sentAt" IS NULL`, hand-written in migration `20261006120000_webhook_outbox_claim_and_retention` (Prisma can't express it — don't remove it from the DB).
+- **Retention**: `WebhooksJob.retention()` (03:00) deletes delivered rows (`sentAt` older than `WEBHOOK_EVENT_RETENTION_DAYS`, default 30) in 5000-row `SKIP LOCKED` batches. Unsent and dead-lettered rows are never deleted.
+- The job is a global worker across tenants; tenant-facing queries (`findAll`, `findOne`, resend) always filter by `tenantId`.
+
 ### FileHarbor (Image Uploads)
 
 `FileHarborService` is stateless — pass `FileHarborConfig` on every call using per-tenant values:
@@ -143,7 +149,8 @@ Supported types: JPEG, PNG, GIF, WebP (max 10 MB). `deleteImageSafely()` silentl
 
 | Job | Schedule | Purpose |
 |---|---|---|
-| `WebhooksJob` | Every 30s | Deliver pending webhook events |
+| `WebhooksJob` | Every 30s | Claim and deliver due webhook events |
+| `WebhooksJob.retention` | 03:00 | Purge delivered webhook events past retention |
 | `AnalyticsJob` | Midnight UTC | Aggregate `DailyStats` per tenant |
 
 ## Configuration

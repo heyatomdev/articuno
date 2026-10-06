@@ -99,6 +99,10 @@ export class AdminWebhooksController {
     description: 'Not authenticated – missing or expired session.',
   })
   @ApiResponse({ status: 404, description: 'Webhook event not found.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Event is being delivered right now — retry in a few minutes.',
+  })
   resendOne(
     @GetSession() session: AdminSession,
     @Param() params: WebhookEventParamsDto,
@@ -111,7 +115,7 @@ export class AdminWebhooksController {
   @ApiOperation({
     summary: 'Reset all failed webhook events for the tenant',
     description:
-      'Resets attempts, nextRetryAt and lastError to 0 / null for every undelivered event belonging to the current tenant. Use this after a temporary outage of the receiving system to trigger re-delivery of the entire backlog.',
+      'Resets attempts, nextRetryAt and lastError to 0 / null for every undelivered event belonging to the current tenant, except events a worker is delivering right now. Use this after a temporary outage of the receiving system to trigger re-delivery of the entire backlog.',
   })
   @ApiResponse({
     status: 200,

@@ -2,7 +2,9 @@ import * as Joi from 'joi';
 
 export const configValidationSchema = Joi.object({
   // Environment
-  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+  NODE_ENV: Joi.string()
+    .valid('development', 'production', 'test')
+    .default('development'),
 
   // Server
   PORT: Joi.number().positive().default(3000),
@@ -33,4 +35,8 @@ export const configValidationSchema = Joi.object({
   // into a NaN window that never blocks.
   THROTTLE_TTL_SECONDS: Joi.number().positive().default(60),
   THROTTLE_LIMIT: Joi.number().positive().default(100),
+
+  // Delivered webhook_events rows older than this are purged nightly.
+  // Unsent and dead-lettered rows are never purged.
+  WEBHOOK_EVENT_RETENTION_DAYS: Joi.number().integer().positive().default(30),
 });

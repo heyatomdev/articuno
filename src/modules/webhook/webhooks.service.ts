@@ -1,115 +1,146 @@
-import {BadRequestException, Injectable, Logger, NotFoundException} from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { createHmac } from 'crypto';
 import { lastValueFrom } from 'rxjs';
-import {Prisma, WebhookEvent} from '@prisma/client';
-import {WebhookEventListQueryDto} from "@/modules/webhook/dto/webhook-event-list-query.dto";
-import {PaginatedResult, paginate} from "@/common/pagination";
-import {PrismaService} from "@/modules/prisma/prisma.service";
+import { Prisma, WebhookEvent } from '@prisma/client';
+import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-list-query.dto';
+import { PaginatedResult, paginate } from '@/common/pagination';
+import { PrismaService } from '@/modules/prisma/prisma.service';
 
 @Injectable()
 export class WebhooksService {
-    private readonly logger = new Logger(WebhooksService.name);
+  private readonly logger = new Logger(WebhooksService.name);
 
-    constructor(
-        private readonly httpService: HttpService,
-        private readonly prisma: PrismaService
-    ) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-    async findAll(
-        tenantId: string,
-        query: WebhookEventListQueryDto,
-    ): Promise<PaginatedResult<WebhookEvent>> {
-        const where = {
-            tenantId,
-            ...(query.event !== undefined && { event: query.event }),
-            ...(query.sent === true && { sentAt: { not: null } }),
-            ...(query.sent === false && { sentAt: null }),
-        };
+  async findAll(
+    tenantId: string,
+    query: WebhookEventListQueryDto,
+  ): Promise<PaginatedResult<WebhookEvent>> {
+    const where = {
+      tenantId,
+      ...(query.event !== undefined && { event: query.event }),
+      ...(query.sent === true && { sentAt: { not: null } }),
+      ...(query.sent === false && { sentAt: null }),
+    };
 
-        const [items, total] = await this.prisma.$transaction([
-            this.prisma.webhookEvent.findMany({
-                where,
-                orderBy: { createdAt: 'desc' },
-                take: query.limit,
-                skip: query.skip,
-            }),
-            this.prisma.webhookEvent.count({ where }),
-        ]);
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.webhookEvent.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: query.limit,
+        skip: query.skip,
+      }),
+      this.prisma.webhookEvent.count({ where }),
+    ]);
 
-        return paginate(items, total, query);
+    return paginate(items, total, query);
+  }
+
+  async findOne(tenantId: string, id: string): Promise<WebhookEvent> {
+    const event = await this.prisma.webhookEvent.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Webhook event non trovato');
     }
 
-    async findOne(tenantId: string, id: string): Promise<WebhookEvent> {
-        const event = await this.prisma.webhookEvent.findFirst({
-            where: { id, tenantId },
-        });
+    return event;
+  }
 
-        if (!event) {
-            throw new NotFoundException('Webhook event non trovato');
-        }
+  // Invia al tenant il payload canonico già salvato in outbox.
+  async send(url: string, secret: string, payload: Prisma.JsonValue) {
+    // Creiamo una firma HMAC per permettere al client di verificare l'origine
+    const signature = this.generateSignature(secret, payload);
 
-        return event;
+    try {
+      await lastValueFrom(
+        this.httpService.post(url, payload, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-webhook-signature': signature,
+            'User-Agent': 'Articuno-Webhook/1.0',
+          },
+          timeout: 5000,
+        }),
+      );
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Errore sconosciuto';
+      this.logger.error(`Webhook fallito verso ${url}: ${message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Ripristina un singolo evento webhook fallito (o in dead-letter) azzerando i tentativi
+   * in modo che il cron lo possa riprendere al prossimo ciclo.
+   */
+  async resendOne(tenantId: string, id: string): Promise<WebhookEvent> {
+    const event = await this.findOne(tenantId, id);
+
+    if (event.sentAt) {
+      throw new BadRequestException(
+        'Il webhook è già stato consegnato con successo e non può essere re-inviato',
+      );
     }
 
-    // Invia al tenant il payload canonico già salvato in outbox.
-    async send(url: string, secret: string, payload: Prisma.JsonValue) {
+    // Clearing nextRetryAt on a row a worker currently owns would make it
+    // due again mid-delivery and let a second worker send it twice. The
+    // lease check is in the UPDATE itself so a claim landing between the
+    // read above and this write cannot slip through.
+    const now = new Date();
+    const { count } = await this.prisma.webhookEvent.updateMany({
+      where: {
+        id,
+        tenantId,
+        sentAt: null,
+        OR: [{ claimedUntil: null }, { claimedUntil: { lte: now } }],
+      },
+      data: { attempts: 0, nextRetryAt: null, lastError: null },
+    });
 
-        // Creiamo una firma HMAC per permettere al client di verificare l'origine
-        const signature = this.generateSignature(secret, payload);
-
-        try {
-            await lastValueFrom(
-                this.httpService.post(url, payload, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-webhook-signature': signature,
-                        'User-Agent': 'Articuno-Webhook/1.0',
-                    },
-                    timeout: 5000,
-                }),
-            );
-            return true;
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Errore sconosciuto';
-            this.logger.error(`Webhook fallito verso ${url}: ${message}`);
-            return false;
-        }
+    if (count === 0) {
+      throw new ConflictException(
+        'Il webhook è in consegna in questo momento, riprovare tra qualche minuto',
+      );
     }
 
-    /**
-     * Ripristina un singolo evento webhook fallito (o in dead-letter) azzerando i tentativi
-     * in modo che il cron lo possa riprendere al prossimo ciclo.
-     */
-    async resendOne(tenantId: string, id: string): Promise<WebhookEvent> {
-        const event = await this.findOne(tenantId, id);
+    return this.findOne(tenantId, id);
+  }
 
-        if (event.sentAt) {
-            throw new BadRequestException('Il webhook è già stato consegnato con successo e non può essere re-inviato');
-        }
+  /**
+   * Ripristina a 0 i tentativi di tutti gli eventi non ancora consegnati del tenant.
+   * Utilizzare in caso di down temporaneo del sistema ricevente.
+   */
+  async resendAllFailed(tenantId: string): Promise<{ reset: number }> {
+    const result = await this.prisma.webhookEvent.updateMany({
+      where: {
+        tenantId,
+        sentAt: null,
+        // Skip rows a worker currently owns — see resendOne.
+        OR: [{ claimedUntil: null }, { claimedUntil: { lte: new Date() } }],
+      },
+      data: { attempts: 0, nextRetryAt: null, lastError: null },
+    });
 
-        return this.prisma.webhookEvent.update({
-            where: { id },
-            data: { attempts: 0, nextRetryAt: null, lastError: null },
-        });
-    }
+    return { reset: result.count };
+  }
 
-    /**
-     * Ripristina a 0 i tentativi di tutti gli eventi non ancora consegnati del tenant.
-     * Utilizzare in caso di down temporaneo del sistema ricevente.
-     */
-    async resendAllFailed(tenantId: string): Promise<{ reset: number }> {
-        const result = await this.prisma.webhookEvent.updateMany({
-            where: { tenantId, sentAt: null },
-            data: { attempts: 0, nextRetryAt: null, lastError: null },
-        });
-
-        return { reset: result.count };
-    }
-
-    private generateSignature(secret: string, payload: Prisma.JsonValue): string {
-        return createHmac('sha256', secret)
-            .update(JSON.stringify(payload))
-            .digest('hex');
-    }
+  private generateSignature(secret: string, payload: Prisma.JsonValue): string {
+    return createHmac('sha256', secret)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+  }
 }
