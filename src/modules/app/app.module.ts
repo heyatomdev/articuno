@@ -4,7 +4,6 @@ import {
   NestModule,
   RequestMethod,
 } from '@nestjs/common';
-import { StatusController } from './status.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -27,10 +26,9 @@ import { ArticleTranslationsModule } from '@/modules/article-translations/articl
 import { InteractionsModule } from '@/modules/interactions/interactions.module';
 import { BookmarksModule } from '@/modules/bookmarks/bookmarks.module';
 import { CommentsModule } from '@/modules/comments/comments.module';
-import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
+import { BannedWordsModule } from '@/modules/banned-words/banned-words.module';
 import { WebhooksModule } from '@/modules/webhook/webhooks.module';
 import { AdminModule } from '@/modules/admin/admin.module';
-import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { HealthModule } from '@/modules/health/health.module';
 import { BastionModule } from '@heyatom/bastion-client/nest';
 
@@ -44,7 +42,6 @@ const splitList = (raw?: string): string[] | undefined =>
         .filter(Boolean);
 
 @Module({
-  controllers: [StatusController],
   imports: [
     // Configuration
     ConfigModule.forRoot({
@@ -155,7 +152,6 @@ const splitList = (raw?: string): string[] | undefined =>
     // Admin only module
     AdminModule,
     AnalyticsModule,
-    NotificationsModule,
     WebhooksModule,
   ],
 })

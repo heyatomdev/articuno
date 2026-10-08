@@ -19,15 +19,15 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
-import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
+import { BannedWordsService } from '@/modules/banned-words/banned-words.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
-import { CreateBannedWordDto } from '@/modules/banned-worlds/dto/create-banned-word.dto';
-import { BannedWordListQueryDto } from '@/modules/banned-worlds/dto/banned-word-list-query.dto';
+import { CreateBannedWordDto } from '@/modules/banned-words/dto/create-banned-word.dto';
+import { BannedWordListQueryDto } from '@/modules/banned-words/dto/banned-word-list-query.dto';
 import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
-import { BannedWordDto } from '@/modules/banned-worlds/dto/banned-word.dto';
+import { BannedWordDto } from '@/modules/banned-words/dto/banned-word.dto';
 
 @ApiTags('Admin / Banned Words')
 @ApiBearerAuth()

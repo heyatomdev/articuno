@@ -29,7 +29,7 @@ export class ArticleTranslationSummaryDto {
   @ApiProperty() readingTime: number;
 }
 
-export class ArticleCategorySummaryDto {
+class ArticleCategorySummaryDto {
   @ApiProperty() id: string;
   @ApiProperty() name: string;
   @ApiProperty() slug: string;
@@ -37,7 +37,7 @@ export class ArticleCategorySummaryDto {
   @ApiProperty({ type: String, nullable: true }) color: string | null;
 }
 
-export class ArticleAuthorSummaryDto {
+class ArticleAuthorSummaryDto {
   @ApiProperty() id: string;
   @ApiProperty({ type: String, nullable: true }) username: string | null;
   @ApiProperty() externalId: string;
@@ -45,13 +45,13 @@ export class ArticleAuthorSummaryDto {
   @ApiProperty({ enum: UserRole, enumName: 'UserRole' }) role: UserRole;
 }
 
-export class ArticleTagSummaryDto {
+class ArticleTagSummaryDto {
   @ApiProperty() id: string;
   @ApiProperty() name: string;
   @ApiProperty() slug: string;
 }
 
-export class ArticleCommentCountDto {
+class ArticleCommentCountDto {
   @ApiProperty() commentsList: number;
 }
 
@@ -73,7 +73,7 @@ export class ArticleBaseDto {
   @ApiProperty() updatedAt: Date;
 }
 
-export class ArticleWithRelationsDto extends ArticleBaseDto {
+class ArticleWithRelationsDto extends ArticleBaseDto {
   @ApiProperty({ type: ArticleCategorySummaryDto })
   category: ArticleCategorySummaryDto;
   @ApiProperty({ type: ArticleAuthorSummaryDto, nullable: true })

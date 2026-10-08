@@ -10,9 +10,6 @@ export default () => ({
   trustProxy: process.env.TRUST_PROXY === 'true',
   baseUrl: process.env.BASE_URL || '',
 
-  // Database
-  database: process.env.DATABASE_URL,
-
   // Rate limiting. `ttl` is in SECONDS here — ThrottlerModule in app.module.ts
   // multiplies by 1000. Both keys were read there long before this namespace
   // existed, so the module was registering `{ ttl: NaN, limit: undefined }` and

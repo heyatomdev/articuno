@@ -31,7 +31,7 @@ import { CategoryDto, CategoryListItemDto } from '@/modules/categories/dto/categ
 import { ApiPaginatedResponse } from '@/common/pagination';
 
 @ApiTags('Categories')
-@ApiSecurity('x-api-key')
+@ApiSecurity('api-key')
 @Controller('categories')
 @UseGuards(TenantGuard)
 export class CategoriesController {

@@ -3,7 +3,7 @@
  * Riusi enum Prisma per evitare duplicazione
  */
 
-import { ContentStatus, UserStatus, TargetType, ReportStatus } from '@prisma/client';
+import { ContentStatus, UserStatus, TargetType } from '@prisma/client';
 
 /**
  * Ragioni automatiche di moderazione
@@ -46,5 +46,5 @@ export class ModerationWebhookPayloadDto {
 }
 
 // Re-export Prisma enum per comodità
-export { ContentStatus, UserStatus, TargetType, ReportStatus };
+export { ContentStatus, UserStatus, TargetType };
 

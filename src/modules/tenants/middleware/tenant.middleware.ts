@@ -37,7 +37,7 @@ export class TenantMiddleware implements NestMiddleware {
     private config: ConfigService,
   ) {}
 
-  async use(req: Request, res: Response, next: NextFunction) {
+  async use(req: Request, _res: Response, next: NextFunction) {
     const auth = req.headers['authorization'];
 
     req['tenant'] = auth?.startsWith('Bearer ')

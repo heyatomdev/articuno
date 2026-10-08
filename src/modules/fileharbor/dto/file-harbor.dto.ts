@@ -1,7 +1,7 @@
 /**
  * Base DTO with common fields for both Images and Avatars
  */
-export abstract class FileHarborBaseDto {
+abstract class FileHarborBaseDto {
   id: string;
   userId?: string;
   format: string;

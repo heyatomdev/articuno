@@ -37,7 +37,7 @@ import {
 } from '@/modules/articles/dto/article-response.dto';
 
 @ApiTags('Articles')
-@ApiSecurity('x-api-key')
+@ApiSecurity('api-key')
 @Controller('articles')
 @UseGuards(TenantGuard)
 export class ArticlesController {

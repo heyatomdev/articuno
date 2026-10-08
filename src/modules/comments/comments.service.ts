@@ -42,10 +42,9 @@ export class CommentsService {
   private async createSystemReport(
     tenantId: string,
     commentId: string,
-    authorExternalId: string,
     reason: string,
-  ): Promise<string> {
-    const report = await this.prisma.report.create({
+  ): Promise<void> {
+    await this.prisma.report.create({
       data: {
         targetType: TargetType.COMMENT,
         targetId: commentId,
@@ -55,7 +54,6 @@ export class CommentsService {
         tenantId,
       },
     });
-    return report.id;
   }
 
   async create(tenantId: string, dto: CreateCommentDto) {
@@ -81,14 +79,8 @@ export class CommentsService {
     });
 
     // Se banned words rilevati, crea un report automatico di sistema
-    let systemReportId: string | null = null;
     if (modPolicy.shouldCreateSystemReport) {
-      systemReportId = await this.createSystemReport(
-        tenantId,
-        dto.articleId,
-        dto.authorExternalId,
-        modPolicy.reason,
-      );
+      await this.createSystemReport(tenantId, dto.articleId, modPolicy.reason);
     }
 
     // 3. Crea commento con status determinato dalla policy
