@@ -50,7 +50,10 @@ export class AdminCategoriesController {
 
   @Post()
   @ApiCreatedResponse({ type: CategoryDto })
-  async create(@GetSession() session: AdminSession, @Body() dto: CreateCategoryDto) {
+  async create(
+    @GetSession() session: AdminSession,
+    @Body() dto: CreateCategoryDto,
+  ) {
     const category = await this.categoriesService.create(session.tenantId, dto);
 
     await this.auditLogger.log({
@@ -69,13 +72,19 @@ export class AdminCategoriesController {
 
   @Get()
   @ApiPaginatedResponse(CategoryListItemDto, 'Paginated list of categories.')
-  findAll(@GetSession() session: AdminSession, @Query() query: CategoryListQueryDto) {
+  findAll(
+    @GetSession() session: AdminSession,
+    @Query() query: CategoryListQueryDto,
+  ) {
     return this.categoriesService.findAll(session.tenantId, query);
   }
 
   @Get(':id')
   @ApiOkResponse({ type: CategoryDto })
-  findOne(@GetSession() session: AdminSession, @Param() params: CategoryParamsDto) {
+  findOne(
+    @GetSession() session: AdminSession,
+    @Param() params: CategoryParamsDto,
+  ) {
     return this.categoriesService.findOne(session.tenantId, params.id);
   }
 
@@ -86,7 +95,11 @@ export class AdminCategoriesController {
     @Param() params: CategoryParamsDto,
     @Body() dto: UpdateCategoryDto,
   ) {
-    const category = await this.categoriesService.update(session.tenantId, params.id, dto);
+    const category = await this.categoriesService.update(
+      session.tenantId,
+      params.id,
+      dto,
+    );
 
     await this.auditLogger.log({
       tenantId: session.tenantId,
@@ -105,7 +118,10 @@ export class AdminCategoriesController {
   @Delete(':id')
   @Roles(MODERATION_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@GetSession() session: AdminSession, @Param() params: CategoryParamsDto) {
+  async remove(
+    @GetSession() session: AdminSession,
+    @Param() params: CategoryParamsDto,
+  ) {
     const category = await this.prisma.category.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { name: true },

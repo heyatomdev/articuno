@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /** BCP 47-ish: `it`, `en-US`, `zh-Hant-TW`. Also keeps the code safe in URLs. */
@@ -8,11 +14,14 @@ export const META_DESCRIPTION_MAX_LENGTH = 500;
 
 export class CreateArticleTranslationDto {
   @ApiProperty({
-    description: 'BCP 47 language code for this translation (e.g. "en", "it", "fr").',
+    description:
+      'BCP 47 language code for this translation (e.g. "en", "it", "fr").',
     example: 'en',
   })
   @IsString()
-  @Matches(LANGUAGE_CODE_PATTERN, { message: 'languageCode must be a BCP 47 language code' })
+  @Matches(LANGUAGE_CODE_PATTERN, {
+    message: 'languageCode must be a BCP 47 language code',
+  })
   @MaxLength(35)
   languageCode: string;
 
@@ -34,7 +43,8 @@ export class CreateArticleTranslationDto {
   content: string;
 
   @ApiProperty({
-    description: 'Short plain-text summary shown in listing pages and previews.',
+    description:
+      'Short plain-text summary shown in listing pages and previews.',
     example: 'A step-by-step guide to building your first NestJS application.',
   })
   @IsString()

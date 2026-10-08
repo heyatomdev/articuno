@@ -221,10 +221,7 @@ export class ModerationPolicyService {
    * Valida una transizione di stato durante revisione umana.
    * Vedi `isValidModerationTransition` (funzione pura, usabile senza DI).
    */
-  isValidModerationTransition(
-    from: ContentStatus,
-    to: ContentStatus,
-  ): boolean {
+  isValidModerationTransition(from: ContentStatus, to: ContentStatus): boolean {
     return isValidModerationTransition(from, to);
   }
 
@@ -237,4 +234,3 @@ export class ModerationPolicyService {
       : this.COMMENT_REPORT_THRESHOLD;
   }
 }
-

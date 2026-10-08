@@ -92,7 +92,11 @@ export class CommentsController {
       },
     });
 
-    const comment = await this.commentsService.update(tenant.id, params.id, dto);
+    const comment = await this.commentsService.update(
+      tenant.id,
+      params.id,
+      dto,
+    );
 
     // only banned-word auto-hide can change it here
     const statusChanged = before?.status && comment.status !== before.status;
@@ -101,7 +105,9 @@ export class CommentsController {
       tenantId: tenant.id,
       actorUserId: before?.author?.externalId ?? 'unknown',
       actorRole: UserRole.MEMBER,
-      action: statusChanged ? AuditAction.COMMENT_STATUS_CHANGED : AuditAction.COMMENT_UPDATED,
+      action: statusChanged
+        ? AuditAction.COMMENT_STATUS_CHANGED
+        : AuditAction.COMMENT_UPDATED,
       resourceType: AuditResourceType.COMMENT,
       resourceId: comment.id,
       changesBefore: before ? { status: before.status } : undefined,

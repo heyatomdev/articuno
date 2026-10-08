@@ -1,4 +1,10 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { COMMENT_MAX_LENGTH } from './create-comment.dto';
 import { ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { ContentStatus } from '@prisma/client';

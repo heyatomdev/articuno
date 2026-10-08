@@ -80,7 +80,10 @@ export class TenantSeedService implements OnModuleInit {
         await this.bannedWordsSeed.seedDefaultBannedWords(defaultTenant.id);
       }
     } catch (error) {
-      this.logger.error(`Error seeding default tenant: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error seeding default tenant: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -110,4 +113,3 @@ export class TenantSeedService implements OnModuleInit {
     return crypto.randomBytes(32).toString('hex');
   }
 }
-

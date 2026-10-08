@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
@@ -31,10 +35,16 @@ export class ArticleTranslationsService {
     return article;
   }
 
-  private async hideArticleForBannedContent(tenantId: string, articleId: string) {
+  private async hideArticleForBannedContent(
+    tenantId: string,
+    articleId: string,
+  ) {
     const article = await this.ensureArticleExists(tenantId, articleId);
 
-    if (article.status === ContentStatus.HIDDEN || article.status === ContentStatus.BANNED) {
+    if (
+      article.status === ContentStatus.HIDDEN ||
+      article.status === ContentStatus.BANNED
+    ) {
       return;
     }
 
@@ -56,20 +66,26 @@ export class ArticleTranslationsService {
     });
   }
 
-  private sanitizeTranslation<T extends { title: string; content: string; excerpt?: string }>(
-    translation: T,
-  ): T & { slug: string; readingTime: number } {
+  private sanitizeTranslation<
+    T extends { title: string; content: string; excerpt?: string },
+  >(translation: T): T & { slug: string; readingTime: number } {
     translation = stripTranslationText(translation);
     return {
       ...translation,
       slug: slugifySafe(translation.title),
       content: sanitizeContent(translation.content),
       readingTime: computeReadingTime(translation.content),
-      ...(translation.excerpt !== undefined ? { excerpt: sanitizeContent(translation.excerpt) } : {}),
+      ...(translation.excerpt !== undefined
+        ? { excerpt: sanitizeContent(translation.excerpt) }
+        : {}),
     };
   }
 
-  async create(tenantId: string, articleId: string, dto: CreateArticleTranslationDto) {
+  async create(
+    tenantId: string,
+    articleId: string,
+    dto: CreateArticleTranslationDto,
+  ) {
     await this.ensureArticleExists(tenantId, articleId);
 
     const hasBannedWords = await this.bannedWordsService.checkText(
@@ -95,7 +111,9 @@ export class ArticleTranslationsService {
       return translation;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Traduzione gia esistente o slug duplicato');
+        throw new ConflictException(
+          'Traduzione gia esistente o slug duplicato',
+        );
       }
       throw error;
     }
@@ -148,11 +166,15 @@ export class ArticleTranslationsService {
       readingTime?: number;
     } = {
       ...stripTranslationText(dto),
-      ...(dto.content !== undefined ? { content: sanitizeContent(dto.content) } : {}),
+      ...(dto.content !== undefined
+        ? { content: sanitizeContent(dto.content) }
+        : {}),
       ...(dto.content !== undefined
         ? { readingTime: computeReadingTime(dto.content) }
         : {}),
-      ...(dto.excerpt !== undefined ? { excerpt: sanitizeContent(dto.excerpt) } : {}),
+      ...(dto.excerpt !== undefined
+        ? { excerpt: sanitizeContent(dto.excerpt) }
+        : {}),
     };
 
     if (dto.title !== undefined && dto.title !== translation.title) {
@@ -178,7 +200,11 @@ export class ArticleTranslationsService {
     }
   }
 
-  async remove(tenantId: string, articleId: string, languageCode: string): Promise<void> {
+  async remove(
+    tenantId: string,
+    articleId: string,
+    languageCode: string,
+  ): Promise<void> {
     const result = await this.prisma.articleTranslation.deleteMany({
       where: { articleId, tenantId, languageCode },
     });
@@ -188,4 +214,3 @@ export class ArticleTranslationsService {
     }
   }
 }
-

@@ -46,7 +46,8 @@ export class UpdateArticleTranslationDto {
 
   @ApiPropertyOptional({
     description: 'Updated SEO meta description.',
-    example: 'Learn NestJS from scratch with this revised step-by-step tutorial.',
+    example:
+      'Learn NestJS from scratch with this revised step-by-step tutorial.',
   })
   @IsOptional()
   @IsString()

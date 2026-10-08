@@ -106,7 +106,10 @@ export class AdminTagsController {
   @Delete(':id')
   @Roles(MODERATION_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@GetSession() session: AdminSession, @Param() params: TagParamsDto) {
+  async remove(
+    @GetSession() session: AdminSession,
+    @Param() params: TagParamsDto,
+  ) {
     const tag = await this.prisma.tag.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { name: true },

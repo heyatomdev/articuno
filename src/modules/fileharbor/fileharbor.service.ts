@@ -1,10 +1,15 @@
-import {BadRequestException, Injectable, InternalServerErrorException, Logger} from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import * as FormData from 'form-data';
 import { firstValueFrom } from 'rxjs';
 import { FileHarborImageDto } from './dto/file-harbor.dto';
-import { ImageCleanupOptions } from "./interfaces/cleanup-options.interface";
-import { FileHarborConfig } from "./interfaces/fileharbor-config.interface";
+import { ImageCleanupOptions } from './interfaces/cleanup-options.interface';
+import { FileHarborConfig } from './interfaces/fileharbor-config.interface';
 
 @Injectable()
 export class FileHarborService {
@@ -16,16 +21,14 @@ export class FileHarborService {
     'image/jpg',
     'image/png',
     'image/gif',
-    'image/webp'
+    'image/webp',
   ] as const;
 
   static readonly MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
   private static readonly UPLOAD_TIMEOUT = 30000; // 30 seconds
   private static readonly DELETE_TIMEOUT = 15000; // 15 seconds
 
-  constructor(
-    private readonly httpService: HttpService,
-  ) {}
+  constructor(private readonly httpService: HttpService) {}
 
   /**
    * Safely delete a single image
@@ -33,7 +36,7 @@ export class FileHarborService {
   async deleteImageSafely(
     url: string | null | undefined,
     config: FileHarborConfig,
-    options: ImageCleanupOptions = {}
+    options: ImageCleanupOptions = {},
   ): Promise<boolean> {
     if (!url) return true;
 
@@ -65,7 +68,7 @@ export class FileHarborService {
     externalId: string = '1',
     config: FileHarborConfig,
     existingImageUrl?: string,
-    options: ImageCleanupOptions = {}
+    options: ImageCleanupOptions = {},
   ): Promise<string | null> {
     if (!image) return null;
 
@@ -77,7 +80,7 @@ export class FileHarborService {
         image,
         `${entityName} Image`,
         externalId,
-        config
+        config,
       );
 
       // Clean up existing image if provided
@@ -88,11 +91,19 @@ export class FileHarborService {
         });
       }
 
-      this.logDebug(`Upload completed: ${uploadResult.fullPath}`, loggerContext);
+      this.logDebug(
+        `Upload completed: ${uploadResult.fullPath}`,
+        loggerContext,
+      );
       return uploadResult.fullPath;
     } catch (error) {
-      this.logger.error(`Failed to upload image for ${entityName}`, error.stack);
-      throw new InternalServerErrorException(`Failed to upload image: ${error.message}`);
+      this.logger.error(
+        `Failed to upload image for ${entityName}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        `Failed to upload image: ${error.message}`,
+      );
     }
   }
 
@@ -108,16 +119,23 @@ export class FileHarborService {
     this.validateImageFile(file);
 
     try {
-      const form = this.createFormData(file, { description, creatorId: externalId });
+      const form = this.createFormData(file, {
+        description,
+        creatorId: externalId,
+      });
 
       const response = await firstValueFrom(
-        this.httpService.post<FileHarborImageDto>(`${config.endpoint}/images`, form, {
-          headers: {
-            ...form.getHeaders(),
-            'X-API-Key': config.apiKey,
+        this.httpService.post<FileHarborImageDto>(
+          `${config.endpoint}/images`,
+          form,
+          {
+            headers: {
+              ...form.getHeaders(),
+              'X-API-Key': config.apiKey,
+            },
+            timeout: FileHarborService.UPLOAD_TIMEOUT,
           },
-          timeout: FileHarborService.UPLOAD_TIMEOUT,
-        }),
+        ),
       );
 
       if (!response.data?.fullPath) {
@@ -126,7 +144,6 @@ export class FileHarborService {
 
       this.logger.log(`Image uploaded: ${response.data.fullPath}`);
       return response.data;
-
     } catch (error) {
       // Status and a slice of the body tell FileHarbor errors apart from a proxy in front of it
       const body = error.response?.data;
@@ -141,7 +158,10 @@ export class FileHarborService {
   /**
    * Check if image exist on FileHarbor
    */
-  async getImageFromId(url: string, config: FileHarborConfig): Promise<object | null> {
+  async getImageFromId(
+    url: string,
+    config: FileHarborConfig,
+  ): Promise<object | null> {
     if (!url) {
       throw new BadRequestException('URL is required');
     }
@@ -150,16 +170,18 @@ export class FileHarborService {
 
     try {
       const response = await firstValueFrom(
-        this.httpService.get(`${config.endpoint}/images/${encodeURIComponent(fileId)}`, {
-          headers: {
-            'X-API-Key': config.apiKey,
+        this.httpService.get(
+          `${config.endpoint}/images/${encodeURIComponent(fileId)}`,
+          {
+            headers: {
+              'X-API-Key': config.apiKey,
+            },
           },
-        }),
+        ),
       );
 
       this.logger.log(`Image found for id ${fileId}`);
       return response.data;
-
     } catch (error) {
       this.logger.error(`Get image failed for ${fileId}: ${error.message}`);
     }
@@ -170,7 +192,10 @@ export class FileHarborService {
   /**
    * Enhanced delete with better ID extraction
    */
-  async deleteImageFromUrl(url: string, config: FileHarborConfig): Promise<any> {
+  async deleteImageFromUrl(
+    url: string,
+    config: FileHarborConfig,
+  ): Promise<any> {
     if (!url) {
       throw new BadRequestException('URL is required');
     }
@@ -178,7 +203,9 @@ export class FileHarborService {
     // coverImage can come from a client: never let it pick which image of the
     // tenant's FileHarbor we delete. Only URLs FileHarbor itself handed out qualify.
     if (!FileHarborService.isUnderEndpoint(url, config.endpoint)) {
-      throw new BadRequestException('URL is not served by the tenant FileHarbor endpoint');
+      throw new BadRequestException(
+        'URL is not served by the tenant FileHarbor endpoint',
+      );
     }
 
     const fileId = this.extractFileIdFromUrl(url);
@@ -189,17 +216,19 @@ export class FileHarborService {
 
     try {
       const response = await firstValueFrom(
-        this.httpService.delete(`${config.endpoint}/images/${encodeURIComponent(fileId)}`, {
-          headers: {
-            'X-API-Key': config.apiKey,
+        this.httpService.delete(
+          `${config.endpoint}/images/${encodeURIComponent(fileId)}`,
+          {
+            headers: {
+              'X-API-Key': config.apiKey,
+            },
+            timeout: FileHarborService.DELETE_TIMEOUT,
           },
-          timeout: FileHarborService.DELETE_TIMEOUT,
-        }),
+        ),
       );
 
       this.logger.log(`Image deleted: ${fileId}`);
       return response.data;
-
     } catch (error) {
       this.logger.error(`Delete failed for ${fileId}: ${error.message}`);
 
@@ -218,8 +247,12 @@ export class FileHarborService {
     try {
       const target = new URL(url);
       const base = new URL(endpoint);
-      const basePath = base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`;
-      return target.origin === base.origin && target.pathname.startsWith(basePath);
+      const basePath = base.pathname.endsWith('/')
+        ? base.pathname
+        : `${base.pathname}/`;
+      return (
+        target.origin === base.origin && target.pathname.startsWith(basePath)
+      );
     } catch {
       return false;
     }
@@ -235,13 +268,13 @@ export class FileHarborService {
 
     if (!FileHarborService.ALLOWED_IMAGE_TYPES.includes(file.mimetype as any)) {
       throw new BadRequestException(
-        `Invalid file type. Allowed: ${FileHarborService.ALLOWED_IMAGE_TYPES.join(', ')}`
+        `Invalid file type. Allowed: ${FileHarborService.ALLOWED_IMAGE_TYPES.join(', ')}`,
       );
     }
 
     if (file.size > FileHarborService.MAX_IMAGE_SIZE) {
       throw new BadRequestException(
-        `File size too large. Maximum ${FileHarborService.MAX_IMAGE_SIZE / 1024 / 1024}MB allowed`
+        `File size too large. Maximum ${FileHarborService.MAX_IMAGE_SIZE / 1024 / 1024}MB allowed`,
       );
     }
   }
@@ -251,12 +284,12 @@ export class FileHarborService {
    */
   private createFormData(
     file: Express.Multer.File,
-    additionalFields: Record<string, string>
+    additionalFields: Record<string, string>,
   ): FormData {
     const form = new FormData();
     form.append('file', file.buffer, {
       filename: file.originalname,
-      contentType: file.mimetype
+      contentType: file.mimetype,
     });
 
     Object.entries(additionalFields).forEach(([key, value]) => {
