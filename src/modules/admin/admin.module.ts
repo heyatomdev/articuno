@@ -4,7 +4,7 @@ import { ArticlesModule } from '@/modules/articles/articles.module';
 import { ArticleTranslationsModule } from '@/modules/article-translations/article-translations.module';
 import { TagsModule } from '@/modules/tags/tags.module';
 import { CategoriesModule } from '@/modules/categories/categories.module';
-import { BannedWordsModule } from '@/modules/banned-worlds/banned-words.module';
+import { BannedWordsModule } from '@/modules/banned-words/banned-words.module';
 import { ReportsModule } from '@/modules/reports/reports.module';
 import { AuditsModule } from '@/modules/audits/audits.module';
 import { UsersModule } from '@/modules/users/users.module';
@@ -19,11 +19,9 @@ import { AdminUsersController } from '@/modules/admin/controllers/admin-users.co
 import { AdminCommentsController } from '@/modules/admin/controllers/admin-comments.controller';
 import { CommentsModule } from '@/modules/comments/comments.module';
 import { WebhooksModule } from '@/modules/webhook/webhooks.module';
-import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { AnalyticsModule } from '@/modules/analytics/analytics.module';
 
 import { AdminWebhooksController } from '@/modules/admin/controllers/admin-webhooks.controller';
-import { AdminNotificationsController } from '@/modules/admin/controllers/admin-notifications.controller';
 import { AdminStatsController } from '@/modules/admin/controllers/admin-stats.controller';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 
@@ -41,7 +39,6 @@ import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
     FileHarborModule,
     CommentsModule,
     WebhooksModule,
-    NotificationsModule,
     AnalyticsModule,
   ],
   controllers: [
@@ -54,7 +51,6 @@ import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
     AdminUsersController,
     AdminCommentsController,
     AdminWebhooksController,
-    AdminNotificationsController,
     AdminStatsController,
   ],
   providers: [AdminThrottlerGuard],

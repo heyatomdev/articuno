@@ -7,7 +7,6 @@ import {
   PrismaHealthIndicator,
 } from '@nestjs/terminus';
 import { PrismaService } from '../prisma/prisma.service';
-import { Public } from '@/decorators/public.decorator';
 
 @ApiTags('health')
 @SkipThrottle({ public: true })
@@ -20,7 +19,6 @@ export class HealthController {
   ) {}
 
   @Get('live')
-  @Public()
   @ApiOperation({
     summary: 'Liveness probe',
     description:
@@ -32,7 +30,6 @@ export class HealthController {
   }
 
   @Get('ready')
-  @Public()
   @HealthCheck()
   @ApiOperation({
     summary: 'Readiness probe',

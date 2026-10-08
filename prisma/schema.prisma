@@ -37,7 +37,6 @@ model Tenant {
   dailyStats          DailyStats[]
   reports             Report[]
   bannedWords         BannedWord[]
-  notifications       Notification[]
   webhookEvents       WebhookEvent[]
 
   // Configurazione Webhook per notifiche e moderazione
@@ -96,7 +95,6 @@ model User {
   comments      Comment[]
   likes         Like[]
   bookmarks     Bookmark[]
-  notifications Notification[]
 
   reportsFiled     Report[] @relation("ReporterReports")
   reportsModerated Report[] @relation("ModeratorReports")
@@ -246,27 +244,6 @@ model Bookmark {
   @@unique([articleId, userId])
   @@index([userId, tenantId]) // Ottimizza la query "i miei preferiti"
   @@map("bookmarks")
-}
-
-model Notification {
-  id      String @id @default(uuid())
-  type    String
-  title   String
-  message String
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  // Logica Outbox per Webhook
-  sentToClient Boolean   @default(false)
-  readAt       DateTime?
-
-  createdAt DateTime @default(now())
-
-  @@map("notifications")
 }
 
 model DailyStats {

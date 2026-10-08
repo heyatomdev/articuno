@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { BannedWordsSeedService } from '@/modules/banned-worlds/banned-words-seed.service';
+import { BannedWordsSeedService } from '@/modules/banned-words/banned-words-seed.service';
 import * as crypto from 'crypto';
 
 @Injectable()

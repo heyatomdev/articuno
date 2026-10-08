@@ -28,7 +28,7 @@ import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
 import { BannedWordDto } from './dto/banned-word.dto';
 
 @ApiTags('Banned Words')
-@ApiSecurity('x-api-key')
+@ApiSecurity('api-key')
 @Controller('banned-words')
 @UseGuards(TenantGuard)
 export class BannedWordsController {

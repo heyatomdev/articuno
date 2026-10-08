@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
+import { BannedWordsService } from '@/modules/banned-words/banned-words.service';
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';

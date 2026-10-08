@@ -4,7 +4,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
+import { BannedWordsService } from '@/modules/banned-words/banned-words.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import {
   UserStatus,
@@ -201,20 +201,6 @@ export class ModerationPolicyService {
       finalStatus: ContentStatus.VISIBLE,
       autoModerated: false,
     };
-  }
-
-  /**
-   * Controlla se un commento deve essere auto-hidden in base a reportCount
-   */
-  isCommentThresholdReached(reportCount: number): boolean {
-    return reportCount >= this.COMMENT_REPORT_THRESHOLD;
-  }
-
-  /**
-   * Controlla se un articolo deve passare a UNDER_REVIEW in base a reportCount
-   */
-  isArticleThresholdReached(reportCount: number): boolean {
-    return reportCount >= this.ARTICLE_REPORT_THRESHOLD;
   }
 
   /**

@@ -68,7 +68,7 @@ export function sanitizeContent(html: string): string {
     },
     // Transform links to be safe
     transformTags: {
-      a: (tagName, attribs) => {
+      a: (_tagName, attribs) => {
         return {
           tagName: 'a',
           attribs: {

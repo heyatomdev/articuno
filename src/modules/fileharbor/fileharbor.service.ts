@@ -156,40 +156,6 @@ export class FileHarborService {
   }
 
   /**
-   * Check if image exist on FileHarbor
-   */
-  async getImageFromId(
-    url: string,
-    config: FileHarborConfig,
-  ): Promise<object | null> {
-    if (!url) {
-      throw new BadRequestException('URL is required');
-    }
-
-    const fileId = this.extractFileIdFromUrl(url);
-
-    try {
-      const response = await firstValueFrom(
-        this.httpService.get(
-          `${config.endpoint}/images/${encodeURIComponent(fileId)}`,
-          {
-            headers: {
-              'X-API-Key': config.apiKey,
-            },
-          },
-        ),
-      );
-
-      this.logger.log(`Image found for id ${fileId}`);
-      return response.data;
-    } catch (error) {
-      this.logger.error(`Get image failed for ${fileId}: ${error.message}`);
-    }
-
-    return {};
-  }
-
-  /**
    * Enhanced delete with better ID extraction
    */
   async deleteImageFromUrl(

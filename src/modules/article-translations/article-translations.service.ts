@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
+import { BannedWordsService } from '@/modules/banned-words/banned-words.service';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ContentStatus } from '@prisma/client';

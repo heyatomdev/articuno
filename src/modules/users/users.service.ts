@@ -4,7 +4,7 @@ import { UpsertUserDto } from '@/modules/users/dto/upsert-user.dto';
 import { PaginatedResult, paginate } from '@/common/pagination';
 import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
-import { UserRole, UserStatus } from '@prisma/client';
+import { UserStatus } from '@prisma/client';
 import { SYSTEM_REPORTER_ID } from '@/modules/users/users.constants';
 
 /** The system reporter is internal: not listed, not editable, not deletable. */
@@ -142,19 +142,6 @@ export class UsersService {
     const updated = await this.prisma.user.update({
       where: { id },
       data: { status },
-      select: this.userListSelect,
-    });
-
-    return this.mapUserListItem(updated);
-  }
-
-  async updateRole(tenantId: string, id: string, role: UserRole): Promise<UserListItemDto> {
-    const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
-    if (!user) throw new NotFoundException('Utente non trovato');
-
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: { role },
       select: this.userListSelect,
     });
 
