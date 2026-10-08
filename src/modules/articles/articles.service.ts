@@ -6,7 +6,7 @@ import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ContentStatus } from '@prisma/client';
-import { sanitizeContent } from '@/utils/html-sanitizer';
+import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
 import { generateRandomName } from '@/utils/random-name';
@@ -77,6 +77,7 @@ export class ArticlesService {
   private sanitizeTranslation<T extends { title: string; content: string; excerpt?: string }>(
     translation: T,
   ): T & { slug: string; readingTime: number } {
+    translation = stripTranslationText(translation);
     return {
       ...translation,
       slug: slugifySafe(translation.title),

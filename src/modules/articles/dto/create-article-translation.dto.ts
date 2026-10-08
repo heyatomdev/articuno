@@ -1,5 +1,10 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+/** BCP 47-ish: `it`, `en-US`, `zh-Hant-TW`. Also keeps the code safe in URLs. */
+export const LANGUAGE_CODE_PATTERN = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+export const TITLE_MAX_LENGTH = 200;
+export const META_DESCRIPTION_MAX_LENGTH = 500;
 
 export class CreateArticleTranslationDto {
   @ApiProperty({
@@ -7,7 +12,8 @@ export class CreateArticleTranslationDto {
     example: 'en',
   })
   @IsString()
-  @IsNotEmpty()
+  @Matches(LANGUAGE_CODE_PATTERN, { message: 'languageCode must be a BCP 47 language code' })
+  @MaxLength(35)
   languageCode: string;
 
   @ApiProperty({
@@ -16,6 +22,7 @@ export class CreateArticleTranslationDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(TITLE_MAX_LENGTH)
   title: string;
 
   @ApiProperty({
@@ -40,6 +47,7 @@ export class CreateArticleTranslationDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(TITLE_MAX_LENGTH)
   metaTitle?: string;
 
   @ApiPropertyOptional({
@@ -48,5 +56,6 @@ export class CreateArticleTranslationDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(META_DESCRIPTION_MAX_LENGTH)
   metaDescription?: string;
 }

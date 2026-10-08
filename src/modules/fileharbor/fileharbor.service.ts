@@ -150,7 +150,7 @@ export class FileHarborService {
 
     try {
       const response = await firstValueFrom(
-        this.httpService.get(`${config.endpoint}/images/${fileId}`, {
+        this.httpService.get(`${config.endpoint}/images/${encodeURIComponent(fileId)}`, {
           headers: {
             'X-API-Key': config.apiKey,
           },
@@ -175,6 +175,12 @@ export class FileHarborService {
       throw new BadRequestException('URL is required');
     }
 
+    // coverImage can come from a client: never let it pick which image of the
+    // tenant's FileHarbor we delete. Only URLs FileHarbor itself handed out qualify.
+    if (!FileHarborService.isUnderEndpoint(url, config.endpoint)) {
+      throw new BadRequestException('URL is not served by the tenant FileHarbor endpoint');
+    }
+
     const fileId = this.extractFileIdFromUrl(url);
 
     if (!fileId || fileId.length < 10) {
@@ -183,7 +189,7 @@ export class FileHarborService {
 
     try {
       const response = await firstValueFrom(
-        this.httpService.delete(`${config.endpoint}/images/${fileId}`, {
+        this.httpService.delete(`${config.endpoint}/images/${encodeURIComponent(fileId)}`, {
           headers: {
             'X-API-Key': config.apiKey,
           },
@@ -204,6 +210,18 @@ export class FileHarborService {
       }
 
       throw new InternalServerErrorException(`Delete failed: ${error.message}`);
+    }
+  }
+
+  /** Same origin as `endpoint` and inside its path (`{endpoint}/...`). */
+  static isUnderEndpoint(url: string, endpoint: string): boolean {
+    try {
+      const target = new URL(url);
+      const base = new URL(endpoint);
+      const basePath = base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`;
+      return target.origin === base.origin && target.pathname.startsWith(basePath);
+    } catch {
+      return false;
     }
   }
 

@@ -4,7 +4,7 @@ import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ContentStatus } from '@prisma/client';
-import { sanitizeContent } from '@/utils/html-sanitizer';
+import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
@@ -59,6 +59,7 @@ export class ArticleTranslationsService {
   private sanitizeTranslation<T extends { title: string; content: string; excerpt?: string }>(
     translation: T,
   ): T & { slug: string; readingTime: number } {
+    translation = stripTranslationText(translation);
     return {
       ...translation,
       slug: slugifySafe(translation.title),
@@ -146,7 +147,7 @@ export class ArticleTranslationsService {
       slug?: string;
       readingTime?: number;
     } = {
-      ...dto,
+      ...stripTranslationText(dto),
       ...(dto.content !== undefined ? { content: sanitizeContent(dto.content) } : {}),
       ...(dto.content !== undefined
         ? { readingTime: computeReadingTime(dto.content) }
@@ -155,7 +156,7 @@ export class ArticleTranslationsService {
     };
 
     if (dto.title !== undefined && dto.title !== translation.title) {
-      sanitizedDto.slug = slugifySafe(dto.title);
+      sanitizedDto.slug = slugifySafe(sanitizedDto.title);
     }
 
     try {

@@ -1,4 +1,8 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  META_DESCRIPTION_MAX_LENGTH,
+  TITLE_MAX_LENGTH,
+} from './create-article-translation.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateArticleTranslationDto {
@@ -9,6 +13,7 @@ export class UpdateArticleTranslationDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(TITLE_MAX_LENGTH)
   title?: string;
 
   @ApiPropertyOptional({
@@ -36,6 +41,7 @@ export class UpdateArticleTranslationDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(TITLE_MAX_LENGTH)
   metaTitle?: string;
 
   @ApiPropertyOptional({
@@ -45,5 +51,6 @@ export class UpdateArticleTranslationDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(META_DESCRIPTION_MAX_LENGTH)
   metaDescription?: string;
 }

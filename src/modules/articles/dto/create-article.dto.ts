@@ -4,7 +4,7 @@ import {
   IsBoolean,
   IsIn,
   IsOptional,
-  IsString,
+  IsUrl,
   IsUUID,
   ValidateNested,
 } from 'class-validator';
@@ -27,7 +27,7 @@ export class CreateArticleDto {
     example: 'https://cdn.example.com/articles/my-article-cover.jpg',
   })
   @IsOptional()
-  @IsString()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
   coverImage?: string;
 
   @ApiPropertyOptional({

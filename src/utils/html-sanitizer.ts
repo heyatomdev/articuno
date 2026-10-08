@@ -67,3 +67,17 @@ export function sanitizeContent(html: string): string {
 export function stripTags(text: string): string {
   return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
 }
+
+/** Title and SEO fields of a translation are plain text: strips their tags. */
+export function stripTranslationText<
+  T extends { title?: string; metaTitle?: string; metaDescription?: string },
+>(t: T): T {
+  return {
+    ...t,
+    ...(t.title !== undefined && { title: stripTags(t.title) }),
+    ...(t.metaTitle !== undefined && { metaTitle: stripTags(t.metaTitle) }),
+    ...(t.metaDescription !== undefined && {
+      metaDescription: stripTags(t.metaDescription),
+    }),
+  };
+}

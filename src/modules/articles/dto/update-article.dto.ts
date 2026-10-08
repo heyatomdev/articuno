@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUrl, IsUUID, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { ContentStatus } from '@prisma/client';
 
@@ -19,7 +19,7 @@ export class UpdateArticleDto {
   })
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
-  @IsString()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
   coverImage?: string | null;
 
   @ApiPropertyOptional({
