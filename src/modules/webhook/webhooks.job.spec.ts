@@ -180,9 +180,13 @@ describe('WebhooksJob', () => {
       prisma.$executeRaw
         .mockResolvedValueOnce(RETENTION_BATCH_SIZE)
         .mockResolvedValueOnce(7);
-      const before = Date.now();
+      // frozen clock: a real one can tick between the test and the job
+      const now = Date.UTC(2026, 9, 8, 3, 0, 0);
+      const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
 
-      expect(await job.purgeDelivered()).toBe(RETENTION_BATCH_SIZE + 7);
+      const purged = await job.purgeDelivered();
+      clock.mockRestore();
+      expect(purged).toBe(RETENTION_BATCH_SIZE + 7);
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
 
       const call = prisma.$executeRaw.mock.calls[0];
@@ -193,8 +197,7 @@ describe('WebhooksJob', () => {
 
       const [, cutoff, limit] = call;
       const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-      expect(before - cutoff.getTime()).toBeGreaterThanOrEqual(thirtyDays);
-      expect(before - cutoff.getTime()).toBeLessThan(thirtyDays + 1000);
+      expect(now - cutoff.getTime()).toBe(thirtyDays);
       expect(limit).toBe(RETENTION_BATCH_SIZE);
       expect(config.getOrThrow).toHaveBeenCalledWith(
         'WEBHOOK_EVENT_RETENTION_DAYS',
