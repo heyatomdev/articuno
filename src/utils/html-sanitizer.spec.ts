@@ -1,6 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { stripTags, stripTranslationText } from './html-sanitizer';
+import { slugifySafe } from './slugify';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 
@@ -9,6 +10,18 @@ describe('stripTags / stripTranslationText', () => {
     expect(stripTags('<img src=x onerror=alert(1)>Ciao <b>mondo</b>')).toBe(
       'Ciao mondo',
     );
+  });
+
+  it('stores plain text, not HTML entities', () => {
+    expect(stripTags('Tom & Jerry <b>"quoted"</b> 5 > 3')).toBe(
+      'Tom & Jerry "quoted" 5 > 3',
+    );
+  });
+
+  it('slugifies the decoded title (no "amp" in the slug)', () => {
+    const { title } = stripTranslationText({ title: 'Tom &amp; <i>Jerry</i>' });
+    expect(title).toBe('Tom & Jerry');
+    expect(slugifySafe(title)).toMatch(/^tom-jerry-[0-9a-z]{8}$/);
   });
 
   it('strips title and SEO fields, leaves the rest alone', () => {
