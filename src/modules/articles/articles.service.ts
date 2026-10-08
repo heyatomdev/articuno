@@ -5,12 +5,13 @@ import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
-import { ContentStatus, Prisma } from '@prisma/client';
+import { ContentStatus } from '@prisma/client';
 import { sanitizeContent } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
 import { generateRandomName } from '@/utils/random-name';
 import { PaginatedResult, paginate } from '@/common/pagination';
+import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 
 @Injectable()
 export class ArticlesService {
@@ -18,6 +19,7 @@ export class ArticlesService {
     private readonly prisma: PrismaService,
     private readonly bannedWordsService: BannedWordsService,
     private readonly fileHarborService: FileHarborService,
+    private readonly webhookPublisher: WebhookEventPublisher,
   ) {}
 
   private readonly articleIncludes = {
@@ -70,26 +72,6 @@ export class ArticlesService {
       orderBy: { languageCode: 'asc' as const },
     },
   };
-
-  private async enqueueWebhookEvent(
-    tenantId: string,
-    event: string,
-    data: Prisma.InputJsonValue,
-  ) {
-    const payload: Prisma.InputJsonObject = {
-      event,
-      tenantId,
-      data,
-    };
-
-    await this.prisma.webhookEvent.create({
-      data: {
-        tenantId,
-        event,
-        payload,
-      },
-    });
-  }
 
   private sanitizeTranslation<T extends { title: string; content: string; excerpt?: string }>(
     translation: T,
@@ -370,23 +352,27 @@ export class ArticlesService {
     }
 
     try {
-      const updatedArticle = await this.prisma.article.update({
-        where: { id },
-        data,
-        include: this.articleIncludes,
-      });
-
-      if (dto.status && dto.status !== currentArticle.status) {
-        await this.enqueueWebhookEvent(tenantId, 'article.status_changed', {
-          articleId: updatedArticle.id,
-          oldStatus: currentArticle.status,
-          newStatus: updatedArticle.status,
-          reason: dto.moderationReason ?? null,
-          moderatorId: dto.moderatorId ?? null,
+      return await this.prisma.$transaction(async (tx) => {
+        const updatedArticle = await tx.article.update({
+          where: { id, tenantId },
+          data,
+          include: this.articleIncludes,
         });
-      }
 
-      return updatedArticle;
+        if (dto.status && dto.status !== currentArticle.status) {
+          await this.webhookPublisher.publishArticleStatusChangedEvent(
+            tenantId,
+            updatedArticle.id,
+            currentArticle.status,
+            updatedArticle.status,
+            dto.moderationReason,
+            dto.moderatorId,
+            tx,
+          );
+        }
+
+        return updatedArticle;
+      });
     } catch (error) {
       if (error.code === 'P2002') {
         throw new ConflictException('Slug traduzione gia esistente');

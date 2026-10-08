@@ -116,6 +116,8 @@ await this.webhookPublisher.publishCommentModerationEvent(...);
 
 Auto-moderation thresholds: ≥5 reports → comment HIDDEN; ≥10 reports → article UNDER_REVIEW.
 
+Concurrency: the article branch locks the row (`SELECT … FOR UPDATE`, tenant-scoped) before counting; the comment branch uses `increment` and hides via `updateMany … status: VISIBLE`, so exactly one report fires the event. Duplicate open reports are refused by the partial unique index `reports_open_reporter_target_key` (hand-written in migration `20261008120000_report_races_and_tenant_indexes`; P2002 → 409). Outbox events describing a change in a `$transaction` must be published with that `tx` (every `WebhookEventPublisher.publish*` takes it last). JIT user rows go through `PrismaService.ensureUser` (retries the upsert race on P2002).
+
 ### Audit Logging
 
 `AuditLoggerService.log()` is **fire-and-forget** — it never throws. Call it after every successful state-changing admin operation and do not guard the main flow on its result:
@@ -155,7 +157,7 @@ Supported types: JPEG, PNG, GIF, WebP (max 10 MB). `deleteImageSafely()` silentl
 
 ## Configuration
 
-Required env var: `DATABASE_URL` (PostgreSQL). See `.env.example` for all options.
+Required env var: `DATABASE_URL` (PostgreSQL). Pool: `DATABASE_POOL_MAX` (default 10 per replica), `DATABASE_POOL_TIMEOUT_MS` (default 5000). See `.env.example` for all options.
 
 Validation runs at startup via Joi (`src/configs/config.validation.ts`) — the app will fail fast on misconfigured env vars.
 

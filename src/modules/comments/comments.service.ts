@@ -36,26 +36,6 @@ export class CommentsService {
     }
   }
 
-  private async ensureUser(tenantId: string, externalUserId: string) {
-    return this.prisma.user.upsert({
-      where: {
-        externalId_tenantId: {
-          externalId: externalUserId,
-          tenantId,
-        },
-      },
-      update: {},
-      create: {
-        externalId: externalUserId,
-        tenantId,
-      },
-      select: {
-        id: true,
-        externalId: true,
-      },
-    });
-  }
-
   /**
    * Crea un report automatico di sistema per banned words
    */
@@ -80,7 +60,7 @@ export class CommentsService {
 
   async create(tenantId: string, dto: CreateCommentDto) {
     await this.ensureArticleExists(tenantId, dto.articleId);
-    const user = await this.ensureUser(tenantId, dto.authorExternalId);
+    const user = await this.prisma.ensureUser(tenantId, dto.authorExternalId);
 
     // 1. Check stato utente (BANNED -> 403, SHADOW_BANNED -> auto-hide)
     const userCheck = await this.moderationPolicy.checkUserModeration(

@@ -18,11 +18,16 @@ export class WebhookEventPublisher {
   /**
    * Pubblica un evento webhook generico
    * Enqueue nell'outbox con semantica "exactly-once"
+   *
+   * Pass `db` (the `tx` of a `$transaction` callback) whenever the event
+   * describes a change made in that transaction: the row then commits or rolls
+   * back together with the change. Every publish* method takes it last.
    */
   async publishEvent(
     tenantId: string,
     event: string,
     data: Prisma.InputJsonValue,
+    db: Prisma.TransactionClient = this.prisma,
   ): Promise<string> {
     const payload: Prisma.InputJsonObject = {
       event,
@@ -30,7 +35,7 @@ export class WebhookEventPublisher {
       data,
     };
 
-    const webhookEvent = await this.prisma.webhookEvent.create({
+    const webhookEvent = await db.webhookEvent.create({
       data: {
         tenantId,
         event,
@@ -53,6 +58,7 @@ export class WebhookEventPublisher {
     moderatorId?: string,
     reportCount?: number,
     threshold?: number,
+    db?: Prisma.TransactionClient,
   ): Promise<string> {
     const payload: ModerationWebhookPayloadDto = {
       event: 'comment.moderated',
@@ -69,7 +75,7 @@ export class WebhookEventPublisher {
       },
     };
 
-    return this.publishEvent(tenantId, 'comment.moderated', payload.data);
+    return this.publishEvent(tenantId, 'comment.moderated', payload.data, db);
   }
 
   /**
@@ -82,6 +88,7 @@ export class WebhookEventPublisher {
     reason: string,
     reportCount: number,
     threshold: number,
+    db?: Prisma.TransactionClient,
   ): Promise<string> {
     const payload = {
       commentId,
@@ -92,7 +99,7 @@ export class WebhookEventPublisher {
       threshold,
     };
 
-    return this.publishEvent(tenantId, 'comment.hidden', payload);
+    return this.publishEvent(tenantId, 'comment.hidden', payload, db);
   }
 
   /**
@@ -105,6 +112,7 @@ export class WebhookEventPublisher {
     newStatus: ContentStatus,
     reason?: string,
     moderatorId?: string,
+    db?: Prisma.TransactionClient,
   ): Promise<string> {
     const payload = {
       articleId,
@@ -114,7 +122,7 @@ export class WebhookEventPublisher {
       moderatorId: moderatorId ?? null,
     };
 
-    return this.publishEvent(tenantId, 'article.status_changed', payload);
+    return this.publishEvent(tenantId, 'article.status_changed', payload, db);
   }
 
   /**
@@ -125,6 +133,7 @@ export class WebhookEventPublisher {
     articleId: string,
     reportsCount: number,
     threshold: number,
+    db?: Prisma.TransactionClient,
   ): Promise<string> {
     const payload = {
       articleId,
@@ -132,7 +141,7 @@ export class WebhookEventPublisher {
       threshold,
     };
 
-    return this.publishEvent(tenantId, 'article.flagged', payload);
+    return this.publishEvent(tenantId, 'article.flagged', payload, db);
   }
 }
 

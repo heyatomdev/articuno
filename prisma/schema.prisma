@@ -104,13 +104,14 @@ model User {
   createdAt DateTime @default(now())
 
   @@unique([externalId, tenantId])
+  @@index([tenantId, createdAt])
   @@map("users")
 }
 
 model Category {
   id          String  @id @default(uuid())
   name        String
-  slug        String  @unique
+  slug        String
   description String?
   color       String?
   tenantId    String
@@ -121,13 +122,14 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([tenantId, slug])
   @@map("categories")
 }
 
 model Tag {
   id       String @id @default(uuid())
   name     String
-  slug     String @unique
+  slug     String
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -136,6 +138,7 @@ model Tag {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([tenantId, slug])
   @@map("tags")
 }
 
@@ -168,6 +171,8 @@ model Article {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, createdAt])
   @@map("articles")
 }
 
@@ -208,6 +213,8 @@ model Comment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([tenantId, articleId, createdAt])
+  @@index([tenantId, status, createdAt])
   @@map("comments")
 }
 
@@ -222,7 +229,7 @@ model Like {
   createdAt DateTime @default(now())
 
   @@unique([articleId, userId]) // Impedisce duplicati
-  @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@map("likes")
 }
 
@@ -302,6 +309,10 @@ model Report {
   createdAt DateTime @default(now())
 
   @@index([tenantId, status])
+  @@index([tenantId, targetType, targetId, status])
+  // One open (PENDING/REVIEWED) report per reporter and target: a partial
+  // unique index Prisma cannot express — it lives in migration
+  // 20261008120000_report_races_and_tenant_indexes (P2002 → 409 in ReportsService).
   @@map("reports")
 }
 
@@ -341,7 +352,6 @@ model AuditLog {
   changeSummary String? // human-readable summary (e.g. "Status: draft → published")
 
   // Indexes for query performance
-  @@index([tenantId])
   @@index([tenantId, timestamp])
   @@index([tenantId, action])
   @@index([tenantId, actorUserId])

@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto } from '@/modules/reports/dto/create-report.dto';
 import { UpdateReportStatusDto } from '@/modules/reports/dto/update-report.dto';
-import { ContentStatus, ReportStatus, TargetType, UserStatus } from '@prisma/client';
+import { ContentStatus, Prisma, ReportStatus, TargetType, UserStatus } from '@prisma/client';
 import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto';
@@ -69,16 +69,7 @@ export class ReportsService {
 
     async create(tenantId: string, dto: CreateReportInput) {
         // 1. Assicurati che l'utente (reporter) esista localmente (Minimal User)
-        const user = await this.prisma.user.upsert({
-            where: {
-                externalId_tenantId: {
-                    externalId: dto.reporterId,
-                    tenantId,
-                },
-            },
-            update: {},
-            create: { externalId: dto.reporterId, tenantId },
-        });
+        const user = await this.prisma.ensureUser(tenantId, dto.reporterId);
 
         if (dto.targetType === TargetType.ARTICLE) {
             const article = await this.prisma.article.findFirst({
@@ -102,23 +93,20 @@ export class ReportsService {
             }
         }
 
-        const duplicateReport = await this.prisma.report.findFirst({
-            where: {
-                targetType: dto.targetType,
-                targetId: dto.targetId,
-                tenantId,
-                reporterId: user.externalId,
-                status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWED] },
-            },
-            select: { id: true },
-        });
-
-        if (duplicateReport) {
-            throw new ConflictException('Hai gia segnalato questo contenuto');
-        }
-
-        // 2. Crea il report e applica eventuale auto-moderazione
+        // 2. Crea il report e applica eventuale auto-moderazione.
+        // Duplicates (same reporter, same target, report still open) are refused
+        // by the partial unique index `reports_open_reporter_target_key`.
         const created = await this.prisma.$transaction(async (tx) => {
+            // Lock the article before counting: otherwise two concurrent
+            // reports can both count threshold-1 and neither flips the status.
+            const [lockedArticle] =
+              dto.targetType === TargetType.ARTICLE
+                ? await tx.$queryRaw<{ id: string; status: ContentStatus }[]>`
+                    SELECT "id", "status" FROM "articles"
+                    WHERE "id" = ${dto.targetId} AND "tenantId" = ${tenantId}
+                    FOR UPDATE`
+                : [];
+
             const report = await tx.report.create({
                 data: {
                     targetType: dto.targetType,
@@ -135,91 +123,106 @@ export class ReportsService {
                 include: reportUserIncludes,
             });
 
-            // Incrementa reportCount sul contenuto
             if (dto.targetType === TargetType.ARTICLE) {
-                const article = await tx.article.findFirst({
-                    where: { id: dto.targetId, tenantId },
-                    select: { id: true, status: true },
-                });
-
-                const reportsCount = await tx.report.count({
-                    where: {
-                        tenantId,
-                        targetType: TargetType.ARTICLE,
-                        targetId: dto.targetId,
-                        status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWED] },
-                    },
-                });
-
-                const threshold = this.moderationPolicy.getReportThreshold('ARTICLE');
-                if (reportsCount >= threshold) {
-                    if (article?.status === ContentStatus.PUBLISHED) {
-                        await tx.article.update({
-                            where: { id: article.id },
-                            data: { status: ContentStatus.UNDER_REVIEW },
-                        });
-
-                        await this.webhookPublisher.publishArticleStatusChangedEvent(
-                          tenantId,
-                          article.id,
-                          ContentStatus.PUBLISHED,
-                          ContentStatus.UNDER_REVIEW,
-                          'REPORT_THRESHOLD_REACHED',
-                          'system',
-                        );
-
-                        await this.webhookPublisher.publishArticleFlaggedEvent(
-                          tenantId,
-                          article.id,
-                          reportsCount,
-                          threshold,
-                        );
-                    }
-                }
+                await this.applyArticleThreshold(tx, tenantId, lockedArticle);
             } else if (dto.targetType === TargetType.COMMENT) {
-                const comment = await tx.comment.findFirst({
-                    where: { id: dto.targetId, tenantId },
-                    select: { id: true, status: true, reportCount: true, authorId: true },
-                });
-
-                // Incrementa reportCount
-                const newReportCount = (comment?.reportCount ?? 0) + 1;
-                await tx.comment.update({
-                    where: { id: dto.targetId },
-                    data: { reportCount: newReportCount },
-                });
-
-                const threshold = this.moderationPolicy.getReportThreshold('COMMENT');
-                if (newReportCount >= threshold && comment?.status === ContentStatus.VISIBLE) {
-                    // Auto-hide il commento
-                    await tx.comment.update({
-                        where: { id: dto.targetId },
-                        data: { status: ContentStatus.HIDDEN },
-                    });
-
-                    // Recupera info per l'autore
-                    const author = await tx.user.findFirst({
-                        where: { id: comment?.authorId },
-                        select: { externalId: true },
-                    });
-
-                    // Pubblica webhook
-                    await this.webhookPublisher.publishCommentHiddenEvent(
-                      tenantId,
-                      comment!.id,
-                      author?.externalId ?? 'unknown',
-                      'REPORT_THRESHOLD_REACHED',
-                      newReportCount,
-                      threshold,
-                    );
-                }
+                await this.applyCommentThreshold(tx, tenantId, dto.targetId);
             }
 
             return report;
+        }).catch((error) => {
+            if (error.code === 'P2002') {
+                throw new ConflictException('Hai gia segnalato questo contenuto');
+            }
+            throw error;
         });
 
         const [withTarget] = await this.withTargets(tenantId, [created]);
         return withTarget;
+    }
+
+    /** Article ≥ threshold open reports → PUBLISHED becomes UNDER_REVIEW. Caller holds the row lock. */
+    private async applyArticleThreshold(
+      tx: Prisma.TransactionClient,
+      tenantId: string,
+      article: { id: string; status: ContentStatus } | undefined,
+    ) {
+        if (article?.status !== ContentStatus.PUBLISHED) return;
+
+        const reportsCount = await tx.report.count({
+            where: {
+                tenantId,
+                targetType: TargetType.ARTICLE,
+                targetId: article.id,
+                status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWED] },
+            },
+        });
+
+        const threshold = this.moderationPolicy.getReportThreshold('ARTICLE');
+        if (reportsCount < threshold) return;
+
+        await tx.article.update({
+            where: { id: article.id, tenantId },
+            data: { status: ContentStatus.UNDER_REVIEW },
+        });
+
+        await this.webhookPublisher.publishArticleStatusChangedEvent(
+          tenantId,
+          article.id,
+          ContentStatus.PUBLISHED,
+          ContentStatus.UNDER_REVIEW,
+          'REPORT_THRESHOLD_REACHED',
+          'system',
+          tx,
+        );
+
+        await this.webhookPublisher.publishArticleFlaggedEvent(
+          tenantId,
+          article.id,
+          reportsCount,
+          threshold,
+          tx,
+        );
+    }
+
+    /**
+     * Bumps `reportCount` atomically; at ≥ threshold a VISIBLE comment becomes
+     * HIDDEN. The status filter on the hide makes only one report fire the event.
+     */
+    private async applyCommentThreshold(
+      tx: Prisma.TransactionClient,
+      tenantId: string,
+      commentId: string,
+    ) {
+        const { reportCount, authorId } = await tx.comment.update({
+            where: { id: commentId, tenantId },
+            data: { reportCount: { increment: 1 } },
+            select: { reportCount: true, authorId: true },
+        });
+
+        const threshold = this.moderationPolicy.getReportThreshold('COMMENT');
+        if (reportCount < threshold) return;
+
+        const { count: hidden } = await tx.comment.updateMany({
+            where: { id: commentId, tenantId, status: ContentStatus.VISIBLE },
+            data: { status: ContentStatus.HIDDEN },
+        });
+        if (hidden === 0) return;
+
+        const author = await tx.user.findFirst({
+            where: { id: authorId, tenantId },
+            select: { externalId: true },
+        });
+
+        await this.webhookPublisher.publishCommentHiddenEvent(
+          tenantId,
+          commentId,
+          author?.externalId ?? 'unknown',
+          'REPORT_THRESHOLD_REACHED',
+          reportCount,
+          threshold,
+          tx,
+        );
     }
 
     /**
@@ -369,7 +372,7 @@ export class ReportsService {
 
         const updated = await this.prisma.$transaction(async (tx) => {
             const updatedReport = await tx.report.update({
-                where: { id },
+                where: { id, tenantId },
                 data: {
                     status: dto.status,
                     moderatorNote: dto.moderatorNote,
@@ -396,7 +399,7 @@ export class ReportsService {
 
                 if (article?.status === ContentStatus.UNDER_REVIEW && activeReportsCount === 0) {
                     await tx.article.update({
-                        where: { id: article.id },
+                        where: { id: article.id, tenantId },
                         data: { status: ContentStatus.PUBLISHED },
                     });
 
@@ -407,6 +410,7 @@ export class ReportsService {
                       ContentStatus.PUBLISHED,
                       'REPORTS_DISMISSED',
                       resolvedModeratorId,
+                      tx,
                     );
                 }
             }
@@ -420,7 +424,7 @@ export class ReportsService {
 
                 const author = comment?.authorId
                   ? await tx.user.findFirst({
-                      where: { id: comment.authorId },
+                      where: { id: comment.authorId, tenantId },
                       select: { externalId: true },
                     })
                   : null;
@@ -439,7 +443,7 @@ export class ReportsService {
                     if (comment && comment.status === ContentStatus.HIDDEN && activeReportsCount === 0) {
                         // Resetta reportCount e ripristina visibilità
                         await tx.comment.update({
-                            where: { id: comment.id },
+                            where: { id: comment.id, tenantId },
                             data: {
                                 status: ContentStatus.VISIBLE,
                                 reportCount: 0,
@@ -453,14 +457,18 @@ export class ReportsService {
                            ContentStatus.VISIBLE,
                            'REPORT_DISMISSED_FALSE_POSITIVE',
                            resolvedModeratorId,
+                           undefined,
+                           undefined,
+                           tx,
                          );
                     }
                 }
 
                 // Caso B: Violazione confermata - ban permanente del commento
-                if (dto.status === ReportStatus.RESOLVED && comment?.status !== ContentStatus.BANNED) {
+                // (`comment` is null when the target was deleted: nothing to ban)
+                if (dto.status === ReportStatus.RESOLVED && comment && comment.status !== ContentStatus.BANNED) {
                     await tx.comment.update({
-                        where: { id: comment.id },
+                        where: { id: comment.id, tenantId },
                         data: { status: ContentStatus.BANNED },
                     });
 
@@ -471,6 +479,9 @@ export class ReportsService {
                        ContentStatus.BANNED,
                        'REPORT_RESOLVED_VIOLATION_CONFIRMED',
                        resolvedModeratorId,
+                       undefined,
+                       undefined,
+                       tx,
                      );
                 }
             }

@@ -26,6 +26,9 @@ export const configValidationSchema = Joi.object({
 
   // Database
   DATABASE_URL: Joi.string().required(),
+  // pg pool per replica: keep max × replicas under Postgres max_connections.
+  DATABASE_POOL_MAX: Joi.number().integer().positive().default(10),
+  DATABASE_POOL_TIMEOUT_MS: Joi.number().integer().positive().default(5000),
 
   // Bastion — see src/modules/bastion
   BASTION_URL: Joi.string().uri({ allowRelative: false }).required(),

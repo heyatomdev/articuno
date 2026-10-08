@@ -3,16 +3,18 @@ import { PrismaService } from '@/modules/prisma/prisma.service';
 import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
-import { ContentStatus, Prisma } from '@prisma/client';
+import { ContentStatus } from '@prisma/client';
 import { sanitizeContent } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
+import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 
 @Injectable()
 export class ArticleTranslationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bannedWordsService: BannedWordsService,
+    private readonly webhookPublisher: WebhookEventPublisher,
   ) {}
 
   private static readonly AUTO_MODERATION_REASON = 'BANNED_WORD_DETECTED';
@@ -29,18 +31,6 @@ export class ArticleTranslationsService {
     return article;
   }
 
-  private async enqueueWebhookEvent(
-    tenantId: string,
-    event: string,
-    data: Prisma.InputJsonValue,
-  ) {
-    const payload: Prisma.InputJsonObject = { event, tenantId, data };
-
-    await this.prisma.webhookEvent.create({
-      data: { tenantId, event, payload },
-    });
-  }
-
   private async hideArticleForBannedContent(tenantId: string, articleId: string) {
     const article = await this.ensureArticleExists(tenantId, articleId);
 
@@ -48,17 +38,21 @@ export class ArticleTranslationsService {
       return;
     }
 
-    await this.prisma.article.update({
-      where: { id: article.id },
-      data: { status: ContentStatus.HIDDEN },
-    });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.article.update({
+        where: { id: article.id, tenantId },
+        data: { status: ContentStatus.HIDDEN },
+      });
 
-    await this.enqueueWebhookEvent(tenantId, 'article.status_changed', {
-      articleId: article.id,
-      oldStatus: article.status,
-      newStatus: ContentStatus.HIDDEN,
-      reason: ArticleTranslationsService.AUTO_MODERATION_REASON,
-      moderatorId: 'system',
+      await this.webhookPublisher.publishArticleStatusChangedEvent(
+        tenantId,
+        article.id,
+        article.status,
+        ContentStatus.HIDDEN,
+        ArticleTranslationsService.AUTO_MODERATION_REASON,
+        'system',
+        tx,
+      );
     });
   }
 
