@@ -76,7 +76,13 @@ export class BookmarksService {
           article: {
             include: {
               category: {
-                select: { id: true, name: true, slug: true, description: true, color: true },
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  description: true,
+                  color: true,
+                },
               },
               tags: { select: { id: true, name: true, slug: true } },
               // List shape: no `content` body, same fields as the article list.
@@ -100,4 +106,3 @@ export class BookmarksService {
     return paginate(items, total, query);
   }
 }
-

@@ -15,7 +15,8 @@ export class BookmarkToggleResultDto {
 
 /** The bookmarked (PUBLISHED) article: row, category, tags, translation summaries (no body). */
 export class BookmarkedArticleDto extends ArticleBaseDto {
-  @ApiProperty({ type: ArticleCategorySummaryDto }) category: ArticleCategorySummaryDto;
+  @ApiProperty({ type: ArticleCategorySummaryDto })
+  category: ArticleCategorySummaryDto;
   @ApiProperty({ type: [ArticleTagSummaryDto] }) tags: ArticleTagSummaryDto[];
   @ApiProperty({ type: [ArticleTranslationSummaryDto] })
   translations: ArticleTranslationSummaryDto[];
