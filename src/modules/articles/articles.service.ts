@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
@@ -31,7 +36,7 @@ export class ArticlesService {
         slug: true,
         description: true,
         color: true,
-      }
+      },
     },
     author: {
       select: {
@@ -40,14 +45,14 @@ export class ArticlesService {
         externalId: true,
         status: true,
         role: true,
-      }
+      },
     },
     tags: {
       select: {
         id: true,
         name: true,
         slug: true,
-      }
+      },
     },
     translations: {
       orderBy: { languageCode: 'asc' as const },
@@ -74,16 +79,18 @@ export class ArticlesService {
     },
   };
 
-  private sanitizeTranslation<T extends { title: string; content: string; excerpt?: string }>(
-    translation: T,
-  ): T & { slug: string; readingTime: number } {
+  private sanitizeTranslation<
+    T extends { title: string; content: string; excerpt?: string },
+  >(translation: T): T & { slug: string; readingTime: number } {
     translation = stripTranslationText(translation);
     return {
       ...translation,
       slug: slugifySafe(translation.title),
       content: sanitizeContent(translation.content),
       readingTime: computeReadingTime(translation.content),
-      ...(translation.excerpt !== undefined ? { excerpt: sanitizeContent(translation.excerpt) } : {}),
+      ...(translation.excerpt !== undefined
+        ? { excerpt: sanitizeContent(translation.excerpt) }
+        : {}),
     };
   }
 
@@ -95,7 +102,9 @@ export class ArticlesService {
       return false;
     }
 
-    const textToCheck = translations.map((t) => `${t.title}\n${t.content}`).join('\n');
+    const textToCheck = translations
+      .map((t) => `${t.title}\n${t.content}`)
+      .join('\n');
     return this.bannedWordsService.checkText(tenantId, textToCheck);
   }
 
@@ -159,6 +168,30 @@ export class ArticlesService {
     }
   }
 
+  /**
+   * A client-supplied coverImage must be an image of the tenant's own
+   * FileHarbor: it is later deleted from there by id (cover replace/delete).
+   * Not for URLs FileHarbor just returned from an upload.
+   */
+  async assertOwnCoverImage(
+    tenantId: string,
+    url?: string | null,
+  ): Promise<void> {
+    if (!url) return;
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId },
+      select: { fileharborEndpoint: true },
+    });
+    if (
+      !tenant?.fileharborEndpoint ||
+      !FileHarborService.isUnderEndpoint(url, tenant.fileharborEndpoint)
+    ) {
+      throw new BadRequestException(
+        "coverImage deve essere un'immagine del FileHarbor del tenant",
+      );
+    }
+  }
+
   async create(tenantId: string, dto: CreateArticleDto) {
     await this.ensureCategoryExists(tenantId, dto.categoryId);
 
@@ -186,10 +219,15 @@ export class ArticlesService {
             },
           ];
 
-    const hasBannedWords = await this.hasBannedWordsInTranslations(tenantId, translationsInput);
+    const hasBannedWords = await this.hasBannedWordsInTranslations(
+      tenantId,
+      translationsInput,
+    );
     const finalStatus = hasBannedWords ? ContentStatus.HIDDEN : requestedStatus;
 
-    const sanitizedTranslations = translationsInput.map((t) => this.sanitizeTranslation(t));
+    const sanitizedTranslations = translationsInput.map((t) =>
+      this.sanitizeTranslation(t),
+    );
 
     try {
       return await this.prisma.article.create({
@@ -206,11 +244,11 @@ export class ArticlesService {
               }
             : undefined,
           translations: {
-              create: sanitizedTranslations.map((translation) => ({
-                ...translation,
-                tenantId,
-              })),
-            },
+            create: sanitizedTranslations.map((translation) => ({
+              ...translation,
+              tenantId,
+            })),
+          },
         },
         include: this.articleIncludes,
       });
@@ -222,7 +260,10 @@ export class ArticlesService {
     }
   }
 
-  async findAll(tenantId: string, query: ArticleFiltersQueryDto): Promise<PaginatedResult<any>> {
+  async findAll(
+    tenantId: string,
+    query: ArticleFiltersQueryDto,
+  ): Promise<PaginatedResult<any>> {
     const where: any = {
       tenantId,
       ...(query.status ? { status: query.status } : {}),
@@ -327,7 +368,10 @@ export class ArticlesService {
   async update(tenantId: string, id: string, dto: UpdateArticleDto) {
     const currentArticle = await this.ensureArticleExists(tenantId, id);
 
-    if (dto.status && !isValidModerationTransition(currentArticle.status, dto.status)) {
+    if (
+      dto.status &&
+      !isValidModerationTransition(currentArticle.status, dto.status)
+    ) {
       throw new BadRequestException(
         `Transizione di stato non consentita: ${currentArticle.status} → ${dto.status}`,
       );
@@ -410,11 +454,13 @@ export class ArticlesService {
       if (tenant?.fileharborEndpoint && tenant?.fileharborApiKey) {
         await this.fileHarborService.deleteImageSafely(
           article.coverImage,
-          { endpoint: tenant.fileharborEndpoint, apiKey: tenant.fileharborApiKey },
+          {
+            endpoint: tenant.fileharborEndpoint,
+            apiKey: tenant.fileharborApiKey,
+          },
           { loggerContext: 'ArticleDelete' },
         );
       }
     }
   }
-
 }

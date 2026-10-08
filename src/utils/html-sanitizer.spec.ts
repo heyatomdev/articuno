@@ -81,5 +81,11 @@ describe('article DTO limits', () => {
         coverImage: 'https://cdn.example.com/v2/images/abc',
       }),
     ).toEqual([]);
+    expect(
+      errorsOf(CreateArticleDto, {
+        ...base,
+        coverImage: 'https://fileharbor:3000/v2/images/abc',
+      }),
+    ).toEqual([]);
   });
 });

@@ -232,6 +232,13 @@ export class AdminArticlesController {
       rawData ??
       (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
     const dto = await this.parseAndValidateDto(CreateArticleDto, payload);
+    if (!file) {
+      // an upload replaces dto.coverImage with FileHarbor's own URL
+      await this.articlesService.assertOwnCoverImage(
+        session.tenantId,
+        dto.coverImage,
+      );
+    }
     this.assertCanSetStatus(session, dto.status);
 
     if (file) {
@@ -373,6 +380,13 @@ export class AdminArticlesController {
       rawData ??
       (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
     const dto = await this.parseAndValidateDto(UpdateArticleDto, payload);
+    if (!file) {
+      // an upload replaces dto.coverImage with FileHarbor's own URL
+      await this.articlesService.assertOwnCoverImage(
+        session.tenantId,
+        dto.coverImage,
+      );
+    }
     // Fetch current state before update for audit comparison
     const before = await this.prisma.article.findFirst({
       where: { id: params.id, tenantId: session.tenantId },

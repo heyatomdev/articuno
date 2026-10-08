@@ -55,3 +55,47 @@ describe('ArticlesService.update status FSM', () => {
     );
   });
 });
+
+describe('ArticlesService.assertOwnCoverImage', () => {
+  const prisma = { tenant: { findFirst: jest.fn() } };
+  const service = new ArticlesService(
+    prisma as any,
+    {} as any,
+    {} as any,
+    {} as any,
+  );
+
+  beforeEach(() => {
+    prisma.tenant.findFirst.mockResolvedValue({
+      fileharborEndpoint: 'https://fileharbor.local/v2',
+    });
+  });
+
+  it('accepts an image of the tenant FileHarbor and an absent cover', async () => {
+    await expect(
+      service.assertOwnCoverImage(
+        't1',
+        'https://fileharbor.local/v2/images/abc',
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.assertOwnCoverImage('t1', null),
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects any other URL', async () => {
+    await expect(
+      service.assertOwnCoverImage('t1', 'https://evil.example/v2/images/abc'),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects a cover when the tenant has no FileHarbor configured', async () => {
+    prisma.tenant.findFirst.mockResolvedValue({ fileharborEndpoint: null });
+    await expect(
+      service.assertOwnCoverImage(
+        't1',
+        'https://fileharbor.local/v2/images/abc',
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+});

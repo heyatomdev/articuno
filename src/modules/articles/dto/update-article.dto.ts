@@ -1,5 +1,14 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUrl, IsUUID, ValidateIf } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  ValidateIf,
+} from 'class-validator';
 import { ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { ContentStatus } from '@prisma/client';
 
@@ -13,17 +22,21 @@ const ARTICLE_STATUSES: ContentStatus[] = [
 
 export class UpdateArticleDto {
   @ApiPropertyOptional({
-    description: 'URL of the article cover image. Pass `null` to remove the existing cover.',
+    description:
+      'URL of the article cover image. Pass `null` to remove the existing cover.',
     example: 'https://cdn.example.com/articles/updated-cover.jpg',
     nullable: true,
   })
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
-  @IsUrl({ protocols: ['https'], require_protocol: true })
+  // https only; require_tld off so internal/dev FileHarbor hosts pass. The
+  // URL must also be under the tenant's FileHarbor endpoint (ArticlesService).
+  @IsUrl({ protocols: ['https'], require_protocol: true, require_tld: false })
   coverImage?: string | null;
 
   @ApiPropertyOptional({
-    description: 'New moderation status. Must be a valid transition from the current status.',
+    description:
+      'New moderation status. Must be a valid transition from the current status.',
     enum: ARTICLE_STATUSES,
     example: ContentStatus.PUBLISHED,
   })
@@ -32,7 +45,8 @@ export class UpdateArticleDto {
   status?: ContentStatus;
 
   @ApiPropertyOptional({
-    description: 'Set to `true` to feature the article, `false` to unfeature it.',
+    description:
+      'Set to `true` to feature the article, `false` to unfeature it.',
     example: true,
   })
   @IsOptional()
@@ -45,7 +59,8 @@ export class UpdateArticleDto {
   featured?: boolean;
 
   @ApiPropertyOptional({
-    description: 'UUID of the author user. Pass `null` to remove the author association.',
+    description:
+      'UUID of the author user. Pass `null` to remove the author association.',
     example: '123e4567-e89b-12d3-a456-426614174000',
     nullable: true,
   })
@@ -63,7 +78,8 @@ export class UpdateArticleDto {
   categoryId?: string;
 
   @ApiPropertyOptional({
-    description: 'Replacement list of tag UUIDs. Replaces all existing tag associations.',
+    description:
+      'Replacement list of tag UUIDs. Replaces all existing tag associations.',
     type: [String],
     example: ['tag-uuid-1', 'tag-uuid-3'],
   })
@@ -73,7 +89,8 @@ export class UpdateArticleDto {
   tagIds?: string[];
 
   @ApiPropertyOptional({
-    description: 'Human-readable reason for a moderation action (e.g. why the article was hidden or banned).',
+    description:
+      'Human-readable reason for a moderation action (e.g. why the article was hidden or banned).',
     example: 'Contains prohibited content.',
   })
   @IsOptional()

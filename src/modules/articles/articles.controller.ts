@@ -57,9 +57,13 @@ export class ArticlesController {
     description: 'Article created successfully.',
     type: ArticleDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  create(@GetTenant() tenant: any, @Body() dto: PublicCreateArticleDto) {
+  async create(@GetTenant() tenant: any, @Body() dto: PublicCreateArticleDto) {
+    await this.articlesService.assertOwnCoverImage(tenant.id, dto.coverImage);
     return this.articlesService.create(tenant.id, dto);
   }
 
@@ -79,7 +83,8 @@ export class ArticlesController {
   @Get(':slug')
   @ApiOperation({
     summary: 'Get an article by slug',
-    description: 'Returns a single article identified by its URL-friendly slug, including all translations.',
+    description:
+      'Returns a single article identified by its URL-friendly slug, including all translations.',
   })
   @ApiParam({
     name: 'slug',
@@ -89,8 +94,16 @@ export class ArticlesController {
   @ApiResponse({ status: 200, description: 'Article found.', type: ArticleDto })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  findOne(@GetTenant() tenant: any, @Param() params: ArticleSlugParamsDto, @Query() query: ArticleShowQueryDto) {
-    return this.articlesService.findOne(tenant.id, params.slug, query.languageCode);
+  findOne(
+    @GetTenant() tenant: any,
+    @Param() params: ArticleSlugParamsDto,
+    @Query() query: ArticleShowQueryDto,
+  ) {
+    return this.articlesService.findOne(
+      tenant.id,
+      params.slug,
+      query.languageCode,
+    );
   }
 
   @Patch(':id')
@@ -100,21 +113,29 @@ export class ArticlesController {
       'Partially updates an article. Only provided fields are changed. ' +
       'Status cannot be changed here: moderation goes through /admin/articles.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article to update', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article to update',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiBody({ type: PublicUpdateArticleDto })
   @ApiResponse({
     status: 200,
     description: 'Article updated successfully.',
     type: ArticleDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error or invalid status transition.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error or invalid status transition.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  update(
+  async update(
     @GetTenant() tenant: any,
     @Param() params: ArticleParamsDto,
     @Body() dto: PublicUpdateArticleDto,
   ) {
+    await this.articlesService.assertOwnCoverImage(tenant.id, dto.coverImage);
     return this.articlesService.update(tenant.id, params.id, dto);
   }
 
@@ -124,12 +145,18 @@ export class ArticlesController {
     summary: 'Delete an article',
     description: 'Permanently deletes an article and all its translations.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article to delete', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 204, description: 'Article deleted successfully – no content returned.' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article to delete',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Article deleted successfully – no content returned.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   async remove(@GetTenant() tenant: any, @Param() params: ArticleParamsDto) {
     await this.articlesService.remove(tenant.id, params.id);
   }
-
 }
