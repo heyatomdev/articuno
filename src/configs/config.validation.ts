@@ -49,6 +49,21 @@ export const configValidationSchema = Joi.object({
   THROTTLE_TTL_SECONDS: Joi.number().positive().default(60),
   THROTTLE_LIMIT: Joi.number().positive().default(100),
 
+  // Creates the `default` tenant at startup when missing. Off in production
+  // unless set explicitly; the generated API key is never logged there.
+  SEED_DEFAULT_TENANT: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.boolean().default(false),
+      otherwise: Joi.boolean().default(true),
+    }),
+  SEED_WEBHOOK_URL: Joi.string()
+    .uri({ allowRelative: false })
+    .allow('')
+    .optional(),
+
   // Delivered webhook_events rows older than this are purged nightly.
   // Unsent and dead-lettered rows are never purged.
   WEBHOOK_EVENT_RETENTION_DAYS: Joi.number().integer().positive().default(30),
