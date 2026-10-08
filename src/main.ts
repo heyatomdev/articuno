@@ -41,11 +41,12 @@ async function bootstrap(): Promise<void> {
         }),
     );
 
-    // Enable CORS
+    // Enable CORS. X-API-Key / X-User-Id are deliberately not allowed: the tenant
+    // key is server-to-server only, a browser must never hold it.
     app.enableCors({
       origin: corsOrigins.length > 0 ? corsOrigins : !isProduction,
       methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'X-API-Key', 'X-User-Id', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     });
     if (isProduction && corsOrigins.length === 0) {
       bootstrapLogger.warn('CORS_ORIGIN is not set in production: browser cross-origin requests are disabled');
