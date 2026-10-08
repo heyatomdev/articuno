@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { ContentStatus } from '@prisma/client';
-import { CommentsService, SYSTEM_REPORTER_ID } from './comments.service';
+import { CommentsService } from './comments.service';
+import { SYSTEM_REPORTER_ID } from '@/modules/users/users.constants';
 
 describe('CommentsService', () => {
   const prisma = {

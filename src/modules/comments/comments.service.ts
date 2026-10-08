@@ -17,9 +17,7 @@ import { stripTags } from '@/utils/html-sanitizer';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ContentStatus, Prisma, TargetType } from '@prisma/client';
 import { PaginatedResult, paginate } from '@/common/pagination';
-
-/** `users.externalId` of the per-tenant reporter behind automatic reports. */
-export const SYSTEM_REPORTER_ID = 'articuno:system';
+import { SYSTEM_REPORTER_ID } from '@/modules/users/users.constants';
 
 @Injectable()
 export class CommentsService {
@@ -129,7 +127,12 @@ export class CommentsService {
         },
       });
       if (modPolicy.shouldCreateSystemReport) {
-        await this.createSystemReport(tx, tenantId, created.id, modPolicy.reason);
+        await this.createSystemReport(
+          tx,
+          tenantId,
+          created.id,
+          modPolicy.reason,
+        );
       }
       return created;
     });
@@ -147,7 +150,6 @@ export class CommentsService {
 
     return comment;
   }
-
 
   /**
    * Strips the `content` field from comments that are not yet publicly visible,
@@ -190,7 +192,7 @@ export class CommentsService {
             select: {
               id: true,
               name: true,
-            }
+            },
           },
           author: {
             select: {
@@ -200,21 +202,26 @@ export class CommentsService {
               createdAt: true,
               username: true,
               avatarUrl: true,
-            }
-          }
+            },
+          },
         },
       }),
       this.prisma.comment.count({ where }),
     ]);
 
     return paginate(
-      items.map((c) => skipSanitize ? c : this.sanitizeForPublicApi(c)),
+      items.map((c) => (skipSanitize ? c : this.sanitizeForPublicApi(c))),
       total,
       query,
     );
   }
 
-  async findOne(tenantId: string, id: string, statusFilter?: ContentStatus | ContentStatus[], skipSanitize = false) {
+  async findOne(
+    tenantId: string,
+    id: string,
+    statusFilter?: ContentStatus | ContentStatus[],
+    skipSanitize = false,
+  ) {
     const statusCondition = statusFilter
       ? Array.isArray(statusFilter)
         ? { in: statusFilter }
@@ -248,7 +255,10 @@ export class CommentsService {
       throw new NotFoundException('Commento non trovato');
     }
 
-    if (dto.status && !isValidModerationTransition(current.status, dto.status)) {
+    if (
+      dto.status &&
+      !isValidModerationTransition(current.status, dto.status)
+    ) {
       throw new BadRequestException(
         `Transizione di stato non consentita: ${current.status} → ${dto.status}`,
       );
@@ -318,4 +328,3 @@ export class CommentsService {
     }
   }
 }
-
