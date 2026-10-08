@@ -1,7 +1,9 @@
+import { SkipThrottle } from '@nestjs/throttler';
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('App')
+@SkipThrottle()
 @Controller()
 export class StatusController {
   @Get('status')

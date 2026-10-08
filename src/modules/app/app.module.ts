@@ -33,6 +33,8 @@ import { AdminModule } from '@/modules/admin/admin.module';
 import { NotificationsModule } from '@/modules/notifications/notifications.module';
 import { HealthModule } from '@/modules/health/health.module';
 import { BastionModule } from '@heyatom/bastion-client/nest';
+import { APP_GUARD } from '@nestjs/core';
+import { ApiThrottlerGuard } from '@/guards/api-throttler.guard';
 
 /** Comma-separated env list → array; undefined keeps the package default. */
 const splitList = (raw?: string): string[] | undefined =>
@@ -45,6 +47,7 @@ const splitList = (raw?: string): string[] | undefined =>
 
 @Module({
   controllers: [StatusController],
+  providers: [{ provide: APP_GUARD, useClass: ApiThrottlerGuard }],
   imports: [
     // Configuration
     ConfigModule.forRoot({
