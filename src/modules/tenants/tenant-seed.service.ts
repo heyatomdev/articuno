@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { BannedWordsSeedService } from '@/modules/banned-worlds/banned-words-seed.service';
+import { BannedWordsSeedService } from '@/modules/banned-words/banned-words-seed.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -10,10 +11,14 @@ export class TenantSeedService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bannedWordsSeed: BannedWordsSeedService,
+    private readonly config: ConfigService,
   ) {}
 
+  /** `SEED_DEFAULT_TENANT` defaults to false in production, true elsewhere. */
   async onModuleInit() {
-    await this.seedDefaultTenant();
+    if (this.config.get<boolean>('SEED_DEFAULT_TENANT')) {
+      await this.seedDefaultTenant();
+    }
   }
 
   /**
@@ -21,8 +26,8 @@ export class TenantSeedService implements OnModuleInit {
    * Default tenant credentials:
    * - Slug: "default"
    * - Domain: "localhost:3000"
-   * - API Key (plain): Auto-generated random key (production-ready)
-   * - Webhook URL: "http://localhost:8000/webhook" (optional, for local development)
+   * - API Key (plain): Auto-generated random key, logged outside production only
+   * - Webhook URL: `SEED_WEBHOOK_URL` (unset = no webhook)
    */
   private async seedDefaultTenant(): Promise<void> {
     try {
@@ -39,10 +44,6 @@ export class TenantSeedService implements OnModuleInit {
         // Generate a production-ready random API key (64 hex characters)
         const plainApiKey = this.generateApiKey();
 
-        // Log the plain API key BEFORE hashing it
-        this.logger.log('Generated API Key (save this securely):');
-        this.logger.log(`   ${plainApiKey}`);
-
         // Hash the API key (SHA-256)
         const hashedApiKey = this.hashApiKey(plainApiKey);
 
@@ -56,7 +57,7 @@ export class TenantSeedService implements OnModuleInit {
             defaultLanguage: 'it',
             apiKey: hashedApiKey,
             enabled: true,
-            webhookUrl: process.env.WEBHOOK_URL || 'http://localhost:8000/webhook',
+            webhookUrl: this.config.get<string>('SEED_WEBHOOK_URL') || null,
             webhookSecret: this.generateWebhookSecret(),
           },
         });
@@ -65,13 +66,24 @@ export class TenantSeedService implements OnModuleInit {
         this.logger.log(`   Tenant ID: ${defaultTenant.id}`);
         this.logger.log(`   Slug: ${defaultTenant.slug}`);
         this.logger.log(`   Domain: ${defaultTenant.domain}`);
-        this.logger.log(`   Header to use: x-api-key: ${plainApiKey}`);
+        // Never in production: log shippers keep it forever. There the tenant
+        // authenticates with a Bastion service-client token instead.
+        if (this.config.get<string>('NODE_ENV') === 'production') {
+          this.logger.warn(
+            '   API key generated but not logged in production: use a Bastion service-client token',
+          );
+        } else {
+          this.logger.log(`   Header to use: x-api-key: ${plainApiKey}`);
+        }
 
         // Seed default banned words for the new tenant
         await this.bannedWordsSeed.seedDefaultBannedWords(defaultTenant.id);
       }
     } catch (error) {
-      this.logger.error(`Error seeding default tenant: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error seeding default tenant: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -101,4 +113,3 @@ export class TenantSeedService implements OnModuleInit {
     return crypto.randomBytes(32).toString('hex');
   }
 }
-

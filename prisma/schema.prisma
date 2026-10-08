@@ -37,7 +37,6 @@ model Tenant {
   dailyStats          DailyStats[]
   reports             Report[]
   bannedWords         BannedWord[]
-  notifications       Notification[]
   webhookEvents       WebhookEvent[]
 
   // Configurazione Webhook per notifiche e moderazione
@@ -96,7 +95,6 @@ model User {
   comments      Comment[]
   likes         Like[]
   bookmarks     Bookmark[]
-  notifications Notification[]
 
   reportsFiled     Report[] @relation("ReporterReports")
   reportsModerated Report[] @relation("ModeratorReports")
@@ -104,13 +102,14 @@ model User {
   createdAt DateTime @default(now())
 
   @@unique([externalId, tenantId])
+  @@index([tenantId, createdAt])
   @@map("users")
 }
 
 model Category {
   id          String  @id @default(uuid())
   name        String
-  slug        String  @unique
+  slug        String
   description String?
   color       String?
   tenantId    String
@@ -121,13 +120,14 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([tenantId, slug])
   @@map("categories")
 }
 
 model Tag {
   id       String @id @default(uuid())
   name     String
-  slug     String @unique
+  slug     String
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -136,6 +136,7 @@ model Tag {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([tenantId, slug])
   @@map("tags")
 }
 
@@ -168,6 +169,8 @@ model Article {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, createdAt])
   @@map("articles")
 }
 
@@ -208,6 +211,8 @@ model Comment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([tenantId, articleId, createdAt])
+  @@index([tenantId, status, createdAt])
   @@map("comments")
 }
 
@@ -222,7 +227,7 @@ model Like {
   createdAt DateTime @default(now())
 
   @@unique([articleId, userId]) // Impedisce duplicati
-  @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@map("likes")
 }
 
@@ -239,27 +244,6 @@ model Bookmark {
   @@unique([articleId, userId])
   @@index([userId, tenantId]) // Ottimizza la query "i miei preferiti"
   @@map("bookmarks")
-}
-
-model Notification {
-  id      String @id @default(uuid())
-  type    String
-  title   String
-  message String
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  // Logica Outbox per Webhook
-  sentToClient Boolean   @default(false)
-  readAt       DateTime?
-
-  createdAt DateTime @default(now())
-
-  @@map("notifications")
 }
 
 model DailyStats {
@@ -302,6 +286,10 @@ model Report {
   createdAt DateTime @default(now())
 
   @@index([tenantId, status])
+  @@index([tenantId, targetType, targetId, status])
+  // One open (PENDING/REVIEWED) report per reporter and target: a partial
+  // unique index Prisma cannot express — it lives in migration
+  // 20261008120000_report_races_and_tenant_indexes (P2002 → 409 in ReportsService).
   @@map("reports")
 }
 
@@ -341,7 +329,6 @@ model AuditLog {
   changeSummary String? // human-readable summary (e.g. "Status: draft → published")
 
   // Indexes for query performance
-  @@index([tenantId])
   @@index([tenantId, timestamp])
   @@index([tenantId, action])
   @@index([tenantId, actorUserId])

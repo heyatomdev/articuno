@@ -2,9 +2,9 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { MetricsService } from './metrics.service';
 
-/** Never instrumented — polling /health/* and /status would otherwise pollute the histogram with its own traffic. */
+/** Never instrumented — polling /health/* would otherwise pollute the histogram with its own traffic. */
 function isSkipped(path: string): boolean {
-  return path.startsWith('/health') || path === '/status';
+  return path.startsWith('/health');
 }
 
 /**

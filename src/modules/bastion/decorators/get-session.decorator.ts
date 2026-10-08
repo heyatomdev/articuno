@@ -7,7 +7,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
  * `request.session`: the shape is unchanged, so no `/admin/*` handler had to move.
  */
 export const GetSession = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext) => {
+  (_data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
     return request.session;
   },

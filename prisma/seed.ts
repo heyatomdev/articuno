@@ -65,7 +65,7 @@ async function main() {
   const categories = await Promise.all(
     categoriesData.map((cat) =>
       prisma.category.upsert({
-        where: { slug: cat.slug },
+        where: { tenantId_slug: { tenantId: tenant.id, slug: cat.slug } },
         update: {},
         create: { ...cat, tenantId: tenant.id },
       }),

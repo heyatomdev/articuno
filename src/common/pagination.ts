@@ -62,7 +62,7 @@ export function paginate<T>(
  * of the plain `description` string most admin list endpoints use. Shape must
  * stay identical to `paginate()`'s `meta`, which is untyped by this class.
  */
-export class PageMetaDto {
+class PageMetaDto {
   @ApiProperty() total: number;
   @ApiProperty() page: number;
   @ApiProperty() limit: number;

@@ -31,7 +31,7 @@ import {
 } from '@/modules/articles/dto/article-response.dto';
 
 @ApiTags('Article Translations')
-@ApiSecurity('x-api-key')
+@ApiSecurity('api-key')
 @Controller('articles/:id/translations')
 @UseGuards(TenantGuard)
 export class ArticleTranslationsController {

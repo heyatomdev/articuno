@@ -4,14 +4,62 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
+import { BannedWordsService } from '@/modules/banned-words/banned-words.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import {
   UserStatus,
   ContentStatus,
   AutoModerationReasonEnum,
-  ModerationTransitionDto,
 } from './moderation.types';
+
+/**
+ * Transizioni di stato consentite (articoli e commenti condividono l'enum: i DTO
+ * limitano `to` agli stati del proprio tipo). Stesso stato = no-op, sempre ok.
+ * BANNED è terminale.
+ */
+const VALID_TRANSITIONS: Record<ContentStatus, ContentStatus[]> = {
+  // articoli
+  [ContentStatus.DRAFT]: [
+    ContentStatus.PUBLISHED,
+    ContentStatus.UNDER_REVIEW,
+    ContentStatus.HIDDEN,
+    ContentStatus.BANNED,
+  ],
+  [ContentStatus.PUBLISHED]: [
+    ContentStatus.DRAFT,
+    ContentStatus.UNDER_REVIEW,
+    ContentStatus.HIDDEN,
+    ContentStatus.BANNED,
+  ],
+  // commenti
+  [ContentStatus.VISIBLE]: [
+    ContentStatus.HIDDEN,
+    ContentStatus.BANNED,
+    ContentStatus.UNDER_REVIEW,
+  ],
+  // entrambi
+  [ContentStatus.UNDER_REVIEW]: [
+    ContentStatus.PUBLISHED,
+    ContentStatus.DRAFT,
+    ContentStatus.VISIBLE,
+    ContentStatus.HIDDEN,
+    ContentStatus.BANNED,
+  ],
+  [ContentStatus.HIDDEN]: [
+    ContentStatus.VISIBLE,
+    ContentStatus.PUBLISHED,
+    ContentStatus.DRAFT,
+    ContentStatus.BANNED,
+  ],
+  [ContentStatus.BANNED]: [],
+};
+
+export function isValidModerationTransition(
+  from: ContentStatus,
+  to: ContentStatus,
+): boolean {
+  return from === to || (VALID_TRANSITIONS[from]?.includes(to) ?? false);
+}
 
 interface ModerationContext {
   tenantId: string;
@@ -156,57 +204,11 @@ export class ModerationPolicyService {
   }
 
   /**
-   * Controlla se un commento deve essere auto-hidden in base a reportCount
+   * Valida una transizione di stato durante revisione umana.
+   * Vedi `isValidModerationTransition` (funzione pura, usabile senza DI).
    */
-  isCommentThresholdReached(reportCount: number): boolean {
-    return reportCount >= this.COMMENT_REPORT_THRESHOLD;
-  }
-
-  /**
-   * Controlla se un articolo deve passare a UNDER_REVIEW in base a reportCount
-   */
-  isArticleThresholdReached(reportCount: number): boolean {
-    return reportCount >= this.ARTICLE_REPORT_THRESHOLD;
-  }
-
-  /**
-   * Valida una transizione di stato durante revisione umana
-   * Ritorna true se la transizione è consentita
-   */
-  isValidModerationTransition(
-    from: ContentStatus,
-    to: ContentStatus,
-  ): boolean {
-    // Regole di transizione semplici
-    const validTransitions: Record<ContentStatus, ContentStatus[]> = {
-      [ContentStatus.VISIBLE]: [
-        ContentStatus.HIDDEN,
-        ContentStatus.BANNED,
-        ContentStatus.UNDER_REVIEW,
-      ],
-      [ContentStatus.HIDDEN]: [
-        ContentStatus.VISIBLE,
-        ContentStatus.BANNED,
-      ],
-      [ContentStatus.BANNED]: [], // Non si torna indietro da BANNED
-      [ContentStatus.UNDER_REVIEW]: [
-        ContentStatus.PUBLISHED,
-        ContentStatus.HIDDEN,
-        ContentStatus.BANNED,
-      ],
-      [ContentStatus.PUBLISHED]: [
-        ContentStatus.UNDER_REVIEW,
-        ContentStatus.HIDDEN,
-        ContentStatus.BANNED,
-      ],
-      [ContentStatus.DRAFT]: [
-        ContentStatus.PUBLISHED,
-        ContentStatus.HIDDEN,
-        ContentStatus.BANNED,
-      ],
-    };
-
-    return validTransitions[from]?.includes(to) ?? false;
+  isValidModerationTransition(from: ContentStatus, to: ContentStatus): boolean {
+    return isValidModerationTransition(from, to);
   }
 
   /**
@@ -218,4 +220,3 @@ export class ModerationPolicyService {
       : this.COMMENT_REPORT_THRESHOLD;
   }
 }
-

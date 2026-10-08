@@ -99,14 +99,14 @@ describe('MetricsMiddleware', () => {
     });
   });
 
-  it('does not observe /health/* or /status', () => {
-    for (const path of ['/health/live', '/health/ready', '/status']) {
+  it('does not observe /health/*', () => {
+    for (const path of ['/health/live', '/health/ready']) {
       const res = makeRes(200);
       middleware.use(makeReq({ method: 'GET', path }), res, next);
       res.emit('finish');
     }
 
     expect(observe).not.toHaveBeenCalled();
-    expect(next).toHaveBeenCalledTimes(3);
+    expect(next).toHaveBeenCalledTimes(2);
   });
 });

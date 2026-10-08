@@ -22,8 +22,8 @@ import {
 import { ArticlesService } from '@/modules/articles/articles.service';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
-import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
-import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
+import { PublicCreateArticleDto } from '@/modules/articles/dto/create-article.dto';
+import { PublicUpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import {
   ArticleParamsDto,
   ArticleSlugParamsDto,
@@ -37,7 +37,7 @@ import {
 } from '@/modules/articles/dto/article-response.dto';
 
 @ApiTags('Articles')
-@ApiSecurity('x-api-key')
+@ApiSecurity('api-key')
 @Controller('articles')
 @UseGuards(TenantGuard)
 export class ArticlesController {
@@ -47,18 +47,23 @@ export class ArticlesController {
   @ApiOperation({
     summary: 'Create an article',
     description:
-      'Creates a new article for the current tenant. You may optionally include translations inline. ' +
+      'Creates a new DRAFT article for the current tenant. You may optionally include translations inline. ' +
+      'Status cannot be set here: publishing goes through /admin/articles. ' +
       'Content is automatically checked for banned words; matching content will be created with a HIDDEN status.',
   })
-  @ApiBody({ type: CreateArticleDto })
+  @ApiBody({ type: PublicCreateArticleDto })
   @ApiResponse({
     status: 201,
     description: 'Article created successfully.',
     type: ArticleDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  create(@GetTenant() tenant: any, @Body() dto: CreateArticleDto) {
+  async create(@GetTenant() tenant: any, @Body() dto: PublicCreateArticleDto) {
+    await this.articlesService.assertOwnCoverImage(tenant.id, dto.coverImage);
     return this.articlesService.create(tenant.id, dto);
   }
 
@@ -78,7 +83,8 @@ export class ArticlesController {
   @Get(':slug')
   @ApiOperation({
     summary: 'Get an article by slug',
-    description: 'Returns a single article identified by its URL-friendly slug, including all translations.',
+    description:
+      'Returns a single article identified by its URL-friendly slug, including all translations.',
   })
   @ApiParam({
     name: 'slug',
@@ -88,8 +94,16 @@ export class ArticlesController {
   @ApiResponse({ status: 200, description: 'Article found.', type: ArticleDto })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  findOne(@GetTenant() tenant: any, @Param() params: ArticleSlugParamsDto, @Query() query: ArticleShowQueryDto) {
-    return this.articlesService.findOne(tenant.id, params.slug, query.languageCode);
+  findOne(
+    @GetTenant() tenant: any,
+    @Param() params: ArticleSlugParamsDto,
+    @Query() query: ArticleShowQueryDto,
+  ) {
+    return this.articlesService.findOne(
+      tenant.id,
+      params.slug,
+      query.languageCode,
+    );
   }
 
   @Patch(':id')
@@ -97,23 +111,31 @@ export class ArticlesController {
     summary: 'Update an article',
     description:
       'Partially updates an article. Only provided fields are changed. ' +
-      'Status changes are validated against the content status state machine.',
+      'Status cannot be changed here: moderation goes through /admin/articles.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article to update', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiBody({ type: UpdateArticleDto })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article to update',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiBody({ type: PublicUpdateArticleDto })
   @ApiResponse({
     status: 200,
     description: 'Article updated successfully.',
     type: ArticleDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error or invalid status transition.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error or invalid status transition.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  update(
+  async update(
     @GetTenant() tenant: any,
     @Param() params: ArticleParamsDto,
-    @Body() dto: UpdateArticleDto,
+    @Body() dto: PublicUpdateArticleDto,
   ) {
+    await this.articlesService.assertOwnCoverImage(tenant.id, dto.coverImage);
     return this.articlesService.update(tenant.id, params.id, dto);
   }
 
@@ -123,12 +145,18 @@ export class ArticlesController {
     summary: 'Delete an article',
     description: 'Permanently deletes an article and all its translations.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article to delete', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 204, description: 'Article deleted successfully – no content returned.' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article to delete',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Article deleted successfully – no content returned.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   async remove(@GetTenant() tenant: any, @Param() params: ArticleParamsDto) {
     await this.articlesService.remove(tenant.id, params.id);
   }
-
 }

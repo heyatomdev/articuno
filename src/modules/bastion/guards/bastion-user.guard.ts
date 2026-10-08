@@ -12,15 +12,18 @@ import {
   BastionUserGuard as PackageUserGuard,
   UserJwtPayload,
 } from '@heyatom/bastion-client/nest';
+import { Reflector } from '@nestjs/core';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AdminSession } from '../bastion.types';
+import { SUPER_ADMIN_ROLES, Roles } from '../decorators/roles.decorator';
 
 /**
  * `/admin/*` guard. The package checks the user token (accepted apps and roles
  * from `BastionModule` options, i.e. `ADMIN_ACCEPTED_*`); what is Articuno's
  * alone is the mapping of Bastion's tenant **uuid** to a local `Tenant`
  * (`bastionTenantId`), the lazily provisioned local `User`, and the
- * `AdminSession` handlers read via `@GetSession()`.
+ * `AdminSession` handlers read via `@GetSession()`. Per-route role check via
+ * `@Roles()`; a route without it is SUPER_ADMIN-only.
  */
 @Injectable()
 export class BastionUserGuard extends PackageUserGuard {
@@ -29,6 +32,7 @@ export class BastionUserGuard extends PackageUserGuard {
     audit: BastionAuditService,
     @Inject(BASTION_OPTIONS) options: BastionModuleOptions,
     private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
   ) {
     super(jwks, audit, options);
   }
@@ -37,6 +41,15 @@ export class BastionUserGuard extends PackageUserGuard {
     await super.canActivate(ctx);
     const req = ctx.switchToHttp().getRequest();
     const payload = req.adminUser as UserJwtPayload;
+
+    const allowed: readonly string[] =
+      this.reflector.getAllAndOverride(Roles, [
+        ctx.getHandler(),
+        ctx.getClass(),
+      ]) ?? SUPER_ADMIN_ROLES;
+    if (!payload.role || !allowed.includes(payload.role)) {
+      throw new ForbiddenException('Ruolo non autorizzato per questa risorsa');
+    }
 
     if (!payload.tenantId) {
       throw new ForbiddenException('Tenant assente nel token');

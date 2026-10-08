@@ -30,7 +30,7 @@ import { PaginatedResult, ApiPaginatedResponse } from "@/common/pagination";
 import { TagDto } from "@/modules/tags/dto/tags.dto";
 
 @ApiTags('Tags')
-@ApiSecurity('x-api-key')
+@ApiSecurity('api-key')
 @Controller('tags')
 @UseGuards(TenantGuard)
 export class TagsController {

@@ -22,6 +22,10 @@ import { CommentsService } from '@/modules/comments/comments.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  MODERATION_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
@@ -39,6 +43,7 @@ import {
 @ApiBearerAuth()
 @Controller('admin/comments')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(MODERATION_ROLES)
 export class AdminCommentsController {
   constructor(
     private readonly commentsService: CommentsService,
@@ -53,38 +58,76 @@ export class AdminCommentsController {
       'Returns a paginated list of all comments for the session tenant. Without `status` every comment is returned regardless of moderation state. Supports filtering by articleId and status.',
   })
   @ApiPaginatedResponse(CommentListItemDto, 'Paginated list of comments.')
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  findAll(@GetSession() session: AdminSession, @Query() query: CommentFiltersQueryDto) {
-    return this.commentsService.findAll(session.tenantId, query, query.status, true);
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
+  findAll(
+    @GetSession() session: AdminSession,
+    @Query() query: CommentFiltersQueryDto,
+  ) {
+    return this.commentsService.findAll(
+      session.tenantId,
+      query,
+      query.status,
+      true,
+    );
   }
 
   @Get(':id')
   @ApiOperation({
     summary: 'Get a comment by ID (admin)',
-    description: 'Returns a single comment identified by its UUID, regardless of status.',
+    description:
+      'Returns a single comment identified by its UUID, regardless of status.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the comment', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the comment',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiResponse({ status: 200, description: 'Comment found.', type: CommentDto })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
-  findOne(@GetSession() session: AdminSession, @Param() params: CommentParamsDto) {
-    return this.commentsService.findOne(session.tenantId, params.id, undefined, true);
+  findOne(
+    @GetSession() session: AdminSession,
+    @Param() params: CommentParamsDto,
+  ) {
+    return this.commentsService.findOne(
+      session.tenantId,
+      params.id,
+      undefined,
+      true,
+    );
   }
 
   @Patch(':id')
   @ApiOperation({
     summary: 'Update a comment (admin)',
-    description: 'Partially updates a comment (e.g. content or status). All statuses can be set by admins.',
+    description:
+      'Partially updates a comment (e.g. content or status). Status changes must be valid transitions (BANNED is terminal); new content is stripped of tags and checked for banned words.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the comment to update', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the comment to update',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiBody({ type: UpdateCommentDto })
   @ApiResponse({
     status: 200,
     description: 'Comment updated successfully.',
     type: CommentDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
   async update(
     @GetSession() session: AdminSession,
@@ -96,15 +139,22 @@ export class AdminCommentsController {
       select: { status: true, content: true },
     });
 
-    const comment = await this.commentsService.update(session.tenantId, params.id, dto);
+    const comment = await this.commentsService.update(
+      session.tenantId,
+      params.id,
+      dto,
+    );
 
-    const statusChanged = dto.status && before?.status && dto.status !== before.status;
+    const statusChanged =
+      dto.status && before?.status && dto.status !== before.status;
 
     await this.auditLogger.log({
       tenantId: session.tenantId,
       actorUserId: session.externalId,
       actorRole: session.userRole,
-      action: statusChanged ? AuditAction.COMMENT_STATUS_CHANGED : AuditAction.COMMENT_UPDATED,
+      action: statusChanged
+        ? AuditAction.COMMENT_STATUS_CHANGED
+        : AuditAction.COMMENT_UPDATED,
       resourceType: AuditResourceType.COMMENT,
       resourceId: comment.id,
       changesBefore: before ?? undefined,
@@ -123,11 +173,24 @@ export class AdminCommentsController {
     summary: 'Delete a comment (admin)',
     description: 'Permanently deletes a comment.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the comment to delete', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 204, description: 'Comment deleted successfully – no content returned.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the comment to delete',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Comment deleted successfully – no content returned.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Comment not found.' })
-  async remove(@GetSession() session: AdminSession, @Param() params: CommentParamsDto) {
+  async remove(
+    @GetSession() session: AdminSession,
+    @Param() params: CommentParamsDto,
+  ) {
     const comment = await this.prisma.comment.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { status: true, content: true },

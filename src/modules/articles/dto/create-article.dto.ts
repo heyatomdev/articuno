@@ -4,11 +4,11 @@ import {
   IsBoolean,
   IsIn,
   IsOptional,
-  IsString,
+  IsUrl,
   IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { ContentStatus } from '@prisma/client';
 
@@ -21,17 +21,20 @@ const ARTICLE_STATUSES: ContentStatus[] = [
 ];
 
 export class CreateArticleDto {
-
   @ApiPropertyOptional({
-    description: 'URL of the article cover image. When creating via multipart/form-data, upload the file in the `coverImage` field instead.',
+    description:
+      'URL of the article cover image. When creating via multipart/form-data, upload the file in the `coverImage` field instead.',
     example: 'https://cdn.example.com/articles/my-article-cover.jpg',
   })
   @IsOptional()
-  @IsString()
+  // https only; require_tld off so internal/dev FileHarbor hosts pass. The
+  // URL must also be under the tenant's FileHarbor endpoint (ArticlesService).
+  @IsUrl({ protocols: ['https'], require_protocol: true, require_tld: false })
   coverImage?: string;
 
   @ApiPropertyOptional({
-    description: 'Initial moderation status of the article. Defaults to DRAFT when omitted.',
+    description:
+      'Initial moderation status of the article. Defaults to DRAFT when omitted.',
     enum: ARTICLE_STATUSES,
     example: ContentStatus.DRAFT,
   })
@@ -40,7 +43,8 @@ export class CreateArticleDto {
   status?: ContentStatus;
 
   @ApiPropertyOptional({
-    description: 'Whether the article should appear in featured/highlighted sections.',
+    description:
+      'Whether the article should appear in featured/highlighted sections.',
     example: false,
   })
   @IsOptional()
@@ -53,7 +57,8 @@ export class CreateArticleDto {
   featured?: boolean;
 
   @ApiPropertyOptional({
-    description: 'UUID of the user (author) to associate with the article. Defaults to the authenticated user when omitted.',
+    description:
+      'UUID of the user (author) to associate with the article. Defaults to the authenticated user when omitted.',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @IsOptional()
@@ -78,7 +83,8 @@ export class CreateArticleDto {
   tagIds?: string[];
 
   @ApiPropertyOptional({
-    description: 'One or more translation objects to create alongside the article. At least one translation (with the default language) is recommended.',
+    description:
+      'One or more translation objects to create alongside the article. At least one translation (with the default language) is recommended.',
     type: [CreateArticleTranslationDto],
   })
   @IsOptional()
@@ -87,3 +93,11 @@ export class CreateArticleDto {
   @Type(() => CreateArticleTranslationDto)
   translations?: CreateArticleTranslationDto[];
 }
+
+/**
+ * Public API (`POST /articles`): no `status`, articles start as DRAFT.
+ * Publishing is an editorial decision, admin only (`/admin/articles`).
+ */
+export class PublicCreateArticleDto extends OmitType(CreateArticleDto, [
+  'status',
+] as const) {}

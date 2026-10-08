@@ -15,6 +15,11 @@ import { CategoriesService } from '@/modules/categories/categories.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  CONTENT_ROLES,
+  MODERATION_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
@@ -35,6 +40,7 @@ import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 @ApiBearerAuth()
 @Controller('admin/categories')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(CONTENT_ROLES)
 export class AdminCategoriesController {
   constructor(
     private readonly categoriesService: CategoriesService,
@@ -44,7 +50,10 @@ export class AdminCategoriesController {
 
   @Post()
   @ApiCreatedResponse({ type: CategoryDto })
-  async create(@GetSession() session: AdminSession, @Body() dto: CreateCategoryDto) {
+  async create(
+    @GetSession() session: AdminSession,
+    @Body() dto: CreateCategoryDto,
+  ) {
     const category = await this.categoriesService.create(session.tenantId, dto);
 
     await this.auditLogger.log({
@@ -63,13 +72,19 @@ export class AdminCategoriesController {
 
   @Get()
   @ApiPaginatedResponse(CategoryListItemDto, 'Paginated list of categories.')
-  findAll(@GetSession() session: AdminSession, @Query() query: CategoryListQueryDto) {
+  findAll(
+    @GetSession() session: AdminSession,
+    @Query() query: CategoryListQueryDto,
+  ) {
     return this.categoriesService.findAll(session.tenantId, query);
   }
 
   @Get(':id')
   @ApiOkResponse({ type: CategoryDto })
-  findOne(@GetSession() session: AdminSession, @Param() params: CategoryParamsDto) {
+  findOne(
+    @GetSession() session: AdminSession,
+    @Param() params: CategoryParamsDto,
+  ) {
     return this.categoriesService.findOne(session.tenantId, params.id);
   }
 
@@ -80,7 +95,11 @@ export class AdminCategoriesController {
     @Param() params: CategoryParamsDto,
     @Body() dto: UpdateCategoryDto,
   ) {
-    const category = await this.categoriesService.update(session.tenantId, params.id, dto);
+    const category = await this.categoriesService.update(
+      session.tenantId,
+      params.id,
+      dto,
+    );
 
     await this.auditLogger.log({
       tenantId: session.tenantId,
@@ -97,8 +116,12 @@ export class AdminCategoriesController {
   }
 
   @Delete(':id')
+  @Roles(MODERATION_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@GetSession() session: AdminSession, @Param() params: CategoryParamsDto) {
+  async remove(
+    @GetSession() session: AdminSession,
+    @Param() params: CategoryParamsDto,
+  ) {
     const category = await this.prisma.category.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { name: true },

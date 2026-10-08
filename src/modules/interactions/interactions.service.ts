@@ -21,73 +21,38 @@ export class InteractionsService {
     }
   }
 
-  private async ensureUser(tenantId: string, externalUserId: string) {
-    return this.prisma.user.upsert({
-      where: {
-        externalId_tenantId: {
-          externalId: externalUserId,
-          tenantId,
-        },
-      },
-      update: {},
-      create: {
-        externalId: externalUserId,
-        tenantId,
-      },
-      select: {
-        id: true,
-      },
-    });
-  }
-
   async toggleLikeArticle(tenantId: string, articleId: string, externalUserId: string) {
     await this.ensureArticleExists(tenantId, articleId);
-    const user = await this.ensureUser(tenantId, externalUserId);
+    const user = await this.prisma.ensureUser(tenantId, externalUserId);
 
-    const existingLike = await this.prisma.like.findFirst({
-      where: {
-        articleId,
-        userId: user.id,
-        tenantId,
-      },
-      select: {
-        id: true,
-      },
-    });
+    // Delete-first instead of find-then-act: a double click can't both see "no
+    // like" and insert twice. The loser of a concurrent insert hits the unique
+    // (articleId, userId) key; the like exists either way, so report liked.
+    const liked = await this.prisma
+      .$transaction(async (tx) => {
+        const { count } = await tx.like.deleteMany({
+          where: { articleId, userId: user.id, tenantId },
+        });
 
-    if (existingLike) {
-      await this.prisma.$transaction([
-        this.prisma.like.delete({
-          where: {
-            id: existingLike.id,
-          },
-        }),
-        this.prisma.article.update({
-          where: { id: articleId },
-          data: { likesCount: { decrement: 1 } },
+        await tx.article.update({
+          where: { id: articleId, tenantId },
+          data: { likesCount: count ? { decrement: count } : { increment: 1 } },
           select: { id: true },
-        }),
-      ]);
+        });
 
-      return { liked: false };
-    }
+        if (count) return false;
 
-    await this.prisma.$transaction([
-      this.prisma.like.create({
-        data: {
-          articleId,
-          userId: user.id,
-          tenantId,
-        },
-      }),
-      this.prisma.article.update({
-        where: { id: articleId },
-        data: { likesCount: { increment: 1 } },
-        select: { id: true },
-      }),
-    ]);
+        await tx.like.create({
+          data: { articleId, userId: user.id, tenantId },
+        });
+        return true;
+      })
+      .catch((error) => {
+        if (error.code === 'P2002') return true;
+        throw error;
+      });
 
-    return { liked: true };
+    return { liked };
   }
 
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Articuno is a **multi-tenant CMS microservice** (NestJS + Prisma + PostgreSQL) designed to run behind main websites (Tenants), providing article management, comments, moderation, webhooks, and analytics. The codebase lives entirely in `src/modules/` with 24 NestJS feature modules.
+Articuno is a **multi-tenant CMS microservice** (NestJS + Prisma + PostgreSQL) designed to run behind main websites (Tenants), providing article management, comments, moderation, webhooks, and analytics. The codebase lives entirely in `src/modules/` with 22 NestJS feature modules.
 
 ## graphify
 
@@ -40,7 +40,6 @@ pnpm run format           # Prettier formatting
 pnpm run test             # Unit tests (rootDir: src, matches *.spec.ts)
 pnpm run test:watch       # Watch mode
 pnpm run test:cov         # Coverage report
-pnpm run test:e2e         # E2E tests (uses test/jest-e2e.json)
 pnpm run test:debug       # Debug tests with --inspect-brk
 ```
 
@@ -61,7 +60,7 @@ modules/{domain}/
 
 Key module groups:
 - **tenants/** — Multi-tenancy middleware, guard, and `@GetTenant()` decorator
-- **bastion/** — Admin auth against Bastion: `BastionUserGuard`, `BastionJwksService`, `@GetSession()` decorator
+- **bastion/** — Admin auth against Bastion: `BastionUserGuard` (extends the `@heyatom/bastion-client` guard, which owns the JWKS cache), `@GetSession()` decorator
 - **admin/controllers/** — Admin panel routes (reuse existing services behind `BastionUserGuard`)
 - **articles/** + **article-translations/** — Content with multilingual support
 - **moderation/** — `ModerationPolicyService` (central policy) + `WebhookEventPublisher` (outbox)
@@ -85,6 +84,12 @@ JIT-upserts the admin as a `User` row because `Report.reporterId` / `Report.mode
 are real foreign keys onto `users(externalId, tenantId)`.
 
 `TenantMiddleware` runs globally except `/health` (GET) and `/admin/*` routes.
+
+**Admin roles**: every admin controller declares `@Roles(CONTENT_ROLES | MODERATION_ROLES | SUPER_ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), enforced by `BastionUserGuard`; no `@Roles` = SUPER_ADMIN-only. AUTHOR+ articles/translations/categories/tags/stats; MODERATOR+ comments/reports/banned-words, DELETE of articles/categories/tags, article status UNDER_REVIEW/HIDDEN/BANNED; SUPER_ADMIN only for users/audits/webhooks/notifications (Bastion's seed grants `articuno-users.manage` / `articuno-config.manage` to no role). Mirrors Meridian's `articuno-*` permissions.
+
+**Rate limiting**: admin routes only — `AdminThrottlerGuard` (`THROTTLE_LIMIT` per `THROTTLE_TTL_SECONDS`) per Bastion user. The public API is deliberately not throttled: it is server-to-server and every tenant backend reaches Articuno from the same Docker IP; rate-limit end users in the tenant site.
+
+**Public API never sets status**: `Public*Dto` variants omit `status` (articles start DRAFT); status changes go through `/admin/*` and `isValidModerationTransition()`.
 
 ### Critical Invariant: tenantId in Every Query
 
@@ -115,6 +120,8 @@ await this.webhookPublisher.publishCommentModerationEvent(...);
 ```
 
 Auto-moderation thresholds: ≥5 reports → comment HIDDEN; ≥10 reports → article UNDER_REVIEW.
+
+Concurrency: the article branch locks the row (`SELECT … FOR UPDATE`, tenant-scoped) before counting; the comment branch uses `increment` and hides via `updateMany … status: VISIBLE`, so exactly one report fires the event. Duplicate open reports are refused by the partial unique index `reports_open_reporter_target_key` (hand-written in migration `20261008120000_report_races_and_tenant_indexes`; P2002 → 409). Outbox events describing a change in a `$transaction` must be published with that `tx` (every `WebhookEventPublisher.publish*` takes it last). JIT user rows go through `PrismaService.ensureUser` (retries the upsert race on P2002).
 
 ### Audit Logging
 
@@ -155,7 +162,9 @@ Supported types: JPEG, PNG, GIF, WebP (max 10 MB). `deleteImageSafely()` silentl
 
 ## Configuration
 
-Required env var: `DATABASE_URL` (PostgreSQL). See `.env.example` for all options.
+Required env var: `DATABASE_URL` (PostgreSQL). Pool: `DATABASE_POOL_MAX` (default 10 per replica), `DATABASE_POOL_TIMEOUT_MS` (default 5000). See `.env.example` for all options.
+
+`SEED_DEFAULT_TENANT` (default false in production, true elsewhere) creates tenant `default` at boot; its API key is logged outside production only.
 
 Validation runs at startup via Joi (`src/configs/config.validation.ts`) — the app will fail fast on misconfigured env vars.
 
@@ -167,7 +176,7 @@ Key runtime settings:
 
 ### Metrics
 
-`src/modules/metrics/`, `@prometheus-io/client` directly (own `Registry`, default label `app=articuno`). `MetricsServer` serves `GET /metrics` with `node:http` on `METRICS_PORT` (default 9091), outside the Nest app: no guards, no TenantMiddleware, no CORS — and nothing on the API port (404 there). Isolation is the network's job: never publish 9091 on the host, nginx never proxies it; Prometheus scrapes `articuno:9091` on the internal Docker network. `MetricsMiddleware` (registered in `AppModule.configure`, all routes) records `http_request_duration_seconds` labelled by route pattern, never the raw URL; `/health*` and `/status` are skipped.
+`src/modules/metrics/`, `@prometheus-io/client` directly (own `Registry`, default label `app=articuno`). `MetricsServer` serves `GET /metrics` with `node:http` on `METRICS_PORT` (default 9091), outside the Nest app: no guards, no TenantMiddleware, no CORS — and nothing on the API port (404 there). Isolation is the network's job: never publish 9091 on the host, nginx never proxies it; Prometheus scrapes `articuno:9091` on the internal Docker network. `MetricsMiddleware` (registered in `AppModule.configure`, all routes) records `http_request_duration_seconds` labelled by route pattern, never the raw URL; `/health*` is skipped.
 
 `articuno_webhook_outbox_events{state}` (gauge, `state` = `overdue` | `dead`, both always emitted) — one `$queryRaw` on `webhook_events` with `sentAt IS NULL`, computed lazily in `collect()` (no query until scraped; a DB error logs `warn` and keeps the previous value). `overdue` = `COALESCE(nextRetryAt, createdAt)` more than 2 minutes in the past (the job runs every 30s; dead-lettered and leased rows have `nextRetryAt` in the future, so they never count). `dead` = `nextRetryAt` equal to the dead-letter sentinel `9999-12-31T23:59:59Z` (`DEAD_LETTER_DATE` in `src/modules/webhook/webhook.constants.ts`, bound as a query parameter — its own file because `WebhooksJob` depends on `MetricsService`). Alerts: `articuno_webhook_outbox_events{state="overdue"} > 0 for 10m`; `increase(articuno_webhook_outbox_events{state="dead"}[1h]) > 0` — `dead` only drops via manual resend, so alert on its increase, not its level.
 

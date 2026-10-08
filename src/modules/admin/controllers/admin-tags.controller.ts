@@ -16,6 +16,11 @@ import { TagsService } from '@/modules/tags/tags.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  CONTENT_ROLES,
+  MODERATION_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateTagDto } from '@/modules/tags/dto/create-tag.dto';
 import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
@@ -33,6 +38,7 @@ import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 @ApiBearerAuth()
 @Controller('admin/tags')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(CONTENT_ROLES)
 export class AdminTagsController {
   constructor(
     private readonly tagsService: TagsService,
@@ -98,8 +104,12 @@ export class AdminTagsController {
   }
 
   @Delete(':id')
+  @Roles(MODERATION_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@GetSession() session: AdminSession, @Param() params: TagParamsDto) {
+  async remove(
+    @GetSession() session: AdminSession,
+    @Param() params: TagParamsDto,
+  ) {
     const tag = await this.prisma.tag.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { name: true },

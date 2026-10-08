@@ -15,7 +15,7 @@ import { CommentsService } from '@/modules/comments/comments.service';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { CreateCommentDto } from '@/modules/comments/dto/create-comment.dto';
-import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
+import { PublicUpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
 import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
 import { ContentStatus, UserRole } from '@prisma/client';
@@ -82,7 +82,7 @@ export class CommentsController {
   async update(
     @GetTenant() tenant: any,
     @Param() params: CommentParamsDto,
-    @Body() dto: UpdateCommentDto,
+    @Body() dto: PublicUpdateCommentDto,
   ) {
     const before = await this.prisma.comment.findFirst({
       where: { id: params.id, tenantId: tenant.id },
@@ -92,15 +92,22 @@ export class CommentsController {
       },
     });
 
-    const comment = await this.commentsService.update(tenant.id, params.id, dto);
+    const comment = await this.commentsService.update(
+      tenant.id,
+      params.id,
+      dto,
+    );
 
-    const statusChanged = dto.status && before?.status && dto.status !== before.status;
+    // only banned-word auto-hide can change it here
+    const statusChanged = before?.status && comment.status !== before.status;
 
     await this.auditLogger.log({
       tenantId: tenant.id,
       actorUserId: before?.author?.externalId ?? 'unknown',
       actorRole: UserRole.MEMBER,
-      action: statusChanged ? AuditAction.COMMENT_STATUS_CHANGED : AuditAction.COMMENT_UPDATED,
+      action: statusChanged
+        ? AuditAction.COMMENT_STATUS_CHANGED
+        : AuditAction.COMMENT_UPDATED,
       resourceType: AuditResourceType.COMMENT,
       resourceId: comment.id,
       changesBefore: before ? { status: before.status } : undefined,

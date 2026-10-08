@@ -20,6 +20,10 @@ import { ReportsService } from '@/modules/reports/reports.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  MODERATION_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AdminCreateReportDto } from '@/modules/reports/dto/admin-create-report.dto';
 import { AdminUpdateReportDto } from '@/modules/reports/dto/admin-update-report.dto';
@@ -35,6 +39,7 @@ import { ReportDto } from '@/modules/reports/dto/report-response.dto';
 @ApiBearerAuth()
 @Controller('admin/reports')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(MODERATION_ROLES)
 export class AdminReportsController {
   constructor(
     private readonly reportsService: ReportsService,
@@ -47,7 +52,7 @@ export class AdminReportsController {
     summary: 'Submit a report (admin)',
     description:
       'Creates a new report for a user, article, or comment from within the admin panel. ' +
-      '`reporterId` is automatically set to the session user\'s external ID.',
+      "`reporterId` is automatically set to the session user's external ID.",
   })
   @ApiBody({ type: AdminCreateReportDto })
   @ApiResponse({
@@ -55,10 +60,19 @@ export class AdminReportsController {
     description: 'Report submitted successfully.',
     type: ReportDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Reported target not found.' })
-  async create(@GetSession() session: AdminSession, @Body() dto: AdminCreateReportDto) {
+  async create(
+    @GetSession() session: AdminSession,
+    @Body() dto: AdminCreateReportDto,
+  ) {
     const report = await this.reportsService.create(session.tenantId, {
       ...dto,
       reporterId: session.externalId,
@@ -81,41 +95,70 @@ export class AdminReportsController {
   @Get()
   @ApiOperation({
     summary: 'List reports (admin)',
-    description: 'Returns a paginated list of all reports for the session tenant. Optionally filter by status.',
+    description:
+      'Returns a paginated list of all reports for the session tenant. Optionally filter by status.',
   })
   @ApiPaginatedResponse(ReportDto, 'Paginated list of reports.')
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  findAll(@GetSession() session: AdminSession, @Query() query: ReportListQueryDto) {
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
+  findAll(
+    @GetSession() session: AdminSession,
+    @Query() query: ReportListQueryDto,
+  ) {
     return this.reportsService.findAll(session.tenantId, query);
   }
 
   @Get(':id')
   @ApiOperation({
     summary: 'Get a report by ID',
-    description: 'Returns the full details of a single report identified by its UUID.',
+    description:
+      'Returns the full details of a single report identified by its UUID.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the report', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the report',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiResponse({ status: 200, description: 'Report found.', type: ReportDto })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Report not found.' })
-  findOne(@GetSession() session: AdminSession, @Param() params: ReportParamsDto) {
+  findOne(
+    @GetSession() session: AdminSession,
+    @Param() params: ReportParamsDto,
+  ) {
     return this.reportsService.findOne(params.id, session.tenantId);
   }
 
   @Patch(':id/status')
   @ApiOperation({
     summary: 'Update report status (admin)',
-    description: 'Updates the resolution status of a report. Valid transitions: PENDING → RESOLVED or DISMISSED.',
+    description:
+      'Updates the resolution status of a report. Valid transitions: PENDING → RESOLVED or DISMISSED.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the report to update', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the report to update',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiBody({ type: AdminUpdateReportDto })
   @ApiResponse({
     status: 200,
     description: 'Report status updated successfully.',
     type: ReportDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Report not found.' })
   async updateStatus(
     @Param('id') id: string,
@@ -127,7 +170,12 @@ export class AdminReportsController {
       select: { status: true, targetType: true, targetId: true },
     });
 
-    const report = await this.reportsService.updateStatus(id, session.tenantId, dto as any, session.externalId);
+    const report = await this.reportsService.updateStatus(
+      id,
+      session.tenantId,
+      dto as any,
+      session.externalId,
+    );
 
     await this.auditLogger.log({
       tenantId: session.tenantId,

@@ -1,10 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { UpsertUserDto } from '@/modules/users/dto/upsert-user.dto';
 import { PaginatedResult, paginate } from '@/common/pagination';
 import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
-import { UserRole, UserStatus } from '@prisma/client';
+import { UserStatus } from '@prisma/client';
+import { SYSTEM_REPORTER_ID } from '@/modules/users/users.constants';
+
+/** The system reporter is internal: not listed, not editable, not deletable. */
+const NOT_SYSTEM = { externalId: { not: SYSTEM_REPORTER_ID } };
+function assertNotSystem(externalId: string): void {
+  if (externalId === SYSTEM_REPORTER_ID) {
+    throw new BadRequestException(
+      `externalId riservato: ${SYSTEM_REPORTER_ID}`,
+    );
+  }
+}
 
 @Injectable()
 export class UsersService {
@@ -59,7 +74,10 @@ export class UsersService {
   ): Promise<PaginatedResult<UserListItemDto>> {
     const where: Parameters<typeof this.prisma.user.findMany>[0]['where'] = {
       tenantId,
-      ...(query.username ? { username: { contains: query.username, mode: 'insensitive' } } : {}),
+      ...NOT_SYSTEM,
+      ...(query.username
+        ? { username: { contains: query.username, mode: 'insensitive' } }
+        : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.role ? { role: query.role } : {}),
     };
@@ -84,7 +102,7 @@ export class UsersService {
 
   async findOne(tenantId: string, id: string): Promise<UserListItemDto> {
     const user = await this.prisma.user.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId, ...NOT_SYSTEM },
       select: this.userListSelect,
     });
 
@@ -96,6 +114,7 @@ export class UsersService {
   }
 
   async upsert(tenantId: string, dto: UpsertUserDto) {
+    assertNotSystem(dto.externalId);
     const updateData: {
       username?: string;
       language?: string;
@@ -124,8 +143,14 @@ export class UsersService {
     });
   }
 
-  async updateStatus(tenantId: string, id: string, status: UserStatus): Promise<UserListItemDto> {
-    const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
+  async updateStatus(
+    tenantId: string,
+    id: string,
+    status: UserStatus,
+  ): Promise<UserListItemDto> {
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId, ...NOT_SYSTEM },
+    });
     if (!user) throw new NotFoundException('Utente non trovato');
 
     const updated = await this.prisma.user.update({
@@ -137,27 +162,20 @@ export class UsersService {
     return this.mapUserListItem(updated);
   }
 
-  async updateRole(tenantId: string, id: string, role: UserRole): Promise<UserListItemDto> {
-    const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
-    if (!user) throw new NotFoundException('Utente non trovato');
-
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: { role },
-      select: this.userListSelect,
-    });
-
-    return this.mapUserListItem(updated);
-  }
-
   async deleteById(tenantId: string, id: string): Promise<void> {
-    const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
+    const user = await this.prisma.user.findFirst({
+      where: { id, tenantId, ...NOT_SYSTEM },
+    });
     if (!user) throw new NotFoundException('Utente non trovato');
 
     await this.prisma.user.delete({ where: { id } });
   }
 
-  async deleteByExternalId(tenantId: string, externalId: string): Promise<void> {
+  async deleteByExternalId(
+    tenantId: string,
+    externalId: string,
+  ): Promise<void> {
+    assertNotSystem(externalId);
     const result = await this.prisma.user.deleteMany({
       where: {
         tenantId,
@@ -170,4 +188,3 @@ export class UsersService {
     }
   }
 }
-

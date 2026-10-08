@@ -21,12 +21,15 @@ import { UsersService } from '@/modules/users/users.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  SUPER_ADMIN_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
 import { UserParamsDto } from '@/modules/users/dto/user-params.dto';
 import { UpdateUserStatusDto } from '@/modules/users/dto/update-user-status.dto';
-import { UpdateUserRoleDto } from '@/modules/users/dto/update-user-role.dto';
 import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
@@ -35,6 +38,7 @@ import { AuditAction, AuditResourceType } from '@prisma/client';
 @ApiBearerAuth()
 @Controller('admin/users')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(SUPER_ADMIN_ROLES)
 export class AdminUsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -99,39 +103,6 @@ export class AdminUsersController {
       changesBefore: { status: before.status },
       changesAfter: { status: updated.status },
       changeSummary: `User status changed: ${before.status} → ${updated.status}`,
-    });
-
-    return updated;
-  }
-
-  @Patch(':id/role')
-  @ApiOperation({
-    summary: 'Update user role',
-    description: 'Assigns a new role to a user within the tenant.',
-  })
-  @ApiParam({ name: 'id', description: 'Internal UUID of the user' })
-  @ApiResponse({ status: 200, description: 'User role updated.', type: UserListItemDto })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  @ApiResponse({ status: 404, description: 'User not found.' })
-  async updateRole(
-    @GetSession() session: AdminSession,
-    @Param() params: UserParamsDto,
-    @Body() dto: UpdateUserRoleDto,
-  ): Promise<UserListItemDto> {
-    const before = await this.usersService.findOne(session.tenantId, params.id);
-    const updated = await this.usersService.updateRole(session.tenantId, params.id, dto.role);
-
-    await this.auditLogger.log({
-      tenantId: session.tenantId,
-      actorUserId: session.externalId,
-      actorRole: session.userRole,
-      action: AuditAction.USER_UPDATED_ROLE,
-      resourceType: AuditResourceType.USER,
-      resourceId: updated.id,
-      resourceName: updated.username ?? updated.externalId,
-      changesBefore: { role: before.role },
-      changesAfter: { role: updated.role },
-      changeSummary: `User role changed: ${before.role} → ${updated.role}`,
     });
 
     return updated;

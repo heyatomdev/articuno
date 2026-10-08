@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   ArticleBaseDto,
-  ArticleTranslationDto,
+  ArticleCategorySummaryDto,
+  ArticleTagSummaryDto,
+  ArticleTranslationSummaryDto,
 } from '@/modules/articles/dto/article-response.dto';
-import { CategoryDto } from '@/modules/categories/dto/category.dto';
-import { TagDto } from '@/modules/tags/dto/tags.dto';
 
 export class BookmarkToggleResultDto {
   @ApiProperty({
@@ -13,12 +13,13 @@ export class BookmarkToggleResultDto {
   bookmarked: boolean;
 }
 
-/** The bookmarked article: row, full category, full tags, all translations. */
+/** The bookmarked (PUBLISHED) article: row, category, tags, translation summaries (no body). */
 export class BookmarkedArticleDto extends ArticleBaseDto {
-  @ApiProperty({ type: CategoryDto }) category: CategoryDto;
-  @ApiProperty({ type: [TagDto] }) tags: TagDto[];
-  @ApiProperty({ type: [ArticleTranslationDto] })
-  translations: ArticleTranslationDto[];
+  @ApiProperty({ type: ArticleCategorySummaryDto })
+  category: ArticleCategorySummaryDto;
+  @ApiProperty({ type: [ArticleTagSummaryDto] }) tags: ArticleTagSummaryDto[];
+  @ApiProperty({ type: [ArticleTranslationSummaryDto] })
+  translations: ArticleTranslationSummaryDto[];
 }
 
 export class BookmarkListItemDto {

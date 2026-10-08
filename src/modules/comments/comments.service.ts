@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -7,10 +8,16 @@ import { PrismaService } from '@/modules/prisma/prisma.service';
 import { CreateCommentDto } from '@/modules/comments/dto/create-comment.dto';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
-import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
+import {
+  isValidModerationTransition,
+  ModerationPolicyService,
+} from '@/modules/moderation/moderation-policy.service';
+import { AutoModerationReasonEnum } from '@/modules/moderation/moderation.types';
+import { stripTags } from '@/utils/html-sanitizer';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
-import { ContentStatus, TargetType } from '@prisma/client';
+import { ContentStatus, Prisma, TargetType } from '@prisma/client';
 import { PaginatedResult, paginate } from '@/common/pagination';
+import { SYSTEM_REPORTER_ID } from '@/modules/users/users.constants';
 
 @Injectable()
 export class CommentsService {
@@ -36,51 +43,54 @@ export class CommentsService {
     }
   }
 
-  private async ensureUser(tenantId: string, externalUserId: string) {
-    return this.prisma.user.upsert({
-      where: {
-        externalId_tenantId: {
-          externalId: externalUserId,
-          tenantId,
-        },
-      },
-      update: {},
-      create: {
-        externalId: externalUserId,
-        tenantId,
-      },
-      select: {
-        id: true,
-        externalId: true,
-      },
-    });
+  /** Comments are plain text: no tags, and not empty once they are gone. */
+  private cleanContent(raw: string): string {
+    const content = stripTags(raw).trim();
+    if (!content) {
+      throw new BadRequestException('Il commento è vuoto');
+    }
+    return content;
   }
 
   /**
-   * Crea un report automatico di sistema per banned words
+   * Report automatico di sistema per banned words, nella transazione del
+   * commento. `Report.reporterId` è una FK su users(externalId, tenantId):
+   * il reporter di sistema è un User per tenant, creato al primo uso.
    */
   private async createSystemReport(
+    tx: Prisma.TransactionClient,
     tenantId: string,
     commentId: string,
-    authorExternalId: string,
     reason: string,
-  ): Promise<string> {
-    const report = await this.prisma.report.create({
+  ): Promise<void> {
+    await tx.user.upsert({
+      where: {
+        externalId_tenantId: { externalId: SYSTEM_REPORTER_ID, tenantId },
+      },
+      update: {},
+      create: {
+        externalId: SYSTEM_REPORTER_ID,
+        tenantId,
+        username: 'Articuno (sistema)',
+      },
+      select: { id: true },
+    });
+    await tx.report.create({
       data: {
         targetType: TargetType.COMMENT,
         targetId: commentId,
-        reason: reason || 'BANNED_WORD_DETECTED',
+        reason: reason || AutoModerationReasonEnum.BANNED_WORD_DETECTED,
         description: 'Sistema automatico',
-        reporterId: 'system', // Reporter di sistema
+        reporterId: SYSTEM_REPORTER_ID,
         tenantId,
       },
     });
-    return report.id;
   }
 
   async create(tenantId: string, dto: CreateCommentDto) {
+    const content = this.cleanContent(dto.content);
     await this.ensureArticleExists(tenantId, dto.articleId);
-    const user = await this.ensureUser(tenantId, dto.authorExternalId);
+    const user = await this.prisma.ensureUser(tenantId, dto.authorExternalId);
 
     // 1. Check stato utente (BANNED -> 403, SHADOW_BANNED -> auto-hide)
     const userCheck = await this.moderationPolicy.checkUserModeration(
@@ -96,34 +106,35 @@ export class CommentsService {
     const modPolicy = await this.moderationPolicy.applyCreationPolicy({
       tenantId,
       targetId: '', // Non necessar io qui, usato per audit
-      content: dto.content,
+      content,
       authorExternalId: dto.authorExternalId,
     });
 
-    // Se banned words rilevati, crea un report automatico di sistema
-    let systemReportId: string | null = null;
-    if (modPolicy.shouldCreateSystemReport) {
-      systemReportId = await this.createSystemReport(
-        tenantId,
-        dto.articleId,
-        dto.authorExternalId,
-        modPolicy.reason,
-      );
-    }
-
-    // 3. Crea commento con status determinato dalla policy
-    const comment = await this.prisma.comment.create({
-      data: {
-        tenantId,
-        articleId: dto.articleId,
-        authorId: user.id,
-        content: dto.content,
-        status: modPolicy.finalStatus,
-        reportCount: 0,
-      },
-      include: {
-        author: true,
-      },
+    // 3. Crea commento con status determinato dalla policy e, se banned words,
+    // il report di sistema che punta al commento appena creato
+    const comment = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.comment.create({
+        data: {
+          tenantId,
+          articleId: dto.articleId,
+          authorId: user.id,
+          content,
+          status: modPolicy.finalStatus,
+          reportCount: 0,
+        },
+        include: {
+          author: true,
+        },
+      });
+      if (modPolicy.shouldCreateSystemReport) {
+        await this.createSystemReport(
+          tx,
+          tenantId,
+          created.id,
+          modPolicy.reason,
+        );
+      }
+      return created;
     });
 
     // 4. Se auto-moderato, pubblica webhook
@@ -139,7 +150,6 @@ export class CommentsService {
 
     return comment;
   }
-
 
   /**
    * Strips the `content` field from comments that are not yet publicly visible,
@@ -182,7 +192,7 @@ export class CommentsService {
             select: {
               id: true,
               name: true,
-            }
+            },
           },
           author: {
             select: {
@@ -192,21 +202,26 @@ export class CommentsService {
               createdAt: true,
               username: true,
               avatarUrl: true,
-            }
-          }
+            },
+          },
         },
       }),
       this.prisma.comment.count({ where }),
     ]);
 
     return paginate(
-      items.map((c) => skipSanitize ? c : this.sanitizeForPublicApi(c)),
+      items.map((c) => (skipSanitize ? c : this.sanitizeForPublicApi(c))),
       total,
       query,
     );
   }
 
-  async findOne(tenantId: string, id: string, statusFilter?: ContentStatus | ContentStatus[], skipSanitize = false) {
+  async findOne(
+    tenantId: string,
+    id: string,
+    statusFilter?: ContentStatus | ContentStatus[],
+    skipSanitize = false,
+  ) {
     const statusCondition = statusFilter
       ? Array.isArray(statusFilter)
         ? { in: statusFilter }
@@ -232,17 +247,72 @@ export class CommentsService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateCommentDto) {
-    await this.findOne(tenantId, id);
-
-    return this.prisma.comment.update({
-      where: {
-        id,
-      },
-      data: dto,
-      include: {
-        author: true,
-      },
+    const current = await this.prisma.comment.findFirst({
+      where: { id, tenantId },
+      select: { status: true, author: { select: { externalId: true } } },
     });
+    if (!current) {
+      throw new NotFoundException('Commento non trovato');
+    }
+
+    if (
+      dto.status &&
+      !isValidModerationTransition(current.status, dto.status)
+    ) {
+      throw new BadRequestException(
+        `Transizione di stato non consentita: ${current.status} → ${dto.status}`,
+      );
+    }
+
+    const data: Prisma.CommentUpdateInput = { status: dto.status };
+    let autoHidden = false;
+
+    if (dto.content !== undefined) {
+      const content = this.cleanContent(dto.content);
+      data.content = content;
+      // Same rule as creation: banned words hide the comment, unless a
+      // moderator is setting the status explicitly in this same request.
+      if (
+        !dto.status &&
+        current.status !== ContentStatus.HIDDEN &&
+        isValidModerationTransition(current.status, ContentStatus.HIDDEN) &&
+        (await this.moderationPolicy.checkBannedWords(tenantId, content))
+      ) {
+        data.status = ContentStatus.HIDDEN;
+        autoHidden = true;
+      }
+    }
+
+    const comment = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.comment.update({
+        where: { id, tenantId },
+        data,
+        include: {
+          author: true,
+        },
+      });
+      if (autoHidden) {
+        await this.createSystemReport(
+          tx,
+          tenantId,
+          updated.id,
+          AutoModerationReasonEnum.BANNED_WORD_DETECTED,
+        );
+      }
+      return updated;
+    });
+
+    if (autoHidden) {
+      await this.webhookPublisher.publishCommentModerationEvent(
+        tenantId,
+        comment.id,
+        current.author.externalId,
+        ContentStatus.HIDDEN,
+        AutoModerationReasonEnum.BANNED_WORD_DETECTED,
+      );
+    }
+
+    return comment;
   }
 
   async remove(tenantId: string, id: string): Promise<void> {
@@ -258,4 +328,3 @@ export class CommentsService {
     }
   }
 }
-
