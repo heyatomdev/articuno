@@ -22,8 +22,8 @@ import {
 import { ArticlesService } from '@/modules/articles/articles.service';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
-import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
-import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
+import { PublicCreateArticleDto } from '@/modules/articles/dto/create-article.dto';
+import { PublicUpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
 import {
   ArticleParamsDto,
   ArticleSlugParamsDto,
@@ -47,10 +47,11 @@ export class ArticlesController {
   @ApiOperation({
     summary: 'Create an article',
     description:
-      'Creates a new article for the current tenant. You may optionally include translations inline. ' +
+      'Creates a new DRAFT article for the current tenant. You may optionally include translations inline. ' +
+      'Status cannot be set here: publishing goes through /admin/articles. ' +
       'Content is automatically checked for banned words; matching content will be created with a HIDDEN status.',
   })
-  @ApiBody({ type: CreateArticleDto })
+  @ApiBody({ type: PublicCreateArticleDto })
   @ApiResponse({
     status: 201,
     description: 'Article created successfully.',
@@ -58,7 +59,7 @@ export class ArticlesController {
   })
   @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  create(@GetTenant() tenant: any, @Body() dto: CreateArticleDto) {
+  create(@GetTenant() tenant: any, @Body() dto: PublicCreateArticleDto) {
     return this.articlesService.create(tenant.id, dto);
   }
 
@@ -97,10 +98,10 @@ export class ArticlesController {
     summary: 'Update an article',
     description:
       'Partially updates an article. Only provided fields are changed. ' +
-      'Status changes are validated against the content status state machine.',
+      'Status cannot be changed here: moderation goes through /admin/articles.',
   })
   @ApiParam({ name: 'id', description: 'UUID of the article to update', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiBody({ type: UpdateArticleDto })
+  @ApiBody({ type: PublicUpdateArticleDto })
   @ApiResponse({
     status: 200,
     description: 'Article updated successfully.',
@@ -112,7 +113,7 @@ export class ArticlesController {
   update(
     @GetTenant() tenant: any,
     @Param() params: ArticleParamsDto,
-    @Body() dto: UpdateArticleDto,
+    @Body() dto: PublicUpdateArticleDto,
   ) {
     return this.articlesService.update(tenant.id, params.id, dto);
   }

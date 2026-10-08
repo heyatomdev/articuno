@@ -79,7 +79,7 @@ export class AdminCommentsController {
   @Patch(':id')
   @ApiOperation({
     summary: 'Update a comment (admin)',
-    description: 'Partially updates a comment (e.g. content or status). All statuses can be set by admins.',
+    description: 'Partially updates a comment (e.g. content or status). Status changes must be valid transitions (BANNED is terminal); new content is stripped of tags and checked for banned words.',
   })
   @ApiParam({ name: 'id', description: 'UUID of the comment to update', example: '123e4567-e89b-12d3-a456-426614174000' })
   @ApiBody({ type: UpdateCommentDto })

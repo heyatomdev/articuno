@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { ContentStatus } from '@prisma/client';
 
 const ARTICLE_STATUSES: ContentStatus[] = [
@@ -88,3 +88,10 @@ export class UpdateArticleDto {
   @IsString()
   moderatorId?: string;
 }
+
+/** Public API (`PATCH /articles/:id`): status and moderation fields are admin only. */
+export class PublicUpdateArticleDto extends OmitType(UpdateArticleDto, [
+  'status',
+  'moderationReason',
+  'moderatorId',
+] as const) {}

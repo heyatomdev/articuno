@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -7,9 +8,14 @@ import { PrismaService } from '@/modules/prisma/prisma.service';
 import { CreateCommentDto } from '@/modules/comments/dto/create-comment.dto';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
-import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
+import {
+  isValidModerationTransition,
+  ModerationPolicyService,
+} from '@/modules/moderation/moderation-policy.service';
+import { AutoModerationReasonEnum } from '@/modules/moderation/moderation.types';
+import { stripTags } from '@/utils/html-sanitizer';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
-import { ContentStatus, TargetType } from '@prisma/client';
+import { ContentStatus, Prisma, TargetType } from '@prisma/client';
 import { PaginatedResult, paginate } from '@/common/pagination';
 
 @Injectable()
@@ -36,6 +42,15 @@ export class CommentsService {
     }
   }
 
+  /** Comments are plain text: no tags, and not empty once they are gone. */
+  private cleanContent(raw: string): string {
+    const content = stripTags(raw).trim();
+    if (!content) {
+      throw new BadRequestException('Il commento è vuoto');
+    }
+    return content;
+  }
+
   /**
    * Crea un report automatico di sistema per banned words
    */
@@ -59,6 +74,7 @@ export class CommentsService {
   }
 
   async create(tenantId: string, dto: CreateCommentDto) {
+    const content = this.cleanContent(dto.content);
     await this.ensureArticleExists(tenantId, dto.articleId);
     const user = await this.prisma.ensureUser(tenantId, dto.authorExternalId);
 
@@ -76,7 +92,7 @@ export class CommentsService {
     const modPolicy = await this.moderationPolicy.applyCreationPolicy({
       tenantId,
       targetId: '', // Non necessar io qui, usato per audit
-      content: dto.content,
+      content,
       authorExternalId: dto.authorExternalId,
     });
 
@@ -97,7 +113,7 @@ export class CommentsService {
         tenantId,
         articleId: dto.articleId,
         authorId: user.id,
-        content: dto.content,
+        content,
         status: modPolicy.finalStatus,
         reportCount: 0,
       },
@@ -212,17 +228,58 @@ export class CommentsService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateCommentDto) {
-    await this.findOne(tenantId, id);
+    const current = await this.prisma.comment.findFirst({
+      where: { id, tenantId },
+      select: { status: true, author: { select: { externalId: true } } },
+    });
+    if (!current) {
+      throw new NotFoundException('Commento non trovato');
+    }
 
-    return this.prisma.comment.update({
-      where: {
-        id,
-      },
-      data: dto,
+    if (dto.status && !isValidModerationTransition(current.status, dto.status)) {
+      throw new BadRequestException(
+        `Transizione di stato non consentita: ${current.status} → ${dto.status}`,
+      );
+    }
+
+    const data: Prisma.CommentUpdateInput = { status: dto.status };
+    let autoHidden = false;
+
+    if (dto.content !== undefined) {
+      const content = this.cleanContent(dto.content);
+      data.content = content;
+      // Same rule as creation: banned words hide the comment, unless a
+      // moderator is setting the status explicitly in this same request.
+      if (
+        !dto.status &&
+        current.status !== ContentStatus.HIDDEN &&
+        isValidModerationTransition(current.status, ContentStatus.HIDDEN) &&
+        (await this.moderationPolicy.checkBannedWords(tenantId, content))
+      ) {
+        data.status = ContentStatus.HIDDEN;
+        autoHidden = true;
+      }
+    }
+
+    const comment = await this.prisma.comment.update({
+      where: { id, tenantId },
+      data,
       include: {
         author: true,
       },
     });
+
+    if (autoHidden) {
+      await this.webhookPublisher.publishCommentModerationEvent(
+        tenantId,
+        comment.id,
+        current.author.externalId,
+        ContentStatus.HIDDEN,
+        AutoModerationReasonEnum.BANNED_WORD_DETECTED,
+      );
+    }
+
+    return comment;
   }
 
   async remove(tenantId: string, id: string): Promise<void> {

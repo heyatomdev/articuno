@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service';
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
@@ -12,6 +12,7 @@ import { slugifySafe } from '@/utils/slugify';
 import { generateRandomName } from '@/utils/random-name';
 import { PaginatedResult, paginate } from '@/common/pagination';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
+import { isValidModerationTransition } from '@/modules/moderation/moderation-policy.service';
 
 @Injectable()
 export class ArticlesService {
@@ -324,6 +325,12 @@ export class ArticlesService {
 
   async update(tenantId: string, id: string, dto: UpdateArticleDto) {
     const currentArticle = await this.ensureArticleExists(tenantId, id);
+
+    if (dto.status && !isValidModerationTransition(currentArticle.status, dto.status)) {
+      throw new BadRequestException(
+        `Transizione di stato non consentita: ${currentArticle.status} → ${dto.status}`,
+      );
+    }
 
     if (dto.categoryId) {
       await this.ensureCategoryExists(tenantId, dto.categoryId);

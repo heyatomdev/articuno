@@ -8,7 +8,7 @@ import {
   IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { ContentStatus } from '@prisma/client';
 
@@ -87,3 +87,11 @@ export class CreateArticleDto {
   @Type(() => CreateArticleTranslationDto)
   translations?: CreateArticleTranslationDto[];
 }
+
+/**
+ * Public API (`POST /articles`): no `status`, articles start as DRAFT.
+ * Publishing is an editorial decision, admin only (`/admin/articles`).
+ */
+export class PublicCreateArticleDto extends OmitType(CreateArticleDto, [
+  'status',
+] as const) {}

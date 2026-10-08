@@ -58,3 +58,12 @@ export function sanitizeContent(html: string): string {
     enforceHtmlBoundary: false,
   });
 }
+
+/**
+ * Plain-text fields (comments, titles, meta): drops every tag and keeps the
+ * text. The result is HTML-escaped (`&` → `&amp;`, `<` → `&lt;`), so it is safe
+ * to inject as HTML; render it as text and the entities show.
+ */
+export function stripTags(text: string): string {
+  return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
+}
