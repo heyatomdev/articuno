@@ -75,6 +75,25 @@ const COVER_UPLOAD = {
   limits: { fileSize: FileHarborService.MAX_IMAGE_SIZE, files: 1 },
 };
 
+/**
+ * Moving an article into, or out of, a moderation status is a moderator's
+ * call: an AUTHOR cannot hide an article, nor republish one a moderator hid.
+ * `from` is undefined on create.
+ */
+export function canSetArticleStatus(
+  role: string,
+  to?: ContentStatus,
+  from?: ContentStatus,
+): boolean {
+  if (!to || to === from) return true;
+  const touchesModeration =
+    MODERATION_STATUSES.includes(to) ||
+    (from !== undefined && MODERATION_STATUSES.includes(from));
+  return (
+    !touchesModeration || (MODERATION_ROLES as readonly string[]).includes(role)
+  );
+}
+
 @ApiTags('Admin / Articles')
 @ApiBearerAuth()
 @Controller('admin/articles')
@@ -93,26 +112,35 @@ export class AdminArticlesController {
    * Recupera la configurazione FileHarbor del tenant.
    * Lancia BadRequestException se non configurata.
    */
-  private async getFileHarborConfig(tenantId: string): Promise<FileHarborConfig> {
+  private async getFileHarborConfig(
+    tenantId: string,
+  ): Promise<FileHarborConfig> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { fileharborEndpoint: true, fileharborApiKey: true },
     });
 
     if (!tenant?.fileharborEndpoint || !tenant?.fileharborApiKey) {
-      throw new BadRequestException('FileHarbor non configurato per questo tenant');
+      throw new BadRequestException(
+        'FileHarbor non configurato per questo tenant',
+      );
     }
 
-    return { endpoint: tenant.fileharborEndpoint, apiKey: tenant.fileharborApiKey };
+    return {
+      endpoint: tenant.fileharborEndpoint,
+      apiKey: tenant.fileharborApiKey,
+    };
   }
 
-  private assertCanSetStatus(session: AdminSession, status?: ContentStatus) {
-    if (
-      status &&
-      MODERATION_STATUSES.includes(status) &&
-      !(MODERATION_ROLES as readonly string[]).includes(session.userRole)
-    ) {
-      throw new ForbiddenException(`Ruolo non autorizzato a impostare lo stato ${status}`);
+  private assertCanSetStatus(
+    session: AdminSession,
+    to?: ContentStatus,
+    from?: ContentStatus,
+  ) {
+    if (!canSetArticleStatus(session.userRole, to, from)) {
+      throw new ForbiddenException(
+        `Ruolo non autorizzato a impostare lo stato ${to}`,
+      );
     }
   }
 
@@ -131,7 +159,10 @@ export class AdminArticlesController {
     }
 
     const dto = plainToInstance(cls, parsed);
-    const errors = await validate(dto as object, { whitelist: true, forbidNonWhitelisted: true });
+    const errors = await validate(dto as object, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
     if (errors.length > 0) {
       const messages = errors
         .map((e) => Object.values(e.constraints ?? {}).join(', '))
@@ -154,16 +185,26 @@ export class AdminArticlesController {
     description:
       'Creates a new article for the session tenant. ' +
       'Accepts either `application/json` (plain body) or `multipart/form-data` (JSON in the `data` field + optional `coverImage` file). ' +
-      'Uploaded images are stored in the tenant\'s FileHarbor instance (JPEG/PNG/GIF/WebP, max 10 MB).',
+      "Uploaded images are stored in the tenant's FileHarbor instance (JPEG/PNG/GIF/WebP, max 10 MB).",
   })
   @ApiConsumes('multipart/form-data', 'application/json')
   @ApiBody({
-    description: 'Article data. When using multipart/form-data, serialize the article JSON in the `data` field and optionally attach a `coverImage` file.',
+    description:
+      'Article data. When using multipart/form-data, serialize the article JSON in the `data` field and optionally attach a `coverImage` file.',
     schema: {
       type: 'object',
       properties: {
-        data: { type: 'string', description: 'JSON-serialized CreateArticleDto', example: '{"categoryId":"uuid","translations":[{"languageCode":"en","title":"Hello","content":"...","excerpt":"..."}]}' },
-        coverImage: { type: 'string', format: 'binary', description: 'Cover image file (JPEG/PNG/GIF/WebP, max 10 MB)' },
+        data: {
+          type: 'string',
+          description: 'JSON-serialized CreateArticleDto',
+          example:
+            '{"categoryId":"uuid","translations":[{"languageCode":"en","title":"Hello","content":"...","excerpt":"..."}]}',
+        },
+        coverImage: {
+          type: 'string',
+          format: 'binary',
+          description: 'Cover image file (JPEG/PNG/GIF/WebP, max 10 MB)',
+        },
       },
     },
   })
@@ -172,15 +213,24 @@ export class AdminArticlesController {
     description: 'Article created successfully.',
     type: ArticleDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error, invalid JSON in `data` field, or FileHarbor not configured.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Validation error, invalid JSON in `data` field, or FileHarbor not configured.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   async create(
     @GetSession() session: AdminSession,
     @Body('data') rawData: string,
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const payload = rawData ?? (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
+    const payload =
+      rawData ??
+      (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
     const dto = await this.parseAndValidateDto(CreateArticleDto, payload);
     this.assertCanSetStatus(session, dto.status);
 
@@ -214,10 +264,14 @@ export class AdminArticlesController {
   @Get()
   @ApiOperation({
     summary: 'List articles',
-    description: 'Returns a paginated list of articles for the session tenant. Supports filtering by status, category, tag, and featured flag.',
+    description:
+      'Returns a paginated list of articles for the session tenant. Supports filtering by status, category, tag, and featured flag.',
   })
   @ApiPaginatedResponse(ArticleListItemDto, 'Paginated list of articles.')
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   findAll(
     @GetSession() session: AdminSession,
     @Query() query: ArticleFiltersQueryDto,
@@ -232,9 +286,16 @@ export class AdminArticlesController {
       'Returns a single article, including all translations. The key is either the article UUID ' +
       'or the slug of any of its translations (slugs are unique per tenant).',
   })
-  @ApiParam({ name: 'key', description: 'UUID of the article, or a translation slug', example: 'getting-started-with-nestjs' })
+  @ApiParam({
+    name: 'key',
+    description: 'UUID of the article, or a translation slug',
+    example: 'getting-started-with-nestjs',
+  })
   @ApiResponse({ status: 200, description: 'Article found.', type: ArticleDto })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   findOne(
     @GetSession() session: AdminSession,
@@ -262,14 +323,27 @@ export class AdminArticlesController {
       'When a new image is uploaded the previous cover is automatically deleted from FileHarbor.',
   })
   @ApiConsumes('multipart/form-data', 'application/json')
-  @ApiParam({ name: 'id', description: 'UUID of the article to update', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article to update',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiBody({
-    description: 'Updated article data. When using multipart/form-data, serialize the update JSON in the `data` field and optionally attach a new `coverImage` file.',
+    description:
+      'Updated article data. When using multipart/form-data, serialize the update JSON in the `data` field and optionally attach a new `coverImage` file.',
     schema: {
       type: 'object',
       properties: {
-        data: { type: 'string', description: 'JSON-serialized UpdateArticleDto', example: '{"status":"PUBLISHED","featured":true}' },
-        coverImage: { type: 'string', format: 'binary', description: 'New cover image file (JPEG/PNG/GIF/WebP, max 10 MB)' },
+        data: {
+          type: 'string',
+          description: 'JSON-serialized UpdateArticleDto',
+          example: '{"status":"PUBLISHED","featured":true}',
+        },
+        coverImage: {
+          type: 'string',
+          format: 'binary',
+          description: 'New cover image file (JPEG/PNG/GIF/WebP, max 10 MB)',
+        },
       },
     },
   })
@@ -278,8 +352,15 @@ export class AdminArticlesController {
     description: 'Article updated successfully.',
     type: ArticleDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error, invalid JSON in `data` field, or invalid status transition.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Validation error, invalid JSON in `data` field, or invalid status transition.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   async update(
     @GetSession() session: AdminSession,
@@ -288,15 +369,16 @@ export class AdminArticlesController {
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const payload = rawData ?? (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
+    const payload =
+      rawData ??
+      (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
     const dto = await this.parseAndValidateDto(UpdateArticleDto, payload);
-    this.assertCanSetStatus(session, dto.status);
-
     // Fetch current state before update for audit comparison
     const before = await this.prisma.article.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
       select: { status: true, coverImage: true, featured: true },
     });
+    this.assertCanSetStatus(session, dto.status, before?.status);
 
     if (file) {
       const config = await this.getFileHarborConfig(session.tenantId);
@@ -316,15 +398,22 @@ export class AdminArticlesController {
       if (imageUrl) dto.coverImage = imageUrl;
     }
 
-    const article = await this.articlesService.update(session.tenantId, params.id, dto);
+    const article = await this.articlesService.update(
+      session.tenantId,
+      params.id,
+      dto,
+    );
 
-    const statusChanged = dto.status && before?.status && dto.status !== before.status;
+    const statusChanged =
+      dto.status && before?.status && dto.status !== before.status;
 
     await this.auditLogger.log({
       tenantId: session.tenantId,
       actorUserId: session.externalId,
       actorRole: session.userRole,
-      action: statusChanged ? AuditAction.ARTICLE_STATUS_CHANGED : AuditAction.ARTICLE_UPDATED,
+      action: statusChanged
+        ? AuditAction.ARTICLE_STATUS_CHANGED
+        : AuditAction.ARTICLE_UPDATED,
       resourceType: AuditResourceType.ARTICLE,
       resourceId: article.id,
       resourceName: article.translations?.[0]?.title,
@@ -343,11 +432,22 @@ export class AdminArticlesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete an article',
-    description: 'Permanently deletes an article and all its translations. The cover image is also removed from FileHarbor if present.',
+    description:
+      'Permanently deletes an article and all its translations. The cover image is also removed from FileHarbor if present.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article to delete', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 204, description: 'Article deleted successfully – no content returned.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article to delete',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Article deleted successfully – no content returned.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   async remove(
     @GetSession() session: AdminSession,
@@ -358,14 +458,20 @@ export class AdminArticlesController {
       select: {
         coverImage: true,
         status: true,
-        translations: { select: { title: true }, orderBy: { languageCode: 'asc' as const } },
+        translations: {
+          select: { title: true },
+          orderBy: { languageCode: 'asc' as const },
+        },
       },
     });
 
     if (existing?.coverImage) {
       try {
         const config = await this.getFileHarborConfig(session.tenantId);
-        await this.fileHarborService.deleteImageSafely(existing.coverImage, config);
+        await this.fileHarborService.deleteImageSafely(
+          existing.coverImage,
+          config,
+        );
       } catch {
         // FileHarbor non configurato o cancellazione fallita: si procede comunque
       }
@@ -388,25 +494,43 @@ export class AdminArticlesController {
   @Post(':id/translations')
   @ApiOperation({
     summary: 'Add a translation',
-    description: 'Creates a new translation for an existing article. Each language code must be unique per article.',
+    description:
+      'Creates a new translation for an existing article. Each language code must be unique per article.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiBody({ type: CreateArticleTranslationDto })
   @ApiResponse({
     status: 201,
     description: 'Translation created successfully.',
     type: ArticleTranslationDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  @ApiResponse({ status: 409, description: 'A translation for this language code already exists.' })
+  @ApiResponse({
+    status: 409,
+    description: 'A translation for this language code already exists.',
+  })
   async createTranslation(
     @GetSession() session: AdminSession,
     @Param() params: ArticleParamsDto,
     @Body() dto: CreateArticleTranslationDto,
   ) {
-    const translation = await this.articleTranslationsService.create(session.tenantId, params.id, dto);
+    const translation = await this.articleTranslationsService.create(
+      session.tenantId,
+      params.id,
+      dto,
+    );
 
     await this.auditLogger.log({
       tenantId: session.tenantId,
@@ -425,15 +549,23 @@ export class AdminArticlesController {
   @Get(':id/translations')
   @ApiOperation({
     summary: 'List translations',
-    description: 'Returns all translations for an article, ordered by language code.',
+    description:
+      'Returns all translations for an article, ordered by language code.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of translations.',
     type: [ArticleTranslationSummaryDto],
   })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   findTranslations(
     @GetSession() session: AdminSession,
@@ -445,16 +577,28 @@ export class AdminArticlesController {
   @Get(':id/translations/:languageCode')
   @ApiOperation({
     summary: 'Get a translation by language',
-    description: 'Returns a single translation for the given article and BCP 47 language code.',
+    description:
+      'Returns a single translation for the given article and BCP 47 language code.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code', example: 'en' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiParam({
+    name: 'languageCode',
+    description: 'BCP 47 language code',
+    example: 'en',
+  })
   @ApiResponse({
     status: 200,
     description: 'Translation found.',
     type: ArticleTranslationDto,
   })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Translation not found.' })
   findTranslation(
     @GetSession() session: AdminSession,
@@ -470,19 +614,37 @@ export class AdminArticlesController {
   @Patch(':id/translations/:languageCode')
   @ApiOperation({
     summary: 'Update a translation',
-    description: 'Partially updates an existing article translation. Only provided fields are changed.',
+    description:
+      'Partially updates an existing article translation. Only provided fields are changed.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code of the translation to update', example: 'en' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiParam({
+    name: 'languageCode',
+    description: 'BCP 47 language code of the translation to update',
+    example: 'en',
+  })
   @ApiBody({ type: UpdateArticleTranslationDto })
   @ApiResponse({
     status: 200,
     description: 'Translation updated successfully.',
     type: ArticleTranslationDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  @ApiResponse({ status: 404, description: 'Article or translation not found.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Article or translation not found.',
+  })
   async updateTranslation(
     @GetSession() session: AdminSession,
     @Param() params: ArticleTranslationParamsDto,
@@ -513,13 +675,31 @@ export class AdminArticlesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a translation',
-    description: 'Permanently removes a single language translation from an article.',
+    description:
+      'Permanently removes a single language translation from an article.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code of the translation to delete', example: 'en' })
-  @ApiResponse({ status: 204, description: 'Translation deleted successfully – no content returned.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
-  @ApiResponse({ status: 404, description: 'Article or translation not found.' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiParam({
+    name: 'languageCode',
+    description: 'BCP 47 language code of the translation to delete',
+    example: 'en',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Translation deleted successfully – no content returned.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Article or translation not found.',
+  })
   async removeTranslation(
     @GetSession() session: AdminSession,
     @Param() params: ArticleTranslationParamsDto,
