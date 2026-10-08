@@ -86,6 +86,12 @@ are real foreign keys onto `users(externalId, tenantId)`.
 
 `TenantMiddleware` runs globally except `/health` (GET) and `/admin/*` routes.
 
+**Admin roles**: every admin controller declares `@Roles(CONTENT_ROLES | MODERATION_ROLES | ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), enforced by `BastionUserGuard`; no `@Roles` = ADMIN-only. AUTHOR+ articles/translations/categories/tags/stats; MODERATOR+ comments/reports/banned-words, DELETE of articles/categories/tags, article status UNDER_REVIEW/HIDDEN/BANNED; ADMIN+ users/audits/webhooks/notifications. Mirrors Meridian's `articuno-*` permissions.
+
+**Rate limiting**: `ApiThrottlerGuard` (global `APP_GUARD`) buckets the public API per tenant + IP and skips controllers that use `AdminThrottlerGuard` (per Bastion user). Probes are `@SkipThrottle()`.
+
+**Public API never sets status**: `Public*Dto` variants omit `status` (articles start DRAFT); status changes go through `/admin/*` and `isValidModerationTransition()`.
+
 ### Critical Invariant: tenantId in Every Query
 
 **Every** database query must filter by `tenantId`. Omitting it leaks data across tenants:
@@ -158,6 +164,8 @@ Supported types: JPEG, PNG, GIF, WebP (max 10 MB). `deleteImageSafely()` silentl
 ## Configuration
 
 Required env var: `DATABASE_URL` (PostgreSQL). Pool: `DATABASE_POOL_MAX` (default 10 per replica), `DATABASE_POOL_TIMEOUT_MS` (default 5000). See `.env.example` for all options.
+
+`SEED_DEFAULT_TENANT` (default false in production, true elsewhere) creates tenant `default` at boot; its API key is logged outside production only.
 
 Validation runs at startup via Joi (`src/configs/config.validation.ts`) — the app will fail fast on misconfigured env vars.
 
