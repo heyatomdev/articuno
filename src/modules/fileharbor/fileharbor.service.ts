@@ -19,7 +19,7 @@ export class FileHarborService {
     'image/webp'
   ] as const;
 
-  private static readonly MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+  static readonly MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
   private static readonly UPLOAD_TIMEOUT = 30000; // 30 seconds
   private static readonly DELETE_TIMEOUT = 15000; // 15 seconds
 

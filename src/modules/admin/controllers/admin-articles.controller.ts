@@ -69,6 +69,12 @@ const MODERATION_STATUSES: ContentStatus[] = [
   ContentStatus.BANNED,
 ];
 
+/** Multer rejects oversize uploads (413) before they are buffered in memory. */
+const COVER_UPLOAD = {
+  storage: memoryStorage(),
+  limits: { fileSize: FileHarborService.MAX_IMAGE_SIZE, files: 1 },
+};
+
 @ApiTags('Admin / Articles')
 @ApiBearerAuth()
 @Controller('admin/articles')
@@ -142,7 +148,7 @@ export class AdminArticlesController {
    *   - `coverImage`  file immagine opzionale (jpeg/png/webp/gif, max 10 MB)
    */
   @Post()
-  @UseInterceptors(FileInterceptor('coverImage', { storage: memoryStorage() }))
+  @UseInterceptors(FileInterceptor('coverImage', COVER_UPLOAD))
   @ApiOperation({
     summary: 'Create an article',
     description:
@@ -247,7 +253,7 @@ export class AdminArticlesController {
    *                   (la vecchia immagine viene cancellata da FileHarbor)
    */
   @Patch(':id')
-  @UseInterceptors(FileInterceptor('coverImage', { storage: memoryStorage() }))
+  @UseInterceptors(FileInterceptor('coverImage', COVER_UPLOAD))
   @ApiOperation({
     summary: 'Update an article',
     description:
