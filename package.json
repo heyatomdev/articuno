@@ -1,6 +1,6 @@
 {
   "name": "articuno",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Multi-tenant blog platform with Prisma",
   "scripts": {
     "build": "nest build && tsc-alias",

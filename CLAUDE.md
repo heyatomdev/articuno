@@ -87,7 +87,7 @@ are real foreign keys onto `users(externalId, tenantId)`.
 
 **Admin roles**: every admin controller declares `@Roles(CONTENT_ROLES | MODERATION_ROLES | SUPER_ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), enforced by `BastionUserGuard`; no `@Roles` = SUPER_ADMIN-only. AUTHOR+ articles/translations/categories/tags/stats; MODERATOR+ comments/reports/banned-words, DELETE of articles/categories/tags, article status UNDER_REVIEW/HIDDEN/BANNED; SUPER_ADMIN only for users/audits/webhooks/notifications (Bastion's seed grants `articuno-users.manage` / `articuno-config.manage` to no role). Mirrors Meridian's `articuno-*` permissions.
 
-**Rate limiting**: two named throttlers. `ApiThrottlerGuard` (global `APP_GUARD`) applies only `public` (`PUBLIC_THROTTLE_LIMIT`, default 1000/window) per tenant + IP, and skips routes that use `AdminThrottlerGuard` at class or method level. `AdminThrottlerGuard` applies only `default` (`THROTTLE_LIMIT`) per Bastion user. Probes are `@SkipThrottle({ public: true })`.
+**Rate limiting**: admin routes only — `AdminThrottlerGuard` (`THROTTLE_LIMIT` per `THROTTLE_TTL_SECONDS`) per Bastion user. The public API is deliberately not throttled: it is server-to-server and every tenant backend reaches Articuno from the same Docker IP; rate-limit end users in the tenant site.
 
 **Public API never sets status**: `Public*Dto` variants omit `status` (articles start DRAFT); status changes go through `/admin/*` and `isValidModerationTransition()`.
 
