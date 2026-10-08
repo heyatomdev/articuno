@@ -58,6 +58,17 @@ export type ReportTarget = {
 /** Comment bodies are free text; the label is a one-line preview of one. */
 const COMMENT_LABEL_MAX = 120;
 
+/**
+ * `reports_open_reporter_target_key` allows one open (PENDING/REVIEWED) report
+ * per reporter and target — on insert, and on an update that reopens one.
+ */
+const conflictOnOpenDuplicate = (message: string) => (error: { code?: string }): never => {
+    if (error.code === 'P2002') {
+        throw new ConflictException(message);
+    }
+    throw error;
+};
+
 @Injectable()
 export class ReportsService {
 
@@ -130,12 +141,7 @@ export class ReportsService {
             }
 
             return report;
-        }).catch((error) => {
-            if (error.code === 'P2002') {
-                throw new ConflictException('Hai gia segnalato questo contenuto');
-            }
-            throw error;
-        });
+        }).catch(conflictOnOpenDuplicate('Hai gia segnalato questo contenuto'));
 
         const [withTarget] = await this.withTargets(tenantId, [created]);
         return withTarget;
@@ -487,7 +493,9 @@ export class ReportsService {
             }
 
             return updatedReport;
-        });
+        }).catch(conflictOnOpenDuplicate(
+          'Il segnalatore ha gia un altro report aperto su questo contenuto',
+        ));
 
         const [withTarget] = await this.withTargets(tenantId, [updated]);
         return withTarget;

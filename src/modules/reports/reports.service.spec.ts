@@ -1,6 +1,11 @@
 import { ReportsService } from './reports.service';
 import { ConflictException } from '@nestjs/common';
-import { ContentStatus, ReportStatus, TargetType, UserStatus } from '@prisma/client';
+import {
+  ContentStatus,
+  ReportStatus,
+  TargetType,
+  UserStatus,
+} from '@prisma/client';
 
 /**
  * `withTargets` — the polymorphic lookup that turns a report's
@@ -145,7 +150,8 @@ describe('ReportsService auto-moderation', () => {
     report: { findFirst: jest.fn() },
   };
   const policy = {
-    getReportThreshold: (t: 'ARTICLE' | 'COMMENT') => (t === 'ARTICLE' ? 10 : 5),
+    getReportThreshold: (t: 'ARTICLE' | 'COMMENT') =>
+      t === 'ARTICLE' ? 10 : 5,
   };
   const publisher = {
     publishArticleStatusChangedEvent: jest.fn(),
@@ -153,7 +159,11 @@ describe('ReportsService auto-moderation', () => {
     publishCommentHiddenEvent: jest.fn(),
     publishCommentModerationEvent: jest.fn(),
   };
-  const service = new ReportsService(prisma as any, policy as any, publisher as any);
+  const service = new ReportsService(
+    prisma as any,
+    policy as any,
+    publisher as any,
+  );
 
   const report = (targetType: TargetType) =>
     service.create('t1', {
@@ -165,7 +175,9 @@ describe('ReportsService auto-moderation', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    prisma.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx));
+    prisma.$transaction.mockImplementation(
+      async (fn: (t: typeof tx) => unknown) => fn(tx),
+    );
     prisma.ensureUser.mockResolvedValue({ externalId: 'ext-1' });
     prisma.article.findFirst.mockResolvedValue({ id: 'x1' });
     prisma.comment.findFirst.mockResolvedValue({ id: 'x1' });
@@ -177,7 +189,9 @@ describe('ReportsService auto-moderation', () => {
 
   describe('article (threshold 10)', () => {
     beforeEach(() => {
-      tx.$queryRaw.mockResolvedValue([{ id: 'x1', status: ContentStatus.PUBLISHED }]);
+      tx.$queryRaw.mockResolvedValue([
+        { id: 'x1', status: ContentStatus.PUBLISHED },
+      ]);
     });
 
     it('locks the article row, scoped by tenant, before counting', async () => {
@@ -209,12 +223,22 @@ describe('ReportsService auto-moderation', () => {
         where: { id: 'x1', tenantId: 't1' },
         data: { status: ContentStatus.UNDER_REVIEW },
       });
-      expect(publisher.publishArticleStatusChangedEvent.mock.calls[0].at(-1)).toBe(tx);
-      expect(publisher.publishArticleFlaggedEvent).toHaveBeenCalledWith('t1', 'x1', 10, 10, tx);
+      expect(
+        publisher.publishArticleStatusChangedEvent.mock.calls[0].at(-1),
+      ).toBe(tx);
+      expect(publisher.publishArticleFlaggedEvent).toHaveBeenCalledWith(
+        't1',
+        'x1',
+        10,
+        10,
+        tx,
+      );
     });
 
     it('does nothing once the article is already UNDER_REVIEW', async () => {
-      tx.$queryRaw.mockResolvedValue([{ id: 'x1', status: ContentStatus.UNDER_REVIEW }]);
+      tx.$queryRaw.mockResolvedValue([
+        { id: 'x1', status: ContentStatus.UNDER_REVIEW },
+      ]);
       tx.report.count.mockResolvedValue(11);
       await report(TargetType.ARTICLE);
 
@@ -246,7 +270,13 @@ describe('ReportsService auto-moderation', () => {
         data: { status: ContentStatus.HIDDEN },
       });
       expect(publisher.publishCommentHiddenEvent).toHaveBeenCalledWith(
-        't1', 'x1', 'author-ext', 'REPORT_THRESHOLD_REACHED', 5, 5, tx,
+        't1',
+        'x1',
+        'author-ext',
+        'REPORT_THRESHOLD_REACHED',
+        5,
+        5,
+        tx,
       );
     });
 
@@ -260,19 +290,46 @@ describe('ReportsService auto-moderation', () => {
   });
 
   it('maps the open-report unique violation (P2002) to 409', async () => {
-    tx.report.create.mockRejectedValue(Object.assign(new Error('dup'), { code: 'P2002' }));
-    await expect(report(TargetType.COMMENT)).rejects.toBeInstanceOf(ConflictException);
+    tx.report.create.mockRejectedValue(
+      Object.assign(new Error('dup'), { code: 'P2002' }),
+    );
+    await expect(report(TargetType.COMMENT)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it('maps P2002 on reopening a report (another open one exists) to 409', async () => {
+    prisma.report.findFirst.mockResolvedValue({
+      id: 'r1',
+      targetType: TargetType.ARTICLE,
+      targetId: 'x1',
+    });
+    tx.report.update.mockRejectedValue(
+      Object.assign(new Error('dup'), { code: 'P2002' }),
+    );
+
+    await expect(
+      service.updateStatus('r1', 't1', { status: ReportStatus.PENDING } as any),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('resolving a report whose comment was deleted does not throw', async () => {
     prisma.report.findFirst.mockResolvedValue({
-      id: 'r1', targetType: TargetType.COMMENT, targetId: 'gone',
+      id: 'r1',
+      targetType: TargetType.COMMENT,
+      targetId: 'gone',
     });
-    tx.report.update.mockResolvedValue({ id: 'r1', targetType: TargetType.COMMENT, targetId: 'gone' });
+    tx.report.update.mockResolvedValue({
+      id: 'r1',
+      targetType: TargetType.COMMENT,
+      targetId: 'gone',
+    });
     tx.comment.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.updateStatus('r1', 't1', { status: ReportStatus.RESOLVED } as any),
+      service.updateStatus('r1', 't1', {
+        status: ReportStatus.RESOLVED,
+      } as any),
     ).resolves.toBeDefined();
     expect(tx.comment.update).not.toHaveBeenCalled();
     expect(publisher.publishCommentModerationEvent).not.toHaveBeenCalled();
