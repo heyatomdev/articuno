@@ -3,7 +3,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('App')
-@SkipThrottle()
+@SkipThrottle({ public: true })
 @Controller()
 export class StatusController {
   @Get('status')

@@ -7,7 +7,7 @@ import { Public } from '@/decorators/public.decorator';
 
 
 @ApiTags('health')
-@SkipThrottle()
+@SkipThrottle({ public: true })
 @Controller('health')
 export class HealthController {
   constructor(

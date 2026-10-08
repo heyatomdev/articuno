@@ -48,6 +48,8 @@ export const configValidationSchema = Joi.object({
   // into a NaN window that never blocks.
   THROTTLE_TTL_SECONDS: Joi.number().positive().default(60),
   THROTTLE_LIMIT: Joi.number().positive().default(100),
+  // Public API, per tenant + IP: server-to-server, one bucket ≈ one tenant backend.
+  PUBLIC_THROTTLE_LIMIT: Joi.number().positive().default(1000),
 
   // Creates the `default` tenant at startup when missing. Off in production
   // unless set explicitly; the generated API key is never logged there.

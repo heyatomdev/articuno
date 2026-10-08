@@ -35,6 +35,7 @@ import { HealthModule } from '@/modules/health/health.module';
 import { BastionModule } from '@heyatom/bastion-client/nest';
 import { APP_GUARD } from '@nestjs/core';
 import { ApiThrottlerGuard } from '@/guards/api-throttler.guard';
+import { PUBLIC_THROTTLER } from '@/guards/throttler.constants';
 
 /** Comma-separated env list → array; undefined keeps the package default. */
 const splitList = (raw?: string): string[] | undefined =>
@@ -117,9 +118,16 @@ const splitList = (raw?: string): string[] | undefined =>
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => [
+        // admin routes (AdminThrottlerGuard), per Bastion user
         {
           ttl: configService.get('throttle.ttl') * 1000,
           limit: configService.get('throttle.limit'),
+        },
+        // public API (ApiThrottlerGuard), per tenant + IP
+        {
+          name: PUBLIC_THROTTLER,
+          ttl: configService.get('throttle.ttl') * 1000,
+          limit: configService.get('throttle.publicLimit'),
         },
       ],
       inject: [ConfigService],

@@ -20,5 +20,6 @@ export default () => ({
   throttle: {
     ttl: parseInt(process.env.THROTTLE_TTL_SECONDS, 10) || 60,
     limit: parseInt(process.env.THROTTLE_LIMIT, 10) || 100,
+    publicLimit: parseInt(process.env.PUBLIC_THROTTLE_LIMIT, 10) || 1000,
   },
 });
