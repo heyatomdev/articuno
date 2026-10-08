@@ -11,7 +11,7 @@ import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
 import {
-  ADMIN_ROLES,
+  SUPER_ADMIN_ROLES,
   Roles,
 } from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
@@ -23,7 +23,7 @@ import { AuditLogDto } from '@/modules/audits/dto/audit-log.dto';
 @ApiBearerAuth()
 @Controller('admin/audits')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
-@Roles(ADMIN_ROLES)
+@Roles(SUPER_ADMIN_ROLES)
 export class AdminAuditsController {
   constructor(private readonly auditsService: AuditsService) {}
 
@@ -35,7 +35,10 @@ export class AdminAuditsController {
       'Supports optional filtering by action, resource type, and actor user ID.',
   })
   @ApiPaginatedResponse(AuditLogDto, 'Paginated list of audit log entries.')
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   findAll(
     @GetSession() session: AdminSession,
     @Query() query: AuditListQueryDto,
@@ -48,19 +51,22 @@ export class AdminAuditsController {
     summary: 'Get an audit log entry by ID',
     description: 'Returns a single audit log entry identified by its UUID.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the audit log entry', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the audit log entry',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiResponse({
     status: 200,
     description: 'Audit log entry found.',
     type: AuditLogDto,
   })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'Audit log entry not found.' })
-  findOne(
-    @GetSession() session: AdminSession,
-    @Param('id') id: string,
-  ) {
+  findOne(@GetSession() session: AdminSession, @Param('id') id: string) {
     return this.auditsService.findOne(id, session.tenantId);
   }
 }
-

@@ -304,13 +304,16 @@ describe('BastionUserGuard', () => {
       ).resolves.toBe(true);
     });
 
-    it('defaults an undecorated route to ADMIN+', async () => {
-      mockJwks.verify.mockResolvedValue({ ...validPayload, role: 'MODERATOR' });
+    it('defaults an undecorated route to SUPER_ADMIN only', async () => {
+      mockJwks.verify.mockResolvedValue({ ...validPayload, role: 'ADMIN' });
       await expect(
         guard.canActivate(makeCtx(auth, UndecoratedController, 'handle')),
       ).rejects.toThrow(ForbiddenException);
 
-      mockJwks.verify.mockResolvedValue({ ...validPayload, role: 'SUPER_ADMIN' });
+      mockJwks.verify.mockResolvedValue({
+        ...validPayload,
+        role: 'SUPER_ADMIN',
+      });
       await expect(
         guard.canActivate(makeCtx(auth, UndecoratedController, 'handle')),
       ).resolves.toBe(true);

@@ -15,7 +15,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AdminSession } from '../bastion.types';
-import { ADMIN_ROLES, Roles } from '../decorators/roles.decorator';
+import { SUPER_ADMIN_ROLES, Roles } from '../decorators/roles.decorator';
 
 /**
  * `/admin/*` guard. The package checks the user token (accepted apps and roles
@@ -23,7 +23,7 @@ import { ADMIN_ROLES, Roles } from '../decorators/roles.decorator';
  * alone is the mapping of Bastion's tenant **uuid** to a local `Tenant`
  * (`bastionTenantId`), the lazily provisioned local `User`, and the
  * `AdminSession` handlers read via `@GetSession()`. Per-route role check via
- * `@Roles()`; a route without it is ADMIN-only.
+ * `@Roles()`; a route without it is SUPER_ADMIN-only.
  */
 @Injectable()
 export class BastionUserGuard extends PackageUserGuard {
@@ -46,7 +46,7 @@ export class BastionUserGuard extends PackageUserGuard {
       this.reflector.getAllAndOverride(Roles, [
         ctx.getHandler(),
         ctx.getClass(),
-      ]) ?? ADMIN_ROLES;
+      ]) ?? SUPER_ADMIN_ROLES;
     if (!payload.role || !allowed.includes(payload.role)) {
       throw new ForbiddenException('Ruolo non autorizzato per questa risorsa');
     }

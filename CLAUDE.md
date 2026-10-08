@@ -86,7 +86,7 @@ are real foreign keys onto `users(externalId, tenantId)`.
 
 `TenantMiddleware` runs globally except `/health` (GET) and `/admin/*` routes.
 
-**Admin roles**: every admin controller declares `@Roles(CONTENT_ROLES | MODERATION_ROLES | ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), enforced by `BastionUserGuard`; no `@Roles` = ADMIN-only. AUTHOR+ articles/translations/categories/tags/stats; MODERATOR+ comments/reports/banned-words, DELETE of articles/categories/tags, article status UNDER_REVIEW/HIDDEN/BANNED; ADMIN+ users/audits/webhooks/notifications. Mirrors Meridian's `articuno-*` permissions.
+**Admin roles**: every admin controller declares `@Roles(CONTENT_ROLES | MODERATION_ROLES | SUPER_ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), enforced by `BastionUserGuard`; no `@Roles` = SUPER_ADMIN-only. AUTHOR+ articles/translations/categories/tags/stats; MODERATOR+ comments/reports/banned-words, DELETE of articles/categories/tags, article status UNDER_REVIEW/HIDDEN/BANNED; SUPER_ADMIN only for users/audits/webhooks/notifications (Bastion's seed grants `articuno-users.manage` / `articuno-config.manage` to no role). Mirrors Meridian's `articuno-*` permissions.
 
 **Rate limiting**: two named throttlers. `ApiThrottlerGuard` (global `APP_GUARD`) applies only `public` (`PUBLIC_THROTTLE_LIMIT`, default 1000/window) per tenant + IP, and skips routes that use `AdminThrottlerGuard` at class or method level. `AdminThrottlerGuard` applies only `default` (`THROTTLE_LIMIT`) per Bastion user. Probes are `@SkipThrottle({ public: true })`.
 
