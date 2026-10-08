@@ -18,6 +18,9 @@ import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publis
 import { ContentStatus, Prisma, TargetType } from '@prisma/client';
 import { PaginatedResult, paginate } from '@/common/pagination';
 
+/** `users.externalId` of the per-tenant reporter behind automatic reports. */
+export const SYSTEM_REPORTER_ID = 'articuno:system';
+
 @Injectable()
 export class CommentsService {
   constructor(
@@ -52,25 +55,38 @@ export class CommentsService {
   }
 
   /**
-   * Crea un report automatico di sistema per banned words
+   * Report automatico di sistema per banned words, nella transazione del
+   * commento. `Report.reporterId` è una FK su users(externalId, tenantId):
+   * il reporter di sistema è un User per tenant, creato al primo uso.
    */
   private async createSystemReport(
+    tx: Prisma.TransactionClient,
     tenantId: string,
     commentId: string,
-    authorExternalId: string,
     reason: string,
-  ): Promise<string> {
-    const report = await this.prisma.report.create({
+  ): Promise<void> {
+    await tx.user.upsert({
+      where: {
+        externalId_tenantId: { externalId: SYSTEM_REPORTER_ID, tenantId },
+      },
+      update: {},
+      create: {
+        externalId: SYSTEM_REPORTER_ID,
+        tenantId,
+        username: 'Articuno (sistema)',
+      },
+      select: { id: true },
+    });
+    await tx.report.create({
       data: {
         targetType: TargetType.COMMENT,
         targetId: commentId,
-        reason: reason || 'BANNED_WORD_DETECTED',
+        reason: reason || AutoModerationReasonEnum.BANNED_WORD_DETECTED,
         description: 'Sistema automatico',
-        reporterId: 'system', // Reporter di sistema
+        reporterId: SYSTEM_REPORTER_ID,
         tenantId,
       },
     });
-    return report.id;
   }
 
   async create(tenantId: string, dto: CreateCommentDto) {
@@ -96,30 +112,26 @@ export class CommentsService {
       authorExternalId: dto.authorExternalId,
     });
 
-    // Se banned words rilevati, crea un report automatico di sistema
-    let systemReportId: string | null = null;
-    if (modPolicy.shouldCreateSystemReport) {
-      systemReportId = await this.createSystemReport(
-        tenantId,
-        dto.articleId,
-        dto.authorExternalId,
-        modPolicy.reason,
-      );
-    }
-
-    // 3. Crea commento con status determinato dalla policy
-    const comment = await this.prisma.comment.create({
-      data: {
-        tenantId,
-        articleId: dto.articleId,
-        authorId: user.id,
-        content,
-        status: modPolicy.finalStatus,
-        reportCount: 0,
-      },
-      include: {
-        author: true,
-      },
+    // 3. Crea commento con status determinato dalla policy e, se banned words,
+    // il report di sistema che punta al commento appena creato
+    const comment = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.comment.create({
+        data: {
+          tenantId,
+          articleId: dto.articleId,
+          authorId: user.id,
+          content,
+          status: modPolicy.finalStatus,
+          reportCount: 0,
+        },
+        include: {
+          author: true,
+        },
+      });
+      if (modPolicy.shouldCreateSystemReport) {
+        await this.createSystemReport(tx, tenantId, created.id, modPolicy.reason);
+      }
+      return created;
     });
 
     // 4. Se auto-moderato, pubblica webhook
@@ -261,12 +273,23 @@ export class CommentsService {
       }
     }
 
-    const comment = await this.prisma.comment.update({
-      where: { id, tenantId },
-      data,
-      include: {
-        author: true,
-      },
+    const comment = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.comment.update({
+        where: { id, tenantId },
+        data,
+        include: {
+          author: true,
+        },
+      });
+      if (autoHidden) {
+        await this.createSystemReport(
+          tx,
+          tenantId,
+          updated.id,
+          AutoModerationReasonEnum.BANNED_WORD_DETECTED,
+        );
+      }
+      return updated;
     });
 
     if (autoHidden) {
