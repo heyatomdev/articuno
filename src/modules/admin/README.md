@@ -24,8 +24,9 @@ src/modules/admin/
 
 Ogni controller:
 1. Usa `@UseGuards(BastionUserGuard, AdminThrottlerGuard)` — Bastion user-JWT (RS256, verificato via JWKS)
-2. Usa `@GetSession()` decorator per estrarre i dati della sessione
-3. Estrae `session.tenantId` per mantenere l'isolamento multi-tenant
+2. Dichiara `@Roles(CONTENT_ROLES | MODERATION_ROLES | ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), verificato da `BastionUserGuard`; senza `@Roles` la rotta è ADMIN-only. AUTHOR+ = articoli/traduzioni/categorie/tag/stats; MODERATOR+ = commenti, report, banned words, DELETE di articoli/categorie/tag e stati UNDER_REVIEW/HIDDEN/BANNED sugli articoli; ADMIN+ = users, audits, webhooks, notifications (allineato ai permessi `articuno-*` di Meridian)
+3. Usa `@GetSession()` decorator per estrarre i dati della sessione
+4. Estrae `session.tenantId` per mantenere l'isolamento multi-tenant
 4. Delega la logica di business ai servizi esistenti
 
 #### AdminArticlesController
@@ -131,6 +132,7 @@ Per aggiungere nuove risorse admin:
 // 1. Creare controller in src/modules/admin/controllers/
 @Controller('admin/resource')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(ADMIN_ROLES)
 export class AdminResourceController {
   constructor(private readonly resourceService: ResourceService) {}
 

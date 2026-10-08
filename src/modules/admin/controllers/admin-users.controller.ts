@@ -21,6 +21,10 @@ import { UsersService } from '@/modules/users/users.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  ADMIN_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
@@ -35,6 +39,7 @@ import { AuditAction, AuditResourceType } from '@prisma/client';
 @ApiBearerAuth()
 @Controller('admin/users')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(ADMIN_ROLES)
 export class AdminUsersController {
   constructor(
     private readonly usersService: UsersService,

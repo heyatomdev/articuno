@@ -10,6 +10,10 @@ import { AuditsService } from '@/modules/audits/audits.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  ADMIN_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AuditListQueryDto } from '@/modules/audits/dto/audit-list-query.dto';
 import { ApiPaginatedResponse } from '@/common/pagination';
@@ -19,6 +23,7 @@ import { AuditLogDto } from '@/modules/audits/dto/audit-log.dto';
 @ApiBearerAuth()
 @Controller('admin/audits')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(ADMIN_ROLES)
 export class AdminAuditsController {
   constructor(private readonly auditsService: AuditsService) {}
 

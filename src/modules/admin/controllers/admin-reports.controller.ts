@@ -20,6 +20,10 @@ import { ReportsService } from '@/modules/reports/reports.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  MODERATION_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AdminCreateReportDto } from '@/modules/reports/dto/admin-create-report.dto';
 import { AdminUpdateReportDto } from '@/modules/reports/dto/admin-update-report.dto';
@@ -35,6 +39,7 @@ import { ReportDto } from '@/modules/reports/dto/report-response.dto';
 @ApiBearerAuth()
 @Controller('admin/reports')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(MODERATION_ROLES)
 export class AdminReportsController {
   constructor(
     private readonly reportsService: ReportsService,

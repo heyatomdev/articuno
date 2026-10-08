@@ -22,6 +22,10 @@ import { CommentsService } from '@/modules/comments/comments.service';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  MODERATION_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
@@ -39,6 +43,7 @@ import {
 @ApiBearerAuth()
 @Controller('admin/comments')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(MODERATION_ROLES)
 export class AdminCommentsController {
   constructor(
     private readonly commentsService: CommentsService,

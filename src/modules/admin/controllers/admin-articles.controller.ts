@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -32,6 +33,11 @@ import { ArticleTranslationsService } from '@/modules/article-translations/artic
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  CONTENT_ROLES,
+  MODERATION_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
@@ -48,7 +54,7 @@ import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { FileHarborConfig } from '@/modules/fileharbor/interfaces/fileharbor-config.interface';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
-import { AuditAction, AuditResourceType } from '@prisma/client';
+import { AuditAction, AuditResourceType, ContentStatus } from '@prisma/client';
 import {
   ArticleDto,
   ArticleListItemDto,
@@ -56,10 +62,18 @@ import {
   ArticleTranslationSummaryDto,
 } from '@/modules/articles/dto/article-response.dto';
 
+/** Statuses only a moderator may set (Meridian: `articuno-moderation.manage`). */
+const MODERATION_STATUSES: ContentStatus[] = [
+  ContentStatus.UNDER_REVIEW,
+  ContentStatus.HIDDEN,
+  ContentStatus.BANNED,
+];
+
 @ApiTags('Admin / Articles')
 @ApiBearerAuth()
 @Controller('admin/articles')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(CONTENT_ROLES)
 export class AdminArticlesController {
   constructor(
     private readonly articlesService: ArticlesService,
@@ -84,6 +98,16 @@ export class AdminArticlesController {
     }
 
     return { endpoint: tenant.fileharborEndpoint, apiKey: tenant.fileharborApiKey };
+  }
+
+  private assertCanSetStatus(session: AdminSession, status?: ContentStatus) {
+    if (
+      status &&
+      MODERATION_STATUSES.includes(status) &&
+      !(MODERATION_ROLES as readonly string[]).includes(session.userRole)
+    ) {
+      throw new ForbiddenException(`Ruolo non autorizzato a impostare lo stato ${status}`);
+    }
   }
 
   /**
@@ -152,6 +176,7 @@ export class AdminArticlesController {
   ) {
     const payload = rawData ?? (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
     const dto = await this.parseAndValidateDto(CreateArticleDto, payload);
+    this.assertCanSetStatus(session, dto.status);
 
     if (file) {
       const config = await this.getFileHarborConfig(session.tenantId);
@@ -259,6 +284,7 @@ export class AdminArticlesController {
   ) {
     const payload = rawData ?? (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
     const dto = await this.parseAndValidateDto(UpdateArticleDto, payload);
+    this.assertCanSetStatus(session, dto.status);
 
     // Fetch current state before update for audit comparison
     const before = await this.prisma.article.findFirst({
@@ -307,6 +333,7 @@ export class AdminArticlesController {
   }
 
   @Delete(':id')
+  @Roles(MODERATION_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete an article',

@@ -8,6 +8,10 @@ import {
 } from '@nestjs/swagger';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  ADMIN_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { NotificationsService } from '@/modules/notifications/notifications.service';
@@ -20,6 +24,7 @@ import { NotificationDto } from '@/modules/notifications/dto/notification.dto';
 @ApiBearerAuth()
 @Controller('admin/notifications')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(ADMIN_ROLES)
 export class AdminNotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 

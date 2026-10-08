@@ -10,7 +10,13 @@ import {
   BastionAuditService,
   BastionJwksService,
 } from '@heyatom/bastion-client/nest';
+import { Reflector } from '@nestjs/core';
 import { PrismaService } from '@/modules/prisma/prisma.service';
+import {
+  CONTENT_ROLES,
+  MODERATION_ROLES,
+  Roles,
+} from '../decorators/roles.decorator';
 
 const mockJwks = { verify: jest.fn() };
 const mockPrisma = {
@@ -18,7 +24,21 @@ const mockPrisma = {
   user: { createMany: jest.fn() },
 };
 
-function makeCtx(headers: Record<string, string> = {}): ExecutionContext {
+@Roles(CONTENT_ROLES)
+class ContentController {
+  read() {}
+  @Roles(MODERATION_ROLES)
+  remove() {}
+}
+class UndecoratedController {
+  handle() {}
+}
+
+function makeCtx(
+  headers: Record<string, string> = {},
+  cls: new () => object = ContentController,
+  handler = 'read',
+): ExecutionContext {
   const req = {
     headers,
     session: undefined,
@@ -27,6 +47,8 @@ function makeCtx(headers: Record<string, string> = {}): ExecutionContext {
   };
   return {
     switchToHttp: () => ({ getRequest: () => req }),
+    getClass: () => cls,
+    getHandler: () => cls.prototype[handler],
   } as unknown as ExecutionContext;
 }
 
@@ -58,6 +80,7 @@ describe('BastionUserGuard', () => {
     const module = await Test.createTestingModule({
       providers: [
         BastionUserGuard,
+        Reflector,
         { provide: BastionJwksService, useValue: mockJwks },
         { provide: PrismaService, useValue: mockPrisma },
         {
@@ -253,5 +276,44 @@ describe('BastionUserGuard', () => {
     expect(mockPrisma.user.createMany.mock.calls[0][0].data.tenantId).not.toBe(
       validPayload.tenantId,
     );
+  });
+
+  describe('@Roles', () => {
+    const auth = { authorization: 'Bearer tok' };
+    beforeEach(() => {
+      mockPrisma.tenant.findUnique.mockResolvedValue(articunoTenant);
+    });
+
+    it('lets AUTHOR reach a content route', async () => {
+      mockJwks.verify.mockResolvedValue({ ...validPayload, role: 'AUTHOR' });
+      await expect(guard.canActivate(makeCtx(auth))).resolves.toBe(true);
+    });
+
+    it('method-level @Roles overrides the class: AUTHOR cannot delete', async () => {
+      mockJwks.verify.mockResolvedValue({ ...validPayload, role: 'AUTHOR' });
+      await expect(
+        guard.canActivate(makeCtx(auth, ContentController, 'remove')),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.user.createMany).not.toHaveBeenCalled();
+    });
+
+    it('lets MODERATOR reach a moderation route', async () => {
+      mockJwks.verify.mockResolvedValue({ ...validPayload, role: 'MODERATOR' });
+      await expect(
+        guard.canActivate(makeCtx(auth, ContentController, 'remove')),
+      ).resolves.toBe(true);
+    });
+
+    it('defaults an undecorated route to ADMIN+', async () => {
+      mockJwks.verify.mockResolvedValue({ ...validPayload, role: 'MODERATOR' });
+      await expect(
+        guard.canActivate(makeCtx(auth, UndecoratedController, 'handle')),
+      ).rejects.toThrow(ForbiddenException);
+
+      mockJwks.verify.mockResolvedValue({ ...validPayload, role: 'SUPER_ADMIN' });
+      await expect(
+        guard.canActivate(makeCtx(auth, UndecoratedController, 'handle')),
+      ).resolves.toBe(true);
+    });
   });
 });

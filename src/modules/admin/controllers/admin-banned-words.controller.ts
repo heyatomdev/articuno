@@ -23,6 +23,10 @@ import { BannedWordsService } from '@/modules/banned-worlds/banned-words.service
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  MODERATION_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateBannedWordDto } from '@/modules/banned-worlds/dto/create-banned-word.dto';
 import { BannedWordListQueryDto } from '@/modules/banned-worlds/dto/banned-word-list-query.dto';
@@ -33,6 +37,7 @@ import { BannedWordDto } from '@/modules/banned-worlds/dto/banned-word.dto';
 @ApiBearerAuth()
 @Controller('admin/banned-words')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(MODERATION_ROLES)
 export class AdminBannedWordsController {
   constructor(private readonly bannedWordsService: BannedWordsService) {}
 

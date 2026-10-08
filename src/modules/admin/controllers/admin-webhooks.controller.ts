@@ -17,6 +17,10 @@ import {
 } from '@nestjs/swagger';
 import { BastionUserGuard } from '@/modules/bastion/guards/bastion-user.guard';
 import { AdminThrottlerGuard } from '@/guards/admin-throttler.guard';
+import {
+  ADMIN_ROLES,
+  Roles,
+} from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AdminSession } from '@/modules/bastion/bastion.types';
 import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-list-query.dto';
@@ -32,6 +36,7 @@ import {
 @ApiBearerAuth()
 @Controller('admin/webhooks')
 @UseGuards(BastionUserGuard, AdminThrottlerGuard)
+@Roles(ADMIN_ROLES)
 export class AdminWebhooksController {
   constructor(private readonly webhookEventsService: WebhooksService) {}
 
