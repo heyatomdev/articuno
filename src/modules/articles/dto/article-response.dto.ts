@@ -29,7 +29,7 @@ export class ArticleTranslationSummaryDto {
   @ApiProperty() readingTime: number;
 }
 
-class ArticleCategorySummaryDto {
+export class ArticleCategorySummaryDto {
   @ApiProperty() id: string;
   @ApiProperty() name: string;
   @ApiProperty() slug: string;
@@ -45,7 +45,7 @@ class ArticleAuthorSummaryDto {
   @ApiProperty({ enum: UserRole, enumName: 'UserRole' }) role: UserRole;
 }
 
-class ArticleTagSummaryDto {
+export class ArticleTagSummaryDto {
   @ApiProperty() id: string;
   @ApiProperty() name: string;
   @ApiProperty() slug: string;
