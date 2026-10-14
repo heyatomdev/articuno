@@ -23,9 +23,17 @@ export class ArticleTranslationsService {
 
   private static readonly AUTO_MODERATION_REASON = 'BANNED_WORD_DETECTED';
 
-  private async ensureArticleExists(tenantId: string, articleId: string) {
+  private async ensureArticleExists(
+    tenantId: string,
+    articleId: string,
+    statuses?: ContentStatus[],
+  ) {
     const article = await this.prisma.article.findFirst({
-      where: { id: articleId, tenantId },
+      where: {
+        id: articleId,
+        tenantId,
+        ...(statuses ? { status: { in: statuses } } : {}),
+      },
     });
 
     if (!article) {
@@ -119,8 +127,16 @@ export class ArticleTranslationsService {
     }
   }
 
-  async findAll(tenantId: string, articleId: string) {
-    await this.ensureArticleExists(tenantId, articleId);
+  /**
+   * `statuses` restricts the parent article's status (public API: see
+   * `publicArticleStatuses`); admin callers omit it and see every status.
+   */
+  async findAll(
+    tenantId: string,
+    articleId: string,
+    statuses?: ContentStatus[],
+  ) {
+    await this.ensureArticleExists(tenantId, articleId, statuses);
 
     return this.prisma.articleTranslation.findMany({
       where: { articleId, tenantId },
@@ -136,9 +152,21 @@ export class ArticleTranslationsService {
     });
   }
 
-  async findOne(tenantId: string, articleId: string, languageCode: string) {
+  async findOne(
+    tenantId: string,
+    articleId: string,
+    languageCode: string,
+    statuses?: ContentStatus[],
+  ) {
     const translation = await this.prisma.articleTranslation.findFirst({
-      where: { articleId, tenantId, languageCode },
+      where: {
+        articleId,
+        tenantId,
+        languageCode,
+        ...(statuses
+          ? { article: { tenantId, status: { in: statuses } } }
+          : {}),
+      },
     });
 
     if (!translation) {

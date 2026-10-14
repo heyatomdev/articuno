@@ -1,15 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
+import { ContentStatus } from '@prisma/client';
 
 @Injectable()
 export class InteractionsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Likes and status only on PUBLISHED articles: a draft or moderated article
+  // must not be reachable (or confirmed to exist) from the public API.
   private async ensureArticleExists(tenantId: string, articleId: string) {
     const article = await this.prisma.article.findFirst({
       where: {
         id: articleId,
         tenantId,
+        status: ContentStatus.PUBLISHED,
       },
       select: {
         id: true,
@@ -21,7 +25,11 @@ export class InteractionsService {
     }
   }
 
-  async toggleLikeArticle(tenantId: string, articleId: string, externalUserId: string) {
+  async toggleLikeArticle(
+    tenantId: string,
+    articleId: string,
+    externalUserId: string,
+  ) {
     await this.ensureArticleExists(tenantId, articleId);
     const user = await this.prisma.ensureUser(tenantId, externalUserId);
 
@@ -55,8 +63,11 @@ export class InteractionsService {
     return { liked };
   }
 
-
-  async getArticleStatus(tenantId: string, articleId: string, externalUserId: string) {
+  async getArticleStatus(
+    tenantId: string,
+    articleId: string,
+    externalUserId: string,
+  ) {
     await this.ensureArticleExists(tenantId, articleId);
 
     const user = await this.prisma.user.findFirst({
@@ -81,12 +92,14 @@ export class InteractionsService {
         where: {
           articleId,
           userId: user.id,
+          tenantId,
         },
       }),
       this.prisma.bookmark.count({
         where: {
           articleId,
           userId: user.id,
+          tenantId,
         },
       }),
     ]);
@@ -96,6 +109,4 @@ export class InteractionsService {
       bookmarked: bookmarksCount > 0,
     };
   }
-
 }
-

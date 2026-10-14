@@ -160,6 +160,17 @@ Traduzioni:
 - `status=PUBLISHED` continua a funzionare ed equivale al default: si può togliere.
 - Se il BE mostrava bozze in anteprima, aggiungere `includeDrafts=true` a lista e dettaglio.
 
+**Stessa regola sugli endpoint che leggono un articolo per id:**
+
+| Endpoint | Articolo non `PUBLISHED` |
+|---|---|
+| `GET /articles/:id/translations`, `GET /articles/:id/translations/:languageCode` | `404`; con `includeDrafts=true` anche `DRAFT` è visibile |
+| `POST /interactions/articles/:articleId/like`, `GET /interactions/articles/:articleId/status` | `404` (anche per le bozze) |
+| `POST /bookmarks/:articleId` | `404` (anche per le bozze) |
+| `GET /bookmarks/me` | i segnalibri di articoli non `PUBLISHED` sono esclusi dalla lista |
+
+Le scritture sulle traduzioni (`POST`/`PATCH`/`DELETE /articles/:id/translations…`) restano possibili su articoli in qualunque stato.
+
 ### Filtri `GET /articles`
 
 - `status`: `PUBLISHED | DRAFT` (opzionale, restringe il risultato; `DRAFT` richiede `includeDrafts=true`)
@@ -239,11 +250,15 @@ Filtro disponibile su `GET /comments`:
 Base: `/interactions`
 
 - `POST /interactions/articles/:articleId/like`
-- `POST /interactions/articles/:articleId/bookmark`
 - `GET /interactions/articles/:articleId/status`
-- `GET /interactions/me/bookmarks`
 
-> Obbligatorio: header `X-User-Id` su tutte le endpoint interactions.
+Segnalibri (base `/bookmarks`):
+
+- `POST /bookmarks/:articleId` (toggle)
+- `GET /bookmarks/me`
+
+> Obbligatorio: header `X-User-Id` su tutte le endpoint interactions e bookmarks.
+> Solo articoli `PUBLISHED`: su qualunque altro stato rispondono `404`.
 
 Esempio:
 

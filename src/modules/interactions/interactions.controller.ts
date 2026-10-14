@@ -47,17 +47,28 @@ export class InteractionsController {
   @Post('articles/:articleId/like')
   @ApiOperation({
     summary: 'Toggle like on an article',
-    description: 'Toggles the like status for the given article by the authenticated user. Returns the updated like count and whether the user has liked the article.',
+    description:
+      'Toggles the like status for the given article by the authenticated user. Returns the updated like count and whether the user has liked the article.',
   })
-  @ApiParam({ name: 'articleId', description: 'UUID of the article to like/unlike', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'articleId',
+    description: 'UUID of the article to like/unlike',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiResponse({
     status: 201,
     description: 'Like toggled successfully.',
     type: LikeToggleResultDto,
   })
-  @ApiResponse({ status: 400, description: 'Missing X-User-Id header or invalid articleId.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Missing X-User-Id header or invalid articleId.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article not found.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Article not found or not PUBLISHED.',
+  })
   toggleLikeArticle(
     @GetTenant() tenant: any,
     @Param() params: ArticleInteractionParamsDto,
@@ -73,17 +84,28 @@ export class InteractionsController {
   @Get('articles/:articleId/status')
   @ApiOperation({
     summary: 'Get interaction status for an article',
-    description: 'Returns whether the current user has liked and/or bookmarked the given article, along with total like and bookmark counts.',
+    description:
+      'Returns whether the current user has liked and/or bookmarked the given article, along with total like and bookmark counts.',
   })
-  @ApiParam({ name: 'articleId', description: 'UUID of the article to check', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'articleId',
+    description: 'UUID of the article to check',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiResponse({
     status: 200,
     description: 'Interaction status returned successfully.',
     type: ArticleInteractionStatusDto,
   })
-  @ApiResponse({ status: 400, description: 'Missing X-User-Id header or invalid articleId.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Missing X-User-Id header or invalid articleId.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article not found.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Article not found or not PUBLISHED.',
+  })
   getArticleStatus(
     @GetTenant() tenant: any,
     @Param() params: ArticleInteractionParamsDto,
@@ -96,4 +118,3 @@ export class InteractionsController {
     );
   }
 }
-

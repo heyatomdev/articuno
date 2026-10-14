@@ -14,6 +14,7 @@ import {
   PublicArticleFiltersQueryDto,
 } from '@/modules/articles/dto/article-filters-query.dto';
 import { ContentStatus } from '@prisma/client';
+import { publicArticleStatuses } from '@/modules/articles/article-visibility';
 import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
@@ -271,7 +272,7 @@ export class ArticlesService {
     tenantId: string,
     query: PublicArticleFiltersQueryDto,
   ): Promise<PaginatedResult<any>> {
-    const visible = this.publicVisibleStatuses(query.includeDrafts);
+    const visible = publicArticleStatuses(query.includeDrafts);
 
     if (query.status && !visible.includes(query.status)) {
       throw new BadRequestException('status=DRAFT richiede includeDrafts=true');
@@ -362,14 +363,8 @@ export class ArticlesService {
       tenantId,
       slug,
       languageCode,
-      this.publicVisibleStatuses(includeDrafts),
+      publicArticleStatuses(includeDrafts),
     );
-  }
-
-  private publicVisibleStatuses(includeDrafts?: boolean): ContentStatus[] {
-    return includeDrafts
-      ? [ContentStatus.PUBLISHED, ContentStatus.DRAFT]
-      : [ContentStatus.PUBLISHED];
   }
 
   async findOne(

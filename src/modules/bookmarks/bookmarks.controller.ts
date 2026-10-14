@@ -62,9 +62,15 @@ export class BookmarksController {
     description: 'Bookmark toggled successfully.',
     type: BookmarkToggleResultDto,
   })
-  @ApiResponse({ status: 400, description: 'Missing X-User-Id header or invalid articleId.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Missing X-User-Id header or invalid articleId.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article not found.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Article not found or not PUBLISHED.',
+  })
   toggle(
     @GetTenant() tenant: any,
     @Param() params: BookmarkParamsDto,
@@ -101,4 +107,3 @@ export class BookmarksController {
     );
   }
 }
-
