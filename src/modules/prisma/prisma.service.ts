@@ -31,13 +31,13 @@ export class PrismaService
    * SELECT-then-INSERT, so a user's first two concurrent requests (a double
    * click) race on `users_externalId_tenantId_key`; the loser re-reads the row.
    */
-  async ensureUser(tenantId: string, externalId: string) {
+  async ensureUser(tenantId: string, externalId: string, username?: string) {
     const where = { externalId_tenantId: { externalId, tenantId } };
     try {
       return await this.user.upsert({
         where,
         update: {},
-        create: { externalId, tenantId },
+        create: { externalId, tenantId, username },
       });
     } catch (error) {
       if (error.code !== 'P2002') throw error;
