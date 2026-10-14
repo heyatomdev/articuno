@@ -210,7 +210,6 @@ Key runtime settings:
 - [docs/article-moderation.md](docs/article-moderation.md) — moderation workflow dettagliato
 - [docs/comment-moderation.md](docs/comment-moderation.md) — comment moderation flow
 - [docs/admin-roles.md](docs/admin-roles.md) — ruoli Bastion e matrice endpoint × ruolo di `/admin/*`
-- [docs/nestjs-integration-guide.md](docs/nestjs-integration-guide.md) — guida integrazione per app NestJS consumatrici
 - [../docs/integrations/articuno.md](../docs/integrations/articuno.md) — integration guide di piattaforma (fonte di verità per chi integra Articuno; aggiornarla quando cambia il contratto)
 - [../docs/standards/coding.md](../docs/standards/coding.md) — NestJS conventions condivise
 - [src/modules/admin/README.md](src/modules/admin/README.md), [src/modules/webhook/tenant-validation.md](src/modules/webhook/tenant-validation.md) — note di modulo
