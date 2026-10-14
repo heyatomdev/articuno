@@ -7,8 +7,8 @@
 
 | # | Problema | Gravità | Stato |
 |---|---|---|---|
-| B1 | `GET /articles` e `GET /articles/:slug` restituiscono articoli BANNED/HIDDEN/DRAFT se il tenant non passa `?status`; `ArticleFiltersQueryDto` accetta perfino `status=BANNED` | alta | Corretto, da committare: `findAllPublic` / `findOnePublic` |
-| B2 | Delete di un utente con commenti → P2003 / 500 (`comments.authorId` RESTRICT). La FK composita `reports.moderatorId` con `SET NULL` azzera anche `tenantId` (NOT NULL): fallisce anche la delete di un admin con report moderati. P2003 non è mappato e il client riceve 500 | media | Corretto, da committare: migration `20261014120000_user_delete_foreign_keys` |
+| B1 | `GET /articles` e `GET /articles/:slug` restituiscono articoli BANNED/HIDDEN/DRAFT se il tenant non passa `?status`; `ArticleFiltersQueryDto` accetta perfino `status=BANNED` | alta | **Chiuso** — `bc2b424`, `f76c116`: regola `publicArticleStatuses()` su lista, dettaglio, traduzioni, like e bookmark |
+| B2 | Delete di un utente con commenti → P2003 / 500 (`comments.authorId` RESTRICT). La FK composita `reports.moderatorId` con `SET NULL` azzera anche `tenantId` (NOT NULL): fallisce anche la delete di un admin con report moderati. P2003 non è mappato e il client riceve 500 | media | **Chiuso** — `4814f1d`: migration `20261014120000_user_delete_foreign_keys`, commenti al placeholder `articuno:deleted`, P2003 → 409 |
 | B3 | `slugifySafe` aggiunge un suffisso casuale e lo slug si rigenera a ogni cambio titolo → i vecchi URL vanno in 404 | media | Aperto (backlog #5) |
 | B4 | `Article.views` non viene mai incrementato: la dashboard mostra 0 e la top 5 ha un ordine arbitrario | media | Aperto (backlog #11) |
 | B5 | Le banned words fanno match per sottostringa (`includes`): "ass" blocca "classe" | media | Aperto (backlog #3) |
@@ -19,12 +19,12 @@
 
 ## Backlog in ordine di priorità
 
-I punti 1, 5 e 6 modificano il contratto pubblico: vanno rilasciati insieme, con una nota di breaking change nella guida di integrazione, senza introdurre il versioning negli URI.
+Il punto 1 è già rilasciato come breaking change documentato in `docs/guida-integrazione-be-nestjs.md`: avvisare i tenant prima del deploy. I punti 5 e 6 modificano anch'essi il contratto pubblico: rilasciarli insieme, con una nota nella guida di integrazione, senza introdurre il versioning negli URI.
 
 | # | Voce | Costo | Scope minimo | Fuori scope (prima iterazione) |
 |---|---|---|---|---|
-| 1 | **API pubblica filtrata per stato** (B1) | S | PUBLISHED di default, DRAFT solo con `includeDrafts=true`, mai UNDER_REVIEW/HIDDEN/BANNED | Preview token HMAC |
-| 2 | **Fix integrità delle delete** (B2) | S | FK dei commenti, FK composita dei report, CASCADE da tenant su reports e banned_words, P2003 → 409 | Export GDPR, offboarding/import del tenant |
+| 1 | ✅ **API pubblica filtrata per stato** (B1) — fatto | S | PUBLISHED di default, DRAFT solo con `includeDrafts=true`, mai UNDER_REVIEW/HIDDEN/BANNED | Preview token HMAC |
+| 2 | ✅ **Fix integrità delle delete** (B2) — fatto | S | FK dei commenti, FK composita dei report, CASCADE da tenant su reports e banned_words, P2003 → 409 | Export GDPR, offboarding/import del tenant |
 | 3 | **Banned words con match per parola intera** (B5) | S | Confini di parola, normalizzazione Unicode e accenti, test di regressione su "classe" | Regex dei tenant (rischio ReDoS), leetspeak, azioni FLAG/HIDE/REJECT |
 | 4 | **Webhook idempotenti** | S | Header `X-Webhook-Id` (id del `WebhookEvent`) e `X-Webhook-Timestamp`, firma su `timestamp.body`, documentati | Rotazione con doppio secret, nonce store |
 | 5 | **Slug stabili** (B3) | S | Slug generato una volta, suffisso solo in caso di collisione, nessuna rigenerazione al cambio titolo, slug modificabile dall'admin | Tabella storico slug e redirect |
