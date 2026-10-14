@@ -85,7 +85,7 @@ are real foreign keys onto `users(externalId, tenantId)`.
 
 `TenantMiddleware` runs globally except `/health` (GET) and `/admin/*` routes.
 
-**Admin roles**: every admin controller declares `@Roles(CONTENT_ROLES | MODERATION_ROLES | SUPER_ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), enforced by `BastionUserGuard`; no `@Roles` = SUPER_ADMIN-only. AUTHOR+ articles/translations/categories/tags/stats; MODERATOR+ comments/reports/banned-words, DELETE of articles/categories/tags, article status UNDER_REVIEW/HIDDEN/BANNED; SUPER_ADMIN only for users/audits/webhooks/notifications (Bastion's seed grants `articuno-users.manage` / `articuno-config.manage` to no role). Mirrors Meridian's `articuno-*` permissions.
+**Admin roles**: every admin controller declares `@Roles(CONTENT_ROLES | MODERATION_ROLES | SUPER_ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), enforced by `BastionUserGuard`; no `@Roles` = SUPER_ADMIN-only. AUTHOR+ articles/translations/categories/tags/stats; MODERATOR+ comments/reports/banned-words, DELETE of articles/categories/tags, article status UNDER_REVIEW/HIDDEN/BANNED; SUPER_ADMIN only for users/audits/webhooks (Bastion's seed grants `articuno-users.manage` / `articuno-config.manage` to no role). Mirrors Meridian's `articuno-*` permissions. Full matrix: [docs/admin-roles.md](docs/admin-roles.md).
 
 **Rate limiting**: admin routes only — `AdminThrottlerGuard` (`THROTTLE_LIMIT` per `THROTTLE_TTL_SECONDS`) per Bastion user. The public API is deliberately not throttled: it is server-to-server and every tenant backend reaches Articuno from the same Docker IP; rate-limit end users in the tenant site.
 
@@ -209,8 +209,7 @@ Key runtime settings:
 - [docs/admin-api.md](docs/admin-api.md) — admin panel API reference
 - [docs/article-moderation.md](docs/article-moderation.md) — moderation workflow dettagliato
 - [docs/comment-moderation.md](docs/comment-moderation.md) — comment moderation flow
-- [docs/admin-roles-policy.md](docs/admin-roles-policy.md) — policy ruoli admin centrale
-- [docs/admin-endpoint-role-matrix.md](docs/admin-endpoint-role-matrix.md) — matrice endpoint × ruolo admin
+- [docs/admin-roles.md](docs/admin-roles.md) — ruoli Bastion e matrice endpoint × ruolo di `/admin/*`
 - [docs/nestjs-integration-guide.md](docs/nestjs-integration-guide.md) — guida integrazione per app NestJS consumatrici
 - [../docs/integrations/articuno.md](../docs/integrations/articuno.md) — integration guide di piattaforma (fonte di verità per chi integra Articuno; aggiornarla quando cambia il contratto)
 - [../docs/standards/coding.md](../docs/standards/coding.md) — NestJS conventions condivise
