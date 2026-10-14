@@ -205,10 +205,20 @@ Key runtime settings:
 
 ## Docs
 
-- `docs/admin-api.md` — admin panel API reference
-- `docs/article-moderation.md` — moderation workflow dettagliato
-- `docs/comment-moderation.md` — comment moderation flow
-- `docs/guida-integrazione-be-nestjs.md` — guida integrazione per app NestJS consumatrici
-- `../docs/ARTICUNO_INTEGRATION.md` — integration guide per Claude (fonte di verità)
-- `../docs/BASTION_INTEGRATION.md` — Bastion JWT/JWKS guide
-- `../docs/CODING_STANDARDS.md` — NestJS conventions condivise
+- [docs/BACKLOG.md](docs/BACKLOG.md) — bug verificati e backlog prioritizzato
+- [docs/admin-api.md](docs/admin-api.md) — admin panel API reference
+- [docs/article-moderation.md](docs/article-moderation.md) — moderation workflow dettagliato
+- [docs/comment-moderation.md](docs/comment-moderation.md) — comment moderation flow
+- [docs/admin-roles-policy.md](docs/admin-roles-policy.md) — policy ruoli admin centrale
+- [docs/admin-endpoint-role-matrix.md](docs/admin-endpoint-role-matrix.md) — matrice endpoint × ruolo admin
+- [docs/nestjs-integration-guide.md](docs/nestjs-integration-guide.md) — guida integrazione per app NestJS consumatrici
+- [../docs/integrations/articuno.md](../docs/integrations/articuno.md) — integration guide di piattaforma (fonte di verità per chi integra Articuno; aggiornarla quando cambia il contratto)
+- [../docs/standards/coding.md](../docs/standards/coding.md) — NestJS conventions condivise
+- [src/modules/admin/README.md](src/modules/admin/README.md), [src/modules/webhook/tenant-validation.md](src/modules/webhook/tenant-validation.md) — note di modulo
+
+## Platform integration guides
+
+Services this repo calls (Bastion for admin JWT/JWKS and service-client auth, FileHarbor for image uploads):
+
+@../docs/integrations/bastion.md
+@../docs/integrations/fileharbor.md

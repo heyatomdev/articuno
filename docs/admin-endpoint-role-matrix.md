@@ -3,7 +3,7 @@
 ## Purpose
 Define a practical endpoint-by-endpoint role matrix for central admin usage across real backend modules.
 
-This document is the operational companion of `governance/admin-centrale-policy-ruoli.md`.
+This document is the operational companion of [admin-roles-policy.md](admin-roles-policy.md).
 
 ## Scope
 - Modules covered: `articles`, `comments`, `reports`, `banned-words`, `analytics`.

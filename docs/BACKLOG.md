@@ -19,7 +19,7 @@
 
 ## Backlog in ordine di priorità
 
-Il punto 1 è già rilasciato come breaking change documentato in `docs/guida-integrazione-be-nestjs.md`: avvisare i tenant prima del deploy. I punti 5 e 6 modificano anch'essi il contratto pubblico: rilasciarli insieme, con una nota nella guida di integrazione, senza introdurre il versioning negli URI.
+Il punto 1 è già rilasciato come breaking change documentato in [nestjs-integration-guide.md](nestjs-integration-guide.md): avvisare i tenant prima del deploy. I punti 5 e 6 modificano anch'essi il contratto pubblico: rilasciarli insieme, con una nota nella guida di integrazione, senza introdurre il versioning negli URI.
 
 | # | Voce | Costo | Scope minimo | Fuori scope (prima iterazione) |
 |---|---|---|---|---|
