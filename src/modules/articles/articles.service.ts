@@ -9,7 +9,10 @@ import { BannedWordsService } from '@/modules/banned-words/banned-words.service'
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
-import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
+import {
+  ArticleFiltersQueryDto,
+  PublicArticleFiltersQueryDto,
+} from '@/modules/articles/dto/article-filters-query.dto';
 import { ContentStatus } from '@prisma/client';
 import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
@@ -260,13 +263,39 @@ export class ArticlesService {
     }
   }
 
+  /**
+   * Public listing (X-API-Key): PUBLISHED only, plus DRAFT with `includeDrafts`.
+   * UNDER_REVIEW, HIDDEN and BANNED are never returned here.
+   */
+  async findAllPublic(
+    tenantId: string,
+    query: PublicArticleFiltersQueryDto,
+  ): Promise<PaginatedResult<any>> {
+    const visible = this.publicVisibleStatuses(query.includeDrafts);
+
+    if (query.status && !visible.includes(query.status)) {
+      throw new BadRequestException('status=DRAFT richiede includeDrafts=true');
+    }
+
+    // statusFilter overrides query.status: the public caller never picks a
+    // status outside `visible`.
+    return this.findAll(tenantId, query, {
+      in: query.status ? [query.status] : visible,
+    });
+  }
+
   async findAll(
     tenantId: string,
     query: ArticleFiltersQueryDto,
+    statusFilter?: { in: ContentStatus[] },
   ): Promise<PaginatedResult<any>> {
     const where: any = {
       tenantId,
-      ...(query.status ? { status: query.status } : {}),
+      ...(statusFilter
+        ? { status: statusFilter }
+        : query.status
+          ? { status: query.status }
+          : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.featured !== undefined ? { featured: query.featured } : {}),
       ...(query.tagId
@@ -319,7 +348,36 @@ export class ArticlesService {
     return paginate(items, total, query);
   }
 
-  async findOne(tenantId: string, slug: string, languageCode?: string) {
+  /**
+   * Public detail by slug (X-API-Key): PUBLISHED only, plus DRAFT with
+   * `includeDrafts`. Any other status answers 404, same as a missing slug.
+   */
+  findOnePublic(
+    tenantId: string,
+    slug: string,
+    languageCode?: string,
+    includeDrafts?: boolean,
+  ) {
+    return this.findOne(
+      tenantId,
+      slug,
+      languageCode,
+      this.publicVisibleStatuses(includeDrafts),
+    );
+  }
+
+  private publicVisibleStatuses(includeDrafts?: boolean): ContentStatus[] {
+    return includeDrafts
+      ? [ContentStatus.PUBLISHED, ContentStatus.DRAFT]
+      : [ContentStatus.PUBLISHED];
+  }
+
+  async findOne(
+    tenantId: string,
+    slug: string,
+    languageCode?: string,
+    statuses?: ContentStatus[],
+  ) {
     const articleIncludes = languageCode
       ? {
           ...this.articleIncludes,
@@ -332,6 +390,7 @@ export class ArticlesService {
     const article = await this.prisma.article.findFirst({
       where: {
         tenantId,
+        ...(statuses ? { status: { in: statuses } } : {}),
         translations: {
           some: {
             tenantId,

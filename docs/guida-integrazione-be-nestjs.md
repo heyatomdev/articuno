@@ -109,7 +109,7 @@ Base: `/articles`
 
 - `POST /articles`
 - `GET /articles`
-- `GET /articles/:id`
+- `GET /articles/:slug`
 - `PATCH /articles/:id`
 - `DELETE /articles/:id`
 
@@ -140,12 +140,39 @@ Traduzioni:
 
 `tagIds` deve essere valorizzato usando gli ID recuperati da `GET /tags`.
 
+### Visibilità per stato (breaking change, ottobre 2026)
+
+`GET /articles` e `GET /articles/:slug` restituiscono **solo articoli `PUBLISHED`**.
+
+| Stato | Default | `includeDrafts=true` |
+|---|---|---|
+| `PUBLISHED` | sì | sì |
+| `DRAFT` | no | sì |
+| `UNDER_REVIEW`, `HIDDEN`, `BANNED` | mai | mai |
+
+- `includeDrafts=true` serve all'anteprima delle bozze nel sito del tenant: non inoltrarlo dal client pubblico.
+- `GET /articles/:slug` su un articolo non visibile risponde `404`, come per uno slug inesistente.
+- Prima del cambio, senza `status` la lista restituiva articoli in **ogni** stato (anche moderati) e il dettaglio non filtrava lo stato.
+
+**Migrazione:**
+- `status=UNDER_REVIEW|HIDDEN|BANNED` ora risponde `400` (validazione). Gli articoli moderati si leggono solo da `/admin/articles` (Bastion).
+- `status=DRAFT` richiede `includeDrafts=true`, altrimenti `400`.
+- `status=PUBLISHED` continua a funzionare ed equivale al default: si può togliere.
+- Se il BE mostrava bozze in anteprima, aggiungere `includeDrafts=true` a lista e dettaglio.
+
 ### Filtri `GET /articles`
 
-- `status`: `DRAFT | PUBLISHED | UNDER_REVIEW | HIDDEN | BANNED`
+- `status`: `PUBLISHED | DRAFT` (opzionale, restringe il risultato; `DRAFT` richiede `includeDrafts=true`)
+- `includeDrafts`: `true | false` (default `false`)
 - `categoryId`: UUID
 - `tagId`: UUID
+- `languageCode`: codice BCP 47
 - `featured`: `true | false`
+
+### Query `GET /articles/:slug`
+
+- `languageCode`: codice BCP 47
+- `includeDrafts`: `true | false` (default `false`)
 
 ---
 
@@ -313,10 +340,17 @@ curl -X POST "$ARTICUNO_BASE_URL/articles" \
   }'
 ```
 
-Lista articoli pubblicati:
+Lista articoli pubblicati (default, `status` non serve):
 
 ```bash
-curl "$ARTICUNO_BASE_URL/articles?status=PUBLISHED" \
+curl "$ARTICUNO_BASE_URL/articles" \
+  -H "X-API-Key: $ARTICUNO_TENANT_API_KEY"
+```
+
+Anteprima di una bozza:
+
+```bash
+curl "$ARTICUNO_BASE_URL/articles/titolo-articolo?includeDrafts=true" \
   -H "X-API-Key: $ARTICUNO_TENANT_API_KEY"
 ```
 

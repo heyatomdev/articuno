@@ -91,6 +91,8 @@ are real foreign keys onto `users(externalId, tenantId)`.
 
 **Public API never sets status**: `Public*Dto` variants omit `status` (articles start DRAFT); status changes go through `/admin/*` and `isValidModerationTransition()`.
 
+**Public API only reads PUBLISHED articles**: `GET /articles` and `GET /articles/:slug` go through `ArticlesService.findAllPublic` / `findOnePublic` (`PublicArticleFiltersQueryDto`): PUBLISHED by default, DRAFT only with `includeDrafts=true`, UNDER_REVIEW/HIDDEN/BANNED never (detail → 404). Admin routes keep `findAll` / `findOne` and see every status.
+
 ### Critical Invariant: tenantId in Every Query
 
 **Every** database query must filter by `tenantId`. Omitting it leaks data across tenants:

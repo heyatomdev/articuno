@@ -28,7 +28,7 @@ import {
   ArticleParamsDto,
   ArticleSlugParamsDto,
 } from '@/modules/articles/dto/article-params.dto';
-import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
+import { PublicArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ArticleShowQueryDto } from '@/modules/articles/dto/article-show-query.dto';
 import { ApiPaginatedResponse } from '@/common/pagination';
 import {
@@ -71,20 +71,31 @@ export class ArticlesController {
   @ApiOperation({
     summary: 'List articles',
     description:
-      'Returns a paginated list of articles belonging to the current tenant. ' +
-      'Supports optional filtering by status, category, tag, and featured flag.',
+      'Returns a paginated list of PUBLISHED articles belonging to the current tenant. ' +
+      'DRAFT articles are added only with `includeDrafts=true` (preview); ' +
+      'UNDER_REVIEW, HIDDEN and BANNED articles are never returned. ' +
+      'Supports optional filtering by category, tag, language and featured flag.',
   })
   @ApiPaginatedResponse(ArticleListItemDto, 'Paginated list of articles.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  findAll(@GetTenant() tenant: any, @Query() query: ArticleFiltersQueryDto) {
-    return this.articlesService.findAll(tenant.id, query);
+  @ApiResponse({
+    status: 400,
+    description: '`status=DRAFT` without `includeDrafts=true`.',
+  })
+  findAll(
+    @GetTenant() tenant: any,
+    @Query() query: PublicArticleFiltersQueryDto,
+  ) {
+    return this.articlesService.findAllPublic(tenant.id, query);
   }
 
   @Get(':slug')
   @ApiOperation({
     summary: 'Get an article by slug',
     description:
-      'Returns a single article identified by its URL-friendly slug, including all translations.',
+      'Returns a single PUBLISHED article identified by its URL-friendly slug, including all translations. ' +
+      'A DRAFT article is resolved only with `includeDrafts=true` (preview); ' +
+      'UNDER_REVIEW, HIDDEN and BANNED articles answer 404.',
   })
   @ApiParam({
     name: 'slug',
@@ -93,16 +104,20 @@ export class ArticlesController {
   })
   @ApiResponse({ status: 200, description: 'Article found.', type: ArticleDto })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article not found.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Article not found or not visible to the public API.',
+  })
   findOne(
     @GetTenant() tenant: any,
     @Param() params: ArticleSlugParamsDto,
     @Query() query: ArticleShowQueryDto,
   ) {
-    return this.articlesService.findOne(
+    return this.articlesService.findOnePublic(
       tenant.id,
       params.slug,
       query.languageCode,
+      query.includeDrafts,
     );
   }
 
