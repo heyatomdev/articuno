@@ -1,4 +1,9 @@
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   HealthCheck,
@@ -10,6 +15,8 @@ import { PrismaService } from '../prisma/prisma.service';
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
+  private readonly logger = new Logger(HealthController.name);
+
   constructor(
     private readonly health: HealthCheckService,
     private readonly prismaIndicator: PrismaHealthIndicator,
@@ -42,7 +49,14 @@ export class HealthController {
       return await this.health.check([
         () => this.prismaIndicator.pingCheck('database', this.prisma),
       ]);
-    } catch {
+    } catch (error) {
+      // Terminus already logged an indicator failure; anything else is a bug.
+      if (!(error instanceof ServiceUnavailableException)) {
+        this.logger.error(
+          'Readiness check failed unexpectedly',
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
       // Terminus' 503 body carries the DB error (host, port): not on an
       // unauthenticated route. The status code is the probe contract.
       throw new ServiceUnavailableException('Service not ready');
