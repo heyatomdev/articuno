@@ -116,6 +116,7 @@ export class WebhooksJob {
       const result = await this.webhookService.send(
         notif.tenant.webhookUrl,
         notif.tenant.webhookSecret,
+        notif.id,
         notif.payload,
       );
 

@@ -46,7 +46,7 @@ Il microservizio non salva mai le API Key in chiaro. Quando viene creato un Tena
 
 📡 Integrazione Webhook
 
-Il microservizio invia eventi (es. comment.created, article.flagged) all'URL configurato dal Tenant. Ogni richiesta è firmata con un segreto condiviso nell'header x-webhook-signature.
+Il microservizio invia eventi (es. comment.created, article.flagged) all'URL configurato dal Tenant. Ogni richiesta è firmata col segreto condiviso in formato Standard Webhooks (header `webhook-id`, `webhook-timestamp`, `webhook-signature`).
 
 Vedi la Guida Validazione Webhook per i dettagli tecnici.
 

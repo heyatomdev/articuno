@@ -109,6 +109,7 @@ describe('WebhooksJob', () => {
       expect(webhooks.send).toHaveBeenCalledWith(
         tenant.webhookUrl,
         tenant.webhookSecret,
+        'e1',
         {},
       );
       expect(prisma.webhookEvent.update).toHaveBeenCalledWith({

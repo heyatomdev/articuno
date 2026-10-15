@@ -1,73 +1,38 @@
 # Guida alla Validazione dei Webhook per i Tenant
 
-Il nostro sistema invia notifiche in tempo reale (come nuovi commenti, like o azioni di moderazione) verso il tuo URL configurato tramite richieste `POST`. Per garantire che la richiesta provenga effettivamente dal nostro microservizio e che il contenuto non sia stato manomesso, **devi validare la firma** inclusa in ogni chiamata.
+Articuno invia gli eventi (moderazione, cambi di stato degli articoli) al tuo `webhookUrl` con richieste `POST` firmate in formato [Standard Webhooks](https://www.standardwebhooks.com/). Contratto completo ed elenco eventi: [guida di integrazione §8](../../../../docs/integrations/articuno.md).
 
-## 1. Parametri di Sicurezza
+## Header
 
-- **URL Webhook**: L'endpoint sul tuo server che riceverà le notifiche (es. `https://tuosito.com/api/webhooks`).
-- **Webhook Secret**: Una stringa segreta condivisa tra il nostro microservizio e il tuo server. **Non condividerla mai**.
-- **Header della richiesta**: Ogni chiamata conterrà l'header `x-webhook-signature`.
+| Header | Contenuto |
+|---|---|
+| `webhook-id` | ID dell'evento: identico nei retry e nei re-invii, usalo per deduplicare |
+| `webhook-timestamp` | Unix seconds dell'invio |
+| `webhook-signature` | `v1,<base64 HMAC-SHA256>` (più firme separate da spazio, accettane una qualsiasi) |
 
-## 2. Logica di Validazione
+## Verifica
 
-La firma è un hash **HMAC SHA-256** generato utilizzando il tuo `Webhook Secret` e l'intero `body` della richiesta (formato JSON).
+1. Rifiuta se `webhook-timestamp` dista più di 5 minuti dal tuo orologio.
+2. Calcola HMAC-SHA256 di `<webhook-id>.<webhook-timestamp>.<body grezzo>` con il `webhookSecret` (stringa UTF-8) e codificalo in base64.
+3. Confrontalo in tempo costante con le firme di `webhook-signature`.
+4. Se hai già processato quel `webhook-id`, rispondi 2xx e non fare nulla.
 
-### Passaggi per la verifica:
-1. Ricevi la richiesta `POST`.
-2. Leggi il corpo (`body`) della richiesta come stringa grezza.
-3. Leggi il valore dell'header `x-webhook-signature`.
-4. Calcola l'hash HMAC SHA-256 del body usando il tuo segreto.
-5. Confronta il tuo hash calcolato con quello ricevuto nell'header.
-
----
-
-## 3. Esempi di Implementazione
-
-### Node.js (Express)
 ```javascript
 const crypto = require('crypto');
 
-function verifyWebhook(req, res, next) {
-  const signature = req.headers['x-webhook-signature'];
-  const secret = process.env.YOUR_WEBHOOK_SECRET;
-  
-  // Importante: usa il body grezzo (raw) se il tuo parser lo modifica
-  const hmac = crypto.createHmac('sha256', secret);
-  const digest = hmac.update(JSON.stringify(req.body)).digest('hex');
-
-  if (signature === digest) {
-    return next(); // Firma valida
-  } else {
-    return res.status(401).send('Firma Webhook non valida');
-  }
-}
-
-app.post('/webhooks/notifications', verifyWebhook, (req, res) => {
-  console.log('Evento ricevuto:', req.body.event);
-  res.status(200).send('OK');
-});
-```
-
-### 4. Struttura del Payload
-
-Riceverai sempre un oggetto JSON con questo formato:
-```json
-{
-  "event": "comment.created",
-  "timestamp": "2023-10-27T10:00:00Z",
-  "data": {
-    "id": "uuid-notifica",
-    "type": "COMMENT",
-    "message": "Qualcuno ha commentato il tuo articolo",
-    "userId": "external-user-id",
-    "tenantId": "tuo-tenant-id"
-  }
+// rawBody: i byte esatti ricevuti, non JSON.stringify(req.body)
+function verifyWebhook(headers, rawBody, secret) {
+  const id = headers['webhook-id'];
+  const ts = headers['webhook-timestamp'];
+  if (Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;
+  const expected = Buffer.from(
+    crypto.createHmac('sha256', secret).update(`${id}.${ts}.${rawBody}`).digest('base64'),
+  );
+  return (headers['webhook-signature'] || '').split(' ').some((sig) => {
+    const got = Buffer.from(sig.replace(/^v1,/, ''));
+    return got.length === expected.length && crypto.timingSafeEqual(got, expected);
+  });
 }
 ```
 
-### 5. Note aggiuntive
-
-- Rispondi velocemente: Restituisci un codice 200 OK immediatamente dopo aver ricevuto la notifica. Elabora la logica pesantemente in background (code/job) per non causare timeout sul nostro server.
-
-- Idempotenza: Gestisci la possibilità di ricevere lo stesso evento più di una volta (usa l'ID della notifica per controllare se l'hai già processata).
-
+Rispondi 2xx subito e lavora in background: oltre 5 s di attesa la consegna è un fallimento e viene ritentata.

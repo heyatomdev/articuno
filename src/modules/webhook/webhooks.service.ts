@@ -5,20 +5,15 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { Agent as HttpAgent } from 'node:http';
-import { Agent as HttpsAgent } from 'node:https';
 import {
   checkWebhookUrl,
   isWebhookTargetBlocked,
-  webhookAgent,
-  webhookLookup,
+  postWebhook,
+  signStandardWebhook,
   WebhookUrlError,
   type WebhookUrlPolicy,
 } from '@heyatom/nest-common/webhooks';
-import { createHmac } from 'crypto';
-import { lastValueFrom } from 'rxjs';
 import { Prisma, WebhookEvent } from '@prisma/client';
 import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-list-query.dto';
 import { PaginatedResult, paginate } from '@heyatom/nest-common';
@@ -32,27 +27,16 @@ export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
 
   private readonly urlPolicy: WebhookUrlPolicy;
-  private readonly httpsAgent: HttpsAgent;
-  /** Only reachable with WEBHOOK_ALLOW_PRIVATE_TARGETS (http:// refused otherwise). */
-  private readonly httpAgent?: HttpAgent;
 
   constructor(
-    private readonly httpService: HttpService,
     private readonly prisma: PrismaService,
     config: ConfigService,
   ) {
+    // Development only (refused with NODE_ENV=production by the config
+    // schema): private targets and http:// admitted.
     this.urlPolicy = {
       allowPrivate: config.get<boolean>('WEBHOOK_ALLOW_PRIVATE_TARGETS'),
     };
-    if (this.urlPolicy.allowPrivate) {
-      // Development only (refused with NODE_ENV=production by the config
-      // schema): private targets and http:// admitted.
-      const lookup = webhookLookup(this.urlPolicy);
-      this.httpsAgent = new HttpsAgent({ lookup });
-      this.httpAgent = new HttpAgent({ lookup });
-    } else {
-      this.httpsAgent = webhookAgent;
-    }
   }
 
   async findAll(
@@ -92,17 +76,21 @@ export class WebhooksService {
   }
 
   /**
-   * Sends the canonical payload stored in the outbox to the tenant.
+   * Sends the canonical payload stored in the outbox to the tenant, signed
+   * with Standard Webhooks headers (`webhook-id` = the outbox row id, stable
+   * across retries so receivers deduplicate on it; `webhook-timestamp` = send
+   * time).
    *
    * The tenant `webhookUrl` is tenant-controlled, so every send goes through
    * the SSRF guard: a textual check first (literal IPs never reach `lookup`),
-   * then an agent whose `lookup` refuses non-public addresses at connect time
-   * (no DNS-rebinding window). `blocked` is terminal: retrying a refused
-   * target is the scan itself.
+   * then a `lookup` that refuses non-public addresses at connect time (no
+   * DNS-rebinding window), no redirects. `blocked` is terminal: retrying a
+   * refused target is the scan itself.
    */
   async send(
     url: string,
     secret: string,
+    id: string,
     payload: Prisma.JsonValue,
   ): Promise<WebhookSendResult> {
     let host: string;
@@ -114,31 +102,38 @@ export class WebhooksService {
       return 'blocked';
     }
 
-    // Creiamo una firma HMAC per permettere al client di verificare l'origine
-    const signature = this.generateSignature(secret, payload);
+    // The signature covers these exact bytes: serialize once.
+    const body = JSON.stringify(payload);
+    const headers = signStandardWebhook({
+      id,
+      timestamp: Math.floor(Date.now() / 1000),
+      body,
+      secrets: [secret],
+    });
 
     try {
-      await lastValueFrom(
-        this.httpService.post(url, payload, {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-webhook-signature': signature,
-            'User-Agent': 'Articuno-Webhook/1.0',
-          },
-          timeout: 5000,
-          maxRedirects: 0,
-          // HTTP(S)_PROXY would let the proxy resolve the target, bypassing
-          // the pinned agent's lookup.
-          proxy: false,
-          httpsAgent: this.httpsAgent,
-          httpAgent: this.httpAgent,
-        }),
+      const { status } = await postWebhook(
+        url,
+        body,
+        {
+          ...headers,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Articuno-Webhook/1.0',
+        },
+        { timeoutMs: 5000, policy: this.urlPolicy },
       );
-      return 'sent';
+      if (status >= 200 && status < 300) return 'sent';
+      this.logger.error(`Webhook fallito verso ${host}: HTTP ${status}`);
+      return 'failed';
     } catch (error) {
       if (isWebhookTargetBlocked(error)) {
         const cause = (error as { cause?: unknown }).cause;
-        const reason = cause instanceof WebhookUrlError ? cause.reason : '';
+        const reason =
+          error instanceof WebhookUrlError
+            ? error.reason
+            : cause instanceof WebhookUrlError
+              ? cause.reason
+              : '';
         this.logger.warn(`Webhook target refused ${host}: ${reason}`);
         return 'blocked';
       }
@@ -207,11 +202,5 @@ export class WebhooksService {
     });
 
     return { reset: result.count };
-  }
-
-  private generateSignature(secret: string, payload: Prisma.JsonValue): string {
-    return createHmac('sha256', secret)
-      .update(JSON.stringify(payload))
-      .digest('hex');
   }
 }
