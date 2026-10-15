@@ -1,10 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { setupSwagger } from '@heyatom/nest-common';
 import { ConfigService } from '@nestjs/config';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './modules/app/app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { SWAGGER_OPTIONS } from '@/common/swagger';
 
 async function bootstrap(): Promise<void> {
   try {
@@ -58,38 +59,16 @@ async function bootstrap(): Promise<void> {
     app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
 
     // /docs enumerates the whole API surface, admin routes included:
-    // development only, as in Bastion, Herald, Beacon and Gatherly.
-    if (!isProduction) {
-      const config = new DocumentBuilder()
-        .setTitle('Articuno')
-        .setDescription(
-          'Multi-tenant CMS management system built with NestJS, Prisma ORM, and PostgreSQL.',
-        )
-        .setVersion(process?.env?.npm_package_version || '2.0.0')
-        .addApiKey(
-          { type: 'apiKey', name: 'X-API-Key', in: 'header' },
-          'api-key',
-        )
-        .addBearerAuth()
-        .setLicense(
-          'MIT',
-          'https://github.com/heyatomdev/articuno/blob/main/README.md',
-        )
-        .setContact(
-          'Andrea Tombolato',
-          'https://heyatom.dev',
-          'hey@heyatom.dev',
-        )
-        .build();
-
-      const document = SwaggerModule.createDocument(app, config);
-      SwaggerModule.setup('/docs', app, document);
+    // ENABLE_SWAGGER, resolved fail-closed in config.validation.ts.
+    const swagger = configService.get<boolean>('ENABLE_SWAGGER');
+    if (swagger) {
+      setupSwagger(app, SWAGGER_OPTIONS);
     }
 
     await app.listen(port);
 
     bootstrapLogger.log(`Articuno started successfully`);
-    if (!isProduction) {
+    if (swagger) {
       bootstrapLogger.log(`API Documentation: http://localhost:${port}/docs`);
     }
     bootstrapLogger.log(`Current BASE_URL is set to: ${baseUrl}`);

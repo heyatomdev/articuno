@@ -4736,9 +4736,17 @@
   },
   "info": {
     "title": "Articuno",
-    "description": "",
+    "description": "Multi-tenant CMS management system built with NestJS, Prisma ORM, and PostgreSQL.",
     "version": "1.2.3",
-    "contact": {}
+    "contact": {
+      "name": "Andrea Tombolato",
+      "url": "https://heyatom.dev",
+      "email": "hey@heyatom.dev"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/heyatomdev/articuno/blob/main/README.md"
+    }
   },
   "tags": [],
   "servers": [],

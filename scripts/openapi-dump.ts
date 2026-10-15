@@ -7,21 +7,17 @@
  */
 import { writeFileSync } from 'node:fs';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { createOpenApiDocument } from '@heyatom/nest-common';
 
 process.env.DATABASE_URL ??= 'postgresql://openapi:dump@localhost:5432/openapi';
 process.env.BASTION_URL ??= 'http://localhost:3001';
 
 async function dump(out: string) {
   const { AppModule } = await import('../src/modules/app/app.module');
+  const { SWAGGER_OPTIONS } = await import('../src/common/swagger');
   const app = await NestFactory.create(AppModule, { logger: false });
-  const config = new DocumentBuilder()
-    .setTitle('Articuno')
-    .setVersion(process.env.npm_package_version || '2.0.0')
-    .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
-    .addBearerAuth()
-    .build();
-  writeFileSync(out, JSON.stringify(SwaggerModule.createDocument(app, config), null, 2) + '\n');
+  const doc = createOpenApiDocument(app, SWAGGER_OPTIONS);
+  writeFileSync(out, JSON.stringify(doc, null, 2) + '\n');
   await app.close();
 }
 

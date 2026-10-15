@@ -1,6 +1,15 @@
 import * as Joi from 'joi';
+import { swaggerEnabled } from '@heyatom/nest-common';
 
 export const configValidationSchema = Joi.object({
+  // /docs and /docs-json. Unset → on only when NODE_ENV is explicitly
+  // development or test (fail-closed). Declared before NODE_ENV on purpose:
+  // the default must see the raw NODE_ENV, not its `development` default.
+  ENABLE_SWAGGER: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default((env: { NODE_ENV?: string }) => swaggerEnabled(env)),
+
   // Environment
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
