@@ -25,7 +25,7 @@ import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto'
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType, UserRole } from '@prisma/client';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import { ReportDto } from '@/modules/reports/dto/report-response.dto';
 
 @ApiTags('Reports')

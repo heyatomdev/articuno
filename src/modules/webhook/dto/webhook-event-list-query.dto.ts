@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { PageParams } from '@/common/pagination';
+import { PageParams } from '@heyatom/nest-common';
 
 export class WebhookEventListQueryDto extends PageParams {
   @ApiPropertyOptional({

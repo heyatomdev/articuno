@@ -21,7 +21,7 @@ import { AutoModerationReasonEnum } from '@/modules/moderation/moderation.types'
 import { stripTags } from '@/utils/html-sanitizer';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ContentStatus, Prisma, TargetType } from '@prisma/client';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import {
   SYSTEM_EXTERNAL_IDS,
   SYSTEM_REPORTER_ID,

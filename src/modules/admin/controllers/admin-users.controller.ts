@@ -30,7 +30,7 @@ import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
 import { UserParamsDto } from '@/modules/users/dto/user-params.dto';
 import { UpdateUserStatusDto } from '@/modules/users/dto/update-user-status.dto';
-import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 

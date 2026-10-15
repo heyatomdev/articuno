@@ -28,7 +28,7 @@ import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
 import { TagParamsDto } from '@/modules/tags/dto/tag-params.dto';
 import { TagSlugParamsDto } from '@/modules/tags/dto/tag-slug-params.dto';
 import { TagsListQuery } from '@/modules/tags/queries/tags.query';
-import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
 import { TagDto } from '@/modules/tags/dto/tags.dto';
 
 @ApiTags('Tags')

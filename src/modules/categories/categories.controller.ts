@@ -31,7 +31,7 @@ import {
   CategoryDto,
   CategoryListItemDto,
 } from '@/modules/categories/dto/category.dto';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 
 @ApiTags('Categories')
 @ApiSecurity('api-key')

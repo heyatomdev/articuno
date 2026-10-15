@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { ContentStatus } from '@prisma/client';
-import { PageParams } from '@/common/pagination';
+import { PageParams } from '@heyatom/nest-common';
 
 /** Comment statuses the public API (X-API-Key) may list or read. */
 export const PUBLIC_COMMENT_STATUSES: ContentStatus[] = [

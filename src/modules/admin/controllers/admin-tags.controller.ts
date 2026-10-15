@@ -26,7 +26,7 @@ import { CreateTagDto } from '@/modules/tags/dto/create-tag.dto';
 import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
 import { TagParamsDto } from '@/modules/tags/dto/tag-params.dto';
 import { TagsListQuery } from '@/modules/tags/queries/tags.query';
-import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
 import { TagDto } from '@/modules/tags/dto/tags.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';

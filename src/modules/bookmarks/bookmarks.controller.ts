@@ -20,7 +20,7 @@ import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BookmarksService } from '@/modules/bookmarks/bookmarks.service';
 import { BookmarkParamsDto } from '@/modules/bookmarks/dto/bookmark-params.dto';
-import { PageParams, ApiPaginatedResponse } from '@/common/pagination';
+import { PageParams, ApiPaginatedResponse } from '@heyatom/nest-common';
 import {
   BookmarkListItemDto,
   BookmarkToggleResultDto,

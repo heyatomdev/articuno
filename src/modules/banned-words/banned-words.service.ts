@@ -6,7 +6,7 @@ import {
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBannedWordDto } from './dto/create-banned-word.dto';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { BannedWordListQueryDto } from './dto/banned-word-list-query.dto';
 import { BannedWordDto } from './dto/banned-word.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';

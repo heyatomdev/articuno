@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { CreateTagDto } from '@/modules/tags/dto/create-tag.dto';
 import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { TagsListQuery } from '@/modules/tags/queries/tags.query';
 import { TagDto } from '@/modules/tags/dto/tags.dto';
 import { plainToInstance } from 'class-transformer';

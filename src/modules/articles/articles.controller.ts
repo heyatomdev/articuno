@@ -30,7 +30,7 @@ import {
 } from '@/modules/articles/dto/article-params.dto';
 import { PublicArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ArticleShowQueryDto } from '@/modules/articles/dto/article-show-query.dto';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import {
   ArticleDto,
   ArticleListItemDto,

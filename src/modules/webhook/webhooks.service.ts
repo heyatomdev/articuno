@@ -10,7 +10,7 @@ import { createHmac } from 'crypto';
 import { lastValueFrom } from 'rxjs';
 import { Prisma, WebhookEvent } from '@prisma/client';
 import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-list-query.dto';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 
 @Injectable()

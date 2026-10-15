@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { PageParams, PaginatedResult, paginate } from '@/common/pagination';
+import { PageParams, PaginatedResult, paginate } from '@heyatom/nest-common';
 import { ContentStatus } from '@prisma/client';
 
 @Injectable()

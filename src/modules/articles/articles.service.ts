@@ -19,7 +19,7 @@ import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
 import { slugifySafe } from '@/utils/slugify';
 import { generateRandomName } from '@/utils/random-name';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { isValidModerationTransition } from '@/modules/moderation/moderation-policy.service';
 import { AutoModerationReasonEnum } from '@/modules/moderation/moderation.types';

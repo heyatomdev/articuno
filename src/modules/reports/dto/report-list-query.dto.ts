@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ReportStatus, TargetType } from '@prisma/client';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { PageParams } from '@/common/pagination';
+import { PageParams } from '@heyatom/nest-common';
 
 export class ReportListQueryDto extends PageParams {
   @ApiProperty({

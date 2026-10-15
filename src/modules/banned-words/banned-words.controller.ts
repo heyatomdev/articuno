@@ -24,7 +24,7 @@ import { CreateBannedWordDto } from './dto/create-banned-word.dto';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BannedWordListQueryDto } from './dto/banned-word-list-query.dto';
-import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
 import { BannedWordDto } from './dto/banned-word.dto';
 
 @ApiTags('Banned Words')

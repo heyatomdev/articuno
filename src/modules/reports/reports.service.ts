@@ -16,7 +16,7 @@ import {
 import { ModerationPolicyService } from '@/modules/moderation/moderation-policy.service';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 
 /**
  * Internal extension of CreateReportDto used by the admin path only.

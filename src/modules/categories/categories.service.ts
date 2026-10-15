@@ -6,7 +6,7 @@ import {
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
 import { slugifySafe } from '@/utils/slugify';
 

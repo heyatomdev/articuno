@@ -30,7 +30,7 @@ import {
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateBannedWordDto } from '@/modules/banned-words/dto/create-banned-word.dto';
 import { BannedWordListQueryDto } from '@/modules/banned-words/dto/banned-word-list-query.dto';
-import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
 import { BannedWordDto } from '@/modules/banned-words/dto/banned-word.dto';
 
 @ApiTags('Admin / Banned Words')
