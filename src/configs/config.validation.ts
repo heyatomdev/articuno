@@ -17,8 +17,20 @@ export const configValidationSchema = Joi.object({
 
   // Server
   PORT: Joi.number().positive().default(3000),
+  // Deprecated names, still read as defaults for CORS_ORIGINS and
+  // TRUST_PROXY_HOPS (declared before them on purpose: a function default only
+  // sees the keys validated before it). Drop once every deploy is migrated.
   CORS_ORIGIN: Joi.string().allow('').optional(),
-  TRUST_PROXY: Joi.boolean().truthy('true').falsy('false').default(false),
+  TRUST_PROXY: Joi.boolean().truthy('true').falsy('false').optional(),
+  // Comma-separated allowlist; empty = no cross-origin browser access.
+  CORS_ORIGINS: Joi.string()
+    .allow('')
+    .default((env: { CORS_ORIGIN?: string }) => env.CORS_ORIGIN ?? ''),
+  // Reverse-proxy hops in front of the app (`trust proxy`); 1 = nginx.
+  TRUST_PROXY_HOPS: Joi.number()
+    .integer()
+    .min(0)
+    .default((env: { TRUST_PROXY?: boolean }) => (env.TRUST_PROXY ? 1 : 0)),
   BASE_URL: Joi.string().uri({ allowRelative: false }).allow('').optional(),
   // Prometheus scrape port (src/modules/metrics) — internal network only.
   METRICS_PORT: Joi.number().port().default(9091),

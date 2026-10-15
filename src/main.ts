@@ -1,6 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { setupSwagger } from '@heyatom/nest-common';
+import { Logger } from '@nestjs/common';
+import {
+  parseCorsOrigins,
+  setupHttpApp,
+  setupSwagger,
+} from '@heyatom/nest-common';
 import { ConfigService } from '@nestjs/config';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './modules/app/app.module';
@@ -17,46 +21,29 @@ async function bootstrap(): Promise<void> {
     app.useLogger(app.get(PinoLogger));
 
     const configService = app.get(ConfigService);
-    const environment =
-      configService.get<string>('environment') ?? 'development';
-    const isProduction = environment === 'production';
-    const corsOrigins = (configService.get<string>('corsOrigin') ?? '')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean);
-    const trustProxy = configService.get<boolean>('trustProxy') ?? false;
-    const port = configService.get<number>('port') ?? 3000;
-    const baseUrl = configService.get<string>('baseUrl') ?? 'Not Set';
-
-    app.enableShutdownHooks();
-    if (trustProxy) {
-      app.set('trust proxy', 1);
-    }
-
-    // Global validation pipe
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
+    const port = configService.getOrThrow<number>('PORT');
+    const baseUrl = configService.get<string>('BASE_URL') || 'Not Set';
+    const corsOrigins = parseCorsOrigins(
+      configService.get<string>('CORS_ORIGINS'),
     );
 
-    // Enable CORS. X-API-Key / X-User-Id are deliberately not allowed: the tenant
-    // key is server-to-server only, a browser must never hold it.
-    app.enableCors({
-      origin: corsOrigins.length > 0 ? corsOrigins : !isProduction,
-      methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+    // Shutdown hooks, trust proxy, helmet, CORS allowlist, 1mb JSON limit,
+    // global ValidationPipe (whitelist + forbidNonWhitelisted + transform).
+    // X-API-Key / X-User-Id are deliberately not in the CORS allowed headers:
+    // the tenant key is server-to-server only, a browser must never hold it.
+    setupHttpApp(app, {
+      trustProxyHops: configService.getOrThrow<number>('TRUST_PROXY_HOPS'),
+      corsOrigins,
     });
-    if (isProduction && corsOrigins.length === 0) {
+    app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
+    if (
+      configService.get('NODE_ENV') === 'production' &&
+      corsOrigins.length === 0
+    ) {
       bootstrapLogger.warn(
-        'CORS_ORIGIN is not set in production: browser cross-origin requests are disabled',
+        'CORS_ORIGINS is not set in production: browser cross-origin requests are disabled',
       );
     }
-
-    app.useBodyParser('json', { limit: '1mb' });
-    app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
 
     // /docs enumerates the whole API surface, admin routes included:
     // ENABLE_SWAGGER, resolved fail-closed in config.validation.ts.
