@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { MetricsService } from '../metrics/metrics.service';
+import { WebhookMetrics } from './webhook.metrics';
 import { WebhooksService } from './webhooks.service';
 import { DEAD_LETTER_DATE } from './webhook.constants';
 
@@ -31,7 +31,7 @@ export class WebhooksJob {
     private prisma: PrismaService,
     private webhookService: WebhooksService,
     private config: ConfigService,
-    private metrics: MetricsService,
+    private metrics: WebhookMetrics,
   ) {}
 
   /**

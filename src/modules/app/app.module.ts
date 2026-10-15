@@ -1,9 +1,4 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -13,8 +8,7 @@ import type { Request } from 'express';
 import { PrismaModule } from '@/modules/prisma/prisma.module';
 import config from '../../configs/config.schema';
 import { configValidationSchema } from '@/configs/config.validation';
-import { MetricsModule } from '@/modules/metrics/metrics.module';
-import { MetricsMiddleware } from '@/modules/metrics/metrics.middleware';
+import { MetricsModule } from '@heyatom/nest-common/metrics';
 import { AnalyticsModule } from '@/modules/analytics/analytics.module';
 import { ReportsModule } from '@/modules/reports/reports.module';
 import { UsersModule } from '@/modules/users/users.module';
@@ -77,8 +71,16 @@ const splitList = (raw?: string): string[] | undefined =>
         }),
     }),
 
-    // Prometheus metrics, served on METRICS_PORT — not on the API port
-    MetricsModule,
+    // Prometheus metrics, served on METRICS_PORT — not on the API port.
+    // Also applies the http_request_duration_seconds middleware to every route.
+    MetricsModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        app: 'articuno',
+        port: config.getOrThrow<number>('METRICS_PORT'),
+        host: config.get<string>('METRICS_HOST'),
+      }),
+    }),
 
     // Rate limiting (admin routes only, see AdminThrottlerGuard)
     ThrottlerModule.forRootAsync({
@@ -132,13 +134,4 @@ const splitList = (raw?: string): string[] | undefined =>
   // the coordinated envelope migration (api standards plan, phase 3).
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    // MetricsMiddleware is a middleware and not an APP_INTERCEPTOR on purpose:
-    // interceptors run after guards and TenantMiddleware, so 401s and 429s
-    // would never be counted.
-    consumer
-      .apply(MetricsMiddleware)
-      .forRoutes({ path: '{*splat}', method: RequestMethod.ALL });
-  }
-}
+export class AppModule {}

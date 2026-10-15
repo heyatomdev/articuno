@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { PrismaModule } from '@/modules/prisma/prisma.module';
-import { MetricsModule } from '@/modules/metrics/metrics.module';
 import { WebhooksService } from './webhooks.service';
 import { WebhooksJob } from './webhooks.job';
+import { WebhookMetrics } from './webhook.metrics';
 
 // Tenant webhook URLs are tenant-controlled: no redirects (SSRF pivot), short
 // timeout, and the response body is never needed, so cap it hard.
@@ -15,12 +15,8 @@ export const WEBHOOK_HTTP_OPTIONS = {
 };
 
 @Module({
-  imports: [
-    HttpModule.register(WEBHOOK_HTTP_OPTIONS),
-    PrismaModule,
-    MetricsModule,
-  ],
-  providers: [WebhooksService, WebhooksJob],
+  imports: [HttpModule.register(WEBHOOK_HTTP_OPTIONS), PrismaModule],
+  providers: [WebhooksService, WebhooksJob, WebhookMetrics],
   exports: [WebhooksService],
 })
 export class WebhooksModule {}

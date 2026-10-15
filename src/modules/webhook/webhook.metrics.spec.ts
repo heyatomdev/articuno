@@ -1,10 +1,27 @@
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { MetricsService } from './metrics.service';
+import { MetricsService } from '@heyatom/nest-common/metrics';
+import { WebhookMetrics } from './webhook.metrics';
 
-describe('MetricsService', () => {
+describe('WebhookMetrics', () => {
   const queryRaw = jest.fn();
   let service: MetricsService;
+
+  it('registers the counter with every result at 0', async () => {
+    service = new MetricsService({ app: 'articuno' });
+    new WebhookMetrics(service, {} as PrismaService);
+    const text = await service.registry.metrics();
+    for (const result of [
+      'success',
+      'failure',
+      'unconfigured',
+      'dead_lettered',
+    ]) {
+      expect(text).toContain(
+        `articuno_webhook_delivery_attempts_total{result="${result}",app="articuno"} 0`,
+      );
+    }
+  });
 
   async function outbox(state: string): Promise<number | undefined> {
     const metric = service.registry.getSingleMetric(
@@ -22,7 +39,8 @@ describe('MetricsService', () => {
 
   beforeEach(() => {
     queryRaw.mockReset();
-    service = new MetricsService({
+    service = new MetricsService({ app: 'articuno' });
+    new WebhookMetrics(service, {
       $queryRaw: queryRaw,
     } as unknown as PrismaService);
   });

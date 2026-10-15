@@ -32,8 +32,10 @@ export const configValidationSchema = Joi.object({
     .min(0)
     .default((env: { TRUST_PROXY?: boolean }) => (env.TRUST_PROXY ? 1 : 0)),
   BASE_URL: Joi.string().uri({ allowRelative: false }).allow('').optional(),
-  // Prometheus scrape port (src/modules/metrics) — internal network only.
+  // Prometheus scrape port (@heyatom/nest-common/metrics) — internal network
+  // only. METRICS_HOST unset = listen on :: (dual-stack).
   METRICS_PORT: Joi.number().port().default(9091),
+  METRICS_HOST: Joi.string().optional(),
 
   // pino levels; unset → info in production, debug elsewhere
   LOG_LEVEL: Joi.string()
