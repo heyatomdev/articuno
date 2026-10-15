@@ -1,7 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { stripTags, stripTranslationText } from './html-sanitizer';
-import { slugifySafe } from './slugify';
+import { nextFreeSlug, slugify } from './slugify';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 
@@ -21,7 +21,7 @@ describe('stripTags / stripTranslationText', () => {
   it('slugifies the decoded title (no "amp" in the slug)', () => {
     const { title } = stripTranslationText({ title: 'Tom &amp; <i>Jerry</i>' });
     expect(title).toBe('Tom & Jerry');
-    expect(slugifySafe(title)).toMatch(/^tom-jerry-[0-9a-z]{8}$/);
+    expect(slugify(title)).toBe('tom-jerry');
   });
 
   it('strips title and SEO fields, leaves the rest alone', () => {
@@ -87,5 +87,21 @@ describe('article DTO limits', () => {
         coverImage: 'https://fileharbor:3000/v2/images/abc',
       }),
     ).toEqual([]);
+  });
+});
+
+describe('slugify / nextFreeSlug', () => {
+  it('has no random suffix and is deterministic', () => {
+    expect(slugify('Caffè & Cornetto!')).toBe('caffe-cornetto');
+    expect(slugify('Caffè & Cornetto!')).toBe(slugify('Caffè & Cornetto!'));
+    expect(slugify('!!!')).toBe('untitled');
+  });
+
+  it('suffixes only on collision', () => {
+    expect(nextFreeSlug('pizza', ['pizza-margherita'])).toBe('pizza');
+    expect(nextFreeSlug('pizza', ['pizza'])).toBe('pizza-2');
+    expect(nextFreeSlug('pizza', ['pizza', 'pizza-2', 'pizza-4'])).toBe(
+      'pizza-3',
+    );
   });
 });

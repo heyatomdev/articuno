@@ -9,7 +9,7 @@
 |---|---|---|---|
 | B1 | `GET /articles` e `GET /articles/:slug` restituiscono articoli BANNED/HIDDEN/DRAFT se il tenant non passa `?status`; `ArticleFiltersQueryDto` accetta perfino `status=BANNED` | alta | **Chiuso** — `bc2b424`, `f76c116`: regola `publicArticleStatuses()` su lista, dettaglio, traduzioni, like e bookmark |
 | B2 | Delete di un utente con commenti → P2003 / 500 (`comments.authorId` RESTRICT). La FK composita `reports.moderatorId` con `SET NULL` azzera anche `tenantId` (NOT NULL): fallisce anche la delete di un admin con report moderati. P2003 non è mappato e il client riceve 500 | media | **Chiuso** — `4814f1d`: migration `20261014120000_user_delete_foreign_keys`, commenti al placeholder `articuno:deleted`, P2003 → 409 |
-| B3 | `slugifySafe` aggiunge un suffisso casuale e lo slug si rigenera a ogni cambio titolo → i vecchi URL vanno in 404 | media | Aperto (backlog #5) |
+| B3 | `slugifySafe` aggiunge un suffisso casuale e lo slug si rigenera a ogni cambio titolo → i vecchi URL vanno in 404 | media | **Chiuso** — slug senza suffisso (`-2`, `-3` solo su collisione), mai rigenerati in update, `slug` modificabile solo da `/admin/*`; gli slug storici restano come sono |
 | B4 | `Article.views` non viene mai incrementato: la dashboard mostra 0 e la top 5 ha un ordine arbitrario | media | Aperto (backlog #11) |
 | B5 | Le banned words fanno match per sottostringa (`includes`): "ass" blocca "classe" | media | Aperto (backlog #3) |
 | B6 | `webhookSecret` e `fileharborApiKey` sono salvati in chiaro su `tenants` | media | Aperto, rimandato: cifratura a riposo col pattern di Herald |
@@ -27,7 +27,7 @@ Il punto 1 è già rilasciato come breaking change (contratto nel §5.1 della [g
 | 2 | ✅ **Fix integrità delle delete** (B2) — fatto | S | FK dei commenti, FK composita dei report, CASCADE da tenant su reports e banned_words, P2003 → 409 | Export GDPR, offboarding/import del tenant |
 | 3 | **Banned words con match per parola intera** (B5) | S | Confini di parola, normalizzazione Unicode e accenti, test di regressione su "classe" | Regex dei tenant (rischio ReDoS), leetspeak, azioni FLAG/HIDE/REJECT |
 | 4 | **Webhook idempotenti** | S | Header `X-Webhook-Id` (id del `WebhookEvent`) e `X-Webhook-Timestamp`, firma su `timestamp.body`, documentati | Rotazione con doppio secret, nonce store |
-| 5 | **Slug stabili** (B3) | S | Slug generato una volta, suffisso solo in caso di collisione, nessuna rigenerazione al cambio titolo, slug modificabile dall'admin | Tabella storico slug e redirect |
+| 5 | ✅ **Slug stabili** (B3) — fatto | S | Slug generato una volta, suffisso solo in caso di collisione, nessuna rigenerazione al cambio titolo, slug modificabile dall'admin | Tabella storico slug e redirect |
 | 6 | **`publishedAt` + eventi di contenuto** | S/M | `publishedAt` impostato alla prima pubblicazione, sort per `publishedAt`, eventi outbox `article.published`/`unpublished`/`deleted` nella stessa `tx` | Endpoint webhook multipli per tenant, filtri, eventi sui commenti |
 | 7 | **Configurazione tenant da admin** | S/M | `GET`/`PATCH /admin/tenant` (SUPER_ADMIN) per webhookUrl, rigenerazione del secret, credenziali FileHarbor, defaultLanguage; `POST /admin/tenant/rotate-api-key`; nuove AuditAction | CRUD multi-tenant, più chiavi o scope (per ruotare senza downtime c'è già il JWT service-client di Bastion) |
 | 8 | **Fallback sulla lingua di default** (B7) | S | Usa `tenant.defaultLanguage` quando manca `languageCode` e aggiunge il flag `isFallback` | Catene di fallback, hreflang (gli alternates sono già in risposta) |

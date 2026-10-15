@@ -12,7 +12,7 @@ import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { TagsListQuery } from '@/modules/tags/queries/tags.query';
 import { TagDto } from '@/modules/tags/dto/tags.dto';
 import { plainToInstance } from 'class-transformer';
-import { slugifySafe } from '@/utils/slugify';
+import { nextFreeSlug, slugify } from '@/utils/slugify';
 
 @Injectable()
 export class TagsService {
@@ -23,12 +23,21 @@ export class TagsService {
   private readonly CONFLICT_ERROR_MESSAGE = 'Slug already exists';
 
   async create(tenantId: string, dto: CreateTagDto) {
+    const base = slugify(dto.name);
+    const taken = await this.prisma.tag.findMany({
+      where: { tenantId, slug: { startsWith: base } },
+      select: { slug: true },
+    });
+
     try {
       return await this.prisma.tag.create({
         data: {
           tenantId,
           name: dto.name,
-          slug: slugifySafe(dto.name),
+          slug: nextFreeSlug(
+            base,
+            taken.map((t) => t.slug),
+          ),
         },
       });
     } catch (error) {
@@ -158,21 +167,18 @@ export class TagsService {
     });
   }
 
-  async update(tenantId: string, id: string, dto: UpdateTagDto) {
-    const existingTag = await this.findOne(tenantId, id);
-
-    const data: UpdateTagDto & { slug?: string } = {};
-    if (dto.name !== undefined) {
-      data.name = dto.name;
-      if (dto.name !== existingTag.name) {
-        data.slug = slugifySafe(dto.name);
-      }
-    }
+  /** The slug never follows `name`: it changes only when `slug` is passed (admin). */
+  async update(
+    tenantId: string,
+    id: string,
+    dto: UpdateTagDto & { slug?: string },
+  ) {
+    await this.findOne(tenantId, id);
 
     try {
       return await this.prisma.tag.update({
         where: { id },
-        data,
+        data: { name: dto.name, slug: dto.slug },
       });
     } catch (error) {
       if (error.code === 'P2002') {

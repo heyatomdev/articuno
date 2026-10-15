@@ -8,19 +8,28 @@ import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto'
 import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
 import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
-import { slugifySafe } from '@/utils/slugify';
+import { nextFreeSlug, slugify } from '@/utils/slugify';
 
 @Injectable()
 export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(tenantId: string, dto: CreateCategoryDto) {
+    const base = slugify(dto.name);
+    const taken = await this.prisma.category.findMany({
+      where: { tenantId, slug: { startsWith: base } },
+      select: { slug: true },
+    });
+
     try {
       return await this.prisma.category.create({
         data: {
           tenantId,
           ...dto,
-          slug: slugifySafe(dto.name),
+          slug: nextFreeSlug(
+            base,
+            taken.map((c) => c.slug),
+          ),
         },
       });
     } catch (error) {
@@ -89,18 +98,18 @@ export class CategoriesService {
     return category;
   }
 
-  async update(tenantId: string, id: string, dto: UpdateCategoryDto) {
-    const existingCategory = await this.findOne(tenantId, id);
-
-    const data: UpdateCategoryDto & { slug?: string } = { ...dto };
-    if (dto.name !== undefined && dto.name !== existingCategory.name) {
-      data.slug = slugifySafe(dto.name);
-    }
+  /** The slug never follows `name`: it changes only when `slug` is passed (admin). */
+  async update(
+    tenantId: string,
+    id: string,
+    dto: UpdateCategoryDto & { slug?: string },
+  ) {
+    await this.findOne(tenantId, id);
 
     try {
       return await this.prisma.category.update({
         where: { id },
-        data,
+        data: dto,
       });
     } catch (error) {
       if (error.code === 'P2002') {

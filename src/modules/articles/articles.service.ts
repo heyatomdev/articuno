@@ -17,7 +17,7 @@ import { ContentStatus } from '@prisma/client';
 import { publicArticleStatuses } from '@/modules/articles/article-visibility';
 import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
-import { slugifySafe } from '@/utils/slugify';
+import { nextFreeSlug, slugify } from '@/utils/slugify';
 import { generateRandomName } from '@/utils/random-name';
 import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
@@ -86,11 +86,10 @@ export class ArticlesService {
 
   private sanitizeTranslation<
     T extends { title: string; content: string; excerpt?: string },
-  >(translation: T): T & { slug: string; readingTime: number } {
+  >(translation: T): T & { readingTime: number } {
     translation = stripTranslationText(translation);
     return {
       ...translation,
-      slug: slugifySafe(translation.title),
       content: sanitizeContent(translation.content),
       readingTime: computeReadingTime(translation.content),
       ...(translation.excerpt !== undefined
@@ -239,6 +238,22 @@ export class ArticlesService {
     const sanitizedTranslations = translationsInput.map((t) =>
       this.sanitizeTranslation(t),
     );
+    const bases = sanitizedTranslations.map((t) => slugify(t.title));
+    const taken = (
+      await this.prisma.articleTranslation.findMany({
+        where: {
+          tenantId,
+          OR: bases.map((base) => ({ slug: { startsWith: base } })),
+        },
+        select: { slug: true },
+      })
+    ).map((t) => t.slug);
+    // Same title in two languages → "titolo", "titolo-2".
+    const slugs = bases.map((base) => {
+      const slug = nextFreeSlug(base, taken);
+      taken.push(slug);
+      return slug;
+    });
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -256,8 +271,9 @@ export class ArticlesService {
                 }
               : undefined,
             translations: {
-              create: sanitizedTranslations.map((translation) => ({
+              create: sanitizedTranslations.map((translation, i) => ({
                 ...translation,
+                slug: slugs[i],
                 tenantId,
               })),
             },

@@ -103,7 +103,7 @@ export class CategoriesController {
   @ApiOperation({
     summary: 'Update a category',
     description:
-      'Updates the name, description, or colour of an existing category. The slug is re-generated when the name changes.',
+      'Updates the name, description, or colour of an existing category. The slug does not change.',
   })
   @ApiParam({
     name: 'id',

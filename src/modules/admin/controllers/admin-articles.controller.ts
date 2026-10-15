@@ -46,7 +46,7 @@ import {
   ArticleParamsDto,
 } from '@/modules/articles/dto/article-params.dto';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
-import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
+import { AdminUpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ApiPaginatedResponse } from '@heyatom/nest-common';
@@ -645,7 +645,7 @@ export class AdminArticlesController {
     description: 'BCP 47 language code of the translation to update',
     example: 'en',
   })
-  @ApiBody({ type: UpdateArticleTranslationDto })
+  @ApiBody({ type: AdminUpdateArticleTranslationDto })
   @ApiResponse({
     status: 200,
     description: 'Translation updated successfully.',
@@ -666,7 +666,7 @@ export class AdminArticlesController {
   async updateTranslation(
     @GetSession() session: AdminSession,
     @Param() params: ArticleTranslationParamsDto,
-    @Body() dto: UpdateArticleTranslationDto,
+    @Body() dto: AdminUpdateArticleTranslationDto,
   ) {
     const translation = await this.articleTranslationsService.update(
       session.tenantId,

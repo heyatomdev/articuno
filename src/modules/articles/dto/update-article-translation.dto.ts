@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { SLUG_PATTERN } from '@/utils/slugify';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import {
   META_DESCRIPTION_MAX_LENGTH,
   TITLE_MAX_LENGTH,
@@ -54,4 +61,20 @@ export class UpdateArticleTranslationDto {
   @IsNotEmpty()
   @MaxLength(META_DESCRIPTION_MAX_LENGTH)
   metaDescription?: string;
+}
+
+/** Admin only: the public API never sets slugs. */
+export class AdminUpdateArticleTranslationDto extends UpdateArticleTranslationDto {
+  @ApiPropertyOptional({
+    description:
+      'New URL slug (lowercase alphanumeric words separated by hyphens). Old links stop working: change it only on purpose.',
+    example: 'science-and-technology',
+    pattern: SLUG_PATTERN.source,
+  })
+  @IsOptional()
+  @Matches(SLUG_PATTERN, {
+    message: 'slug must be a valid slug (lowercase alphanumeric with hyphens)',
+  })
+  @MaxLength(200)
+  slug?: string;
 }

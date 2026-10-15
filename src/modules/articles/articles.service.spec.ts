@@ -66,6 +66,7 @@ describe('ArticlesService.create with a banned word', () => {
   const prisma = {
     category: { findFirst: jest.fn() },
     article: { create: jest.fn() },
+    articleTranslation: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
   const bannedWords = { checkText: jest.fn() };
@@ -85,11 +86,35 @@ describe('ArticlesService.create with a banned word', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     prisma.category.findFirst.mockResolvedValue({ id: 'cat-1' });
+    prisma.articleTranslation.findMany.mockResolvedValue([]);
     prisma.$transaction.mockImplementation((fn) => fn(prisma));
     prisma.article.create.mockImplementation(({ data }) => ({
       id: 'a1',
       status: data.status,
     }));
+  });
+
+  it('slugs translations without random suffixes, numbering only collisions', async () => {
+    bannedWords.checkText.mockResolvedValue(false);
+    prisma.articleTranslation.findMany.mockResolvedValue([{ slug: 'pizza' }]);
+
+    await service.create(
+      't1',
+      dto({
+        translations: [
+          { languageCode: 'it', title: 'Pizza', content: 'x' },
+          { languageCode: 'en', title: 'Pizza', content: 'x' },
+          { languageCode: 'fr', title: 'Crêpe', content: 'x' },
+        ],
+      }) as any,
+    );
+
+    const created =
+      prisma.article.create.mock.calls[0][0].data.translations.create;
+    expect(created.map((t) => t.slug)).toEqual(['pizza-2', 'pizza-3', 'crepe']);
+    expect(
+      prisma.articleTranslation.findMany.mock.calls[0][0].where.tenantId,
+    ).toBe('t1');
   });
 
   it('creates the article HIDDEN and enqueues article.status_changed in the same tx', async () => {

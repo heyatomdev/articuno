@@ -99,7 +99,7 @@ export class TagsController {
   @ApiOperation({
     summary: 'Update a tag',
     description:
-      'Updates the name (and consequently the slug) of an existing tag.',
+      'Updates the name of an existing tag. The slug does not change.',
   })
   @ApiParam({
     name: 'id',
