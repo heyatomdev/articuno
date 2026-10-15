@@ -34,8 +34,8 @@ async function bootstrap(): Promise<void> {
     setupHttpApp(app, {
       trustProxyHops: configService.getOrThrow<number>('TRUST_PROXY_HOPS'),
       corsOrigins,
+      urlencodedBodyLimit: '256kb',
     });
-    app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
     if (
       configService.get('NODE_ENV') === 'production' &&
       corsOrigins.length === 0

@@ -23,8 +23,8 @@
     "node": ">=20.19.0"
   },
   "dependencies": {
-    "@heyatom/bastion-client": "^0.7.0",
-    "@heyatom/nest-common": "^0.2.0",
+    "@heyatom/bastion-client": "^0.8.0",
+    "@heyatom/nest-common": "^0.3.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.2.7",
     "@nestjs/config": "^4.0.4",
@@ -45,7 +45,6 @@
     "form-data": "^4.0.6",
     "helmet": "^8.3.0",
     "joi": "^18.2.9",
-    "jose": "^6.2.12",
     "multer": "^2.4.0",
     "nestjs-pino": "^4.6.1",
     "pino-http": "^11.0.0",
@@ -100,9 +99,7 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"
     },
-    "transformIgnorePatterns": [
-      "/node_modules/(?!jose)/"
-    ]
+    "transformIgnorePatterns": []
   },
   "prisma": {
     "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
