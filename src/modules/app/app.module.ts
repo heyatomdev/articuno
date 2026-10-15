@@ -9,7 +9,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
-import { randomUUID } from 'crypto';
 import type { Request } from 'express';
 import { PrismaModule } from '@/modules/prisma/prisma.module';
 import config from '../../configs/config.schema';
@@ -32,7 +31,11 @@ import { WebhooksModule } from '@/modules/webhook/webhooks.module';
 import { AdminModule } from '@/modules/admin/admin.module';
 import { HealthModule } from '@/modules/health/health.module';
 import { BastionModule } from '@heyatom/bastion-client/nest';
-import { AllExceptionsFilter } from '@heyatom/nest-common';
+import {
+  AllExceptionsFilter,
+  loggerParams,
+  minimalRequestSerializer,
+} from '@heyatom/nest-common';
 
 /** Comma-separated env list → array; undefined keeps the package default. */
 const splitList = (raw?: string): string[] | undefined =>
@@ -53,57 +56,25 @@ const splitList = (raw?: string): string[] | undefined =>
       validationSchema: configValidationSchema,
     }),
 
-    // Same pino setup as Bastion: one JSON line per request in production,
-    // pino-pretty single-line in development.
+    // One JSON line per request (pino-pretty single-line in development),
+    // server-generated X-Request-Id, sensitive headers redacted.
     LoggerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const production = config.get('NODE_ENV') === 'production';
-        return {
-          pinoHttp: {
-            level:
-              config.get<string>('LOG_LEVEL') ??
-              (production ? 'info' : 'debug'),
-            transport: production
-              ? undefined
-              : {
-                  target: 'pino-pretty',
-                  options: { singleLine: true, colorize: true },
-                },
-            redact: {
-              paths: [
-                'req.headers.authorization',
-                'req.headers.cookie',
-                'req.headers["x-api-key"]',
-                'res.headers["set-cookie"]',
-              ],
-              remove: true,
-            },
-            genReqId: () => randomUUID(),
-            serializers: {
-              // `raw.ip` honours TRUST_PROXY (`trust proxy` in main.ts).
-              req: (req: {
-                id: string;
-                method: string;
-                url: string;
+      useFactory: (config: ConfigService) =>
+        loggerParams({
+          service: 'articuno',
+          level: config.getOrThrow<string>('LOG_LEVEL'),
+          pretty: config.get('NODE_ENV') !== 'production',
+          serializers: {
+            // `ip` honours TRUST_PROXY_HOPS (`trust proxy`); `remoteAddress`
+            // is the socket peer, i.e. nginx behind the proxy.
+            req: (
+              req: Parameters<typeof minimalRequestSerializer>[0] & {
                 raw: Request;
-              }) => ({
-                id: req.id,
-                method: req.method,
-                url: req.url,
-                ip: req.raw.ip,
-              }),
-              res: (res: { statusCode: number }) => ({
-                statusCode: res.statusCode,
-              }),
-            },
-            customProps: () => ({ service: 'articuno' }),
-            autoLogging: {
-              ignore: (req) => (req.url ?? '').startsWith('/health'),
-            },
+              },
+            ) => ({ ...minimalRequestSerializer(req), ip: req.raw.ip }),
           },
-        };
-      },
+        }),
     }),
 
     // Prometheus metrics, served on METRICS_PORT — not on the API port
