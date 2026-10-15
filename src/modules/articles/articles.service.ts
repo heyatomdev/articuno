@@ -22,6 +22,7 @@ import { generateRandomName } from '@/utils/random-name';
 import { PaginatedResult, paginate } from '@/common/pagination';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { isValidModerationTransition } from '@/modules/moderation/moderation-policy.service';
+import { AutoModerationReasonEnum } from '@/modules/moderation/moderation.types';
 
 @Injectable()
 export class ArticlesService {
@@ -227,34 +228,58 @@ export class ArticlesService {
       tenantId,
       translationsInput,
     );
-    const finalStatus = hasBannedWords ? ContentStatus.HIDDEN : requestedStatus;
+    // A banned word hides the article; BANNED is terminal and stays as is.
+    const autoHidden =
+      hasBannedWords &&
+      requestedStatus !== ContentStatus.HIDDEN &&
+      requestedStatus !== ContentStatus.BANNED;
+    const finalStatus = autoHidden ? ContentStatus.HIDDEN : requestedStatus;
 
     const sanitizedTranslations = translationsInput.map((t) =>
       this.sanitizeTranslation(t),
     );
 
     try {
-      return await this.prisma.article.create({
-        data: {
-          coverImage: dto.coverImage,
-          status: finalStatus,
-          featured: dto.featured,
-          categoryId: dto.categoryId,
-          authorId: dto.authorId,
-          tenantId,
-          tags: dto.tagIds
-            ? {
-                connect: dto.tagIds.map((id) => ({ id })),
-              }
-            : undefined,
-          translations: {
-            create: sanitizedTranslations.map((translation) => ({
-              ...translation,
-              tenantId,
-            })),
+      return await this.prisma.$transaction(async (tx) => {
+        const article = await tx.article.create({
+          data: {
+            coverImage: dto.coverImage,
+            status: finalStatus,
+            featured: dto.featured,
+            categoryId: dto.categoryId,
+            authorId: dto.authorId,
+            tenantId,
+            tags: dto.tagIds
+              ? {
+                  connect: dto.tagIds.map((id) => ({ id })),
+                }
+              : undefined,
+            translations: {
+              create: sanitizedTranslations.map((translation) => ({
+                ...translation,
+                tenantId,
+              })),
+            },
           },
-        },
-        include: this.articleIncludes,
+          include: this.articleIncludes,
+        });
+
+        // Same event the translation path emits when a banned word hides an
+        // existing article. Outbox row in the same tx: delivery is async
+        // (WebhooksJob), the request never waits on the tenant endpoint.
+        if (autoHidden) {
+          await this.webhookPublisher.publishArticleStatusChangedEvent(
+            tenantId,
+            article.id,
+            requestedStatus,
+            ContentStatus.HIDDEN,
+            AutoModerationReasonEnum.BANNED_WORD_DETECTED,
+            'system',
+            tx,
+          );
+        }
+
+        return article;
       });
     } catch (error) {
       if (error.code === 'P2002') {

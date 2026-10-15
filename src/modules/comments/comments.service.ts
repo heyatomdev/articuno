@@ -7,7 +7,12 @@ import {
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { CreateCommentDto } from '@/modules/comments/dto/create-comment.dto';
 import { UpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
-import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
+import {
+  CommentFiltersQueryDto,
+  PUBLIC_COMMENT_STATUSES,
+  PublicCommentFiltersQueryDto,
+} from '@/modules/comments/dto/comment-filters-query.dto';
+import { publicArticleStatuses } from '@/modules/articles/article-visibility';
 import {
   isValidModerationTransition,
   ModerationPolicyService,
@@ -17,7 +22,23 @@ import { stripTags } from '@/utils/html-sanitizer';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { ContentStatus, Prisma, TargetType } from '@prisma/client';
 import { PaginatedResult, paginate } from '@/common/pagination';
-import { SYSTEM_REPORTER_ID } from '@/modules/users/users.constants';
+import {
+  SYSTEM_EXTERNAL_IDS,
+  SYSTEM_REPORTER_ID,
+} from '@/modules/users/users.constants';
+
+/**
+ * Which comments a caller may see. Admin callers leave every field unset;
+ * the public API pins both the comment and the article statuses.
+ */
+export interface CommentScope {
+  /** Comment statuses to return; unset = every status. */
+  statuses?: ContentStatus[];
+  /** Statuses the parent article must be in; unset = any article. */
+  articleStatuses?: ContentStatus[];
+  /** Null `content` on comments that are not VISIBLE (public API). */
+  sanitize?: boolean;
+}
 
 @Injectable()
 export class CommentsService {
@@ -27,11 +48,16 @@ export class CommentsService {
     private readonly webhookPublisher: WebhookEventPublisher,
   ) {}
 
-  private async ensureArticleExists(tenantId: string, articleId: string) {
+  private async ensureArticleExists(
+    tenantId: string,
+    articleId: string,
+    statuses?: ContentStatus[],
+  ) {
     const article = await this.prisma.article.findFirst({
       where: {
         id: articleId,
         tenantId,
+        ...(statuses ? { status: { in: statuses } } : {}),
       },
       select: {
         id: true,
@@ -89,7 +115,13 @@ export class CommentsService {
 
   async create(tenantId: string, dto: CreateCommentDto) {
     const content = this.cleanContent(dto.content);
-    await this.ensureArticleExists(tenantId, dto.articleId);
+    // Only the public API creates comments: same visibility rule as the public
+    // article endpoints (PUBLISHED only, 404 otherwise).
+    await this.ensureArticleExists(
+      tenantId,
+      dto.articleId,
+      publicArticleStatuses(),
+    );
     const user = await this.prisma.ensureUser(tenantId, dto.authorExternalId);
 
     // 1. Check stato utente (BANNED -> 403, SHADOW_BANNED -> auto-hide)
@@ -163,22 +195,69 @@ export class CommentsService {
     return comment;
   }
 
+  /**
+   * Public listing (X-API-Key): VISIBLE and UNDER_REVIEW comments of articles
+   * the public API can read (PUBLISHED), narrowed by `query.status` if given.
+   */
+  findAllPublic(
+    tenantId: string,
+    query: PublicCommentFiltersQueryDto,
+  ): Promise<PaginatedResult<any>> {
+    return this.findAll(tenantId, query, {
+      statuses: query.status ? [query.status] : PUBLIC_COMMENT_STATUSES,
+      articleStatuses: publicArticleStatuses(),
+      sanitize: true,
+    });
+  }
+
+  /**
+   * Public detail (X-API-Key): same rule as `findAllPublic`, 404 otherwise.
+   * The comment's own author (`viewerExternalId`, from X-User-Id) reads it
+   * whatever its status and its article's, with the full content, so a
+   * gateway can check ownership before forwarding PATCH/DELETE.
+   */
+  async findOnePublic(tenantId: string, id: string, viewerExternalId?: string) {
+    const viewer = viewerExternalId?.trim();
+    // Internal placeholders own no one's comments: never match them.
+    if (viewer && !SYSTEM_EXTERNAL_IDS.includes(viewer)) {
+      const own = await this.prisma.comment.findFirst({
+        where: { id, tenantId, author: { tenantId, externalId: viewer } },
+        include: { author: true },
+      });
+      if (own) {
+        return own;
+      }
+    }
+
+    return this.findOne(tenantId, id, {
+      statuses: PUBLIC_COMMENT_STATUSES,
+      articleStatuses: publicArticleStatuses(),
+      sanitize: true,
+    });
+  }
+
+  private scopeWhere(
+    tenantId: string,
+    scope: CommentScope,
+  ): Prisma.CommentWhereInput {
+    return {
+      tenantId,
+      ...(scope.statuses && { status: { in: scope.statuses } }),
+      ...(scope.articleStatuses && {
+        article: { tenantId, status: { in: scope.articleStatuses } },
+      }),
+    };
+  }
+
+  /** Admin listing: every status unless `scope` narrows it. */
   async findAll(
     tenantId: string,
-    query: CommentFiltersQueryDto,
-    statusFilter?: ContentStatus | ContentStatus[],
-    skipSanitize = false,
+    query: CommentFiltersQueryDto | PublicCommentFiltersQueryDto,
+    scope: CommentScope = {},
   ): Promise<PaginatedResult<any>> {
-    const statusCondition = statusFilter
-      ? Array.isArray(statusFilter)
-        ? { in: statusFilter }
-        : statusFilter
-      : undefined;
-
-    const where = {
-      tenantId,
+    const where: Prisma.CommentWhereInput = {
+      ...this.scopeWhere(tenantId, scope),
       ...(query.articleId && { articleId: query.articleId }),
-      ...(statusCondition && { status: statusCondition }),
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -210,30 +289,16 @@ export class CommentsService {
     ]);
 
     return paginate(
-      items.map((c) => (skipSanitize ? c : this.sanitizeForPublicApi(c))),
+      items.map((c) => (scope.sanitize ? this.sanitizeForPublicApi(c) : c)),
       total,
       query,
     );
   }
 
-  async findOne(
-    tenantId: string,
-    id: string,
-    statusFilter?: ContentStatus | ContentStatus[],
-    skipSanitize = false,
-  ) {
-    const statusCondition = statusFilter
-      ? Array.isArray(statusFilter)
-        ? { in: statusFilter }
-        : statusFilter
-      : undefined;
-
+  /** Admin detail: any status unless `scope` narrows it. */
+  async findOne(tenantId: string, id: string, scope: CommentScope = {}) {
     const comment = await this.prisma.comment.findFirst({
-      where: {
-        id,
-        tenantId,
-        ...(statusCondition && { status: statusCondition }),
-      },
+      where: { id, ...this.scopeWhere(tenantId, scope) },
       include: {
         author: true,
       },
@@ -243,7 +308,7 @@ export class CommentsService {
       throw new NotFoundException('Commento non trovato');
     }
 
-    return skipSanitize ? comment : this.sanitizeForPublicApi(comment);
+    return scope.sanitize ? this.sanitizeForPublicApi(comment) : comment;
   }
 
   async update(tenantId: string, id: string, dto: UpdateCommentDto) {

@@ -154,6 +154,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return assetExtensions.some((ext) => urlLower.endsWith(ext));
   }
 
+  /** Paths whose errors are expected noise: log them at debug, not error. */
+  private isQuiet(url: string, status: number): boolean {
+    // URL without query parameters for pattern matching
+    const urlPath = url.split('?')[0];
+    return (
+      this.ignoredPaths.includes(urlPath) ||
+      // also check the full URL with query params
+      this.ignoredPatterns.some(
+        (pattern) => pattern.test(urlPath) || pattern.test(url),
+      ) ||
+      // 404s for static assets are not application errors
+      (status === 404 && this.isLikelyAssetRequest(urlPath))
+    );
+  }
+
   catch(
     caught: HttpException | Prisma.PrismaClientKnownRequestError,
     host: ArgumentsHost,
@@ -181,40 +196,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errors = res.message || null;
     }
 
-    // Get URL without query parameters for pattern matching
-    const urlPath = request.url.split('?')[0];
-
-    // Check exact paths first
-    if (this.ignoredPaths.includes(urlPath)) {
-      Logger.debug(`Ignoring ${urlPath} request`);
-      return;
+    // Noisy paths (browser probes, scanners, missing assets) are logged at
+    // debug instead of error. They still get the response: returning early
+    // here would leave the request hanging until the client times out.
+    if (this.isQuiet(request.url, status)) {
+      this.logger.debug(`${status} ${request.url.split('?')[0]}`);
+    } else {
+      // Method and URL come from pino-http's `req` on the same line.
+      this.logger.error(`${status} ${exception.message}`);
     }
-
-    // Check patterns (also check the full URL with query params)
-    if (
-      this.ignoredPatterns.some(
-        (pattern) => pattern.test(urlPath) || pattern.test(request.url),
-      )
-    ) {
-      Logger.debug(`Ignoring ${urlPath} request (pattern match)`);
-      return;
-    }
-
-    // Only log if it's a real application error (not 404s for assets)
-    if (status === 404 && this.isLikelyAssetRequest(urlPath)) {
-      Logger.debug(`Ignoring potential asset request: ${urlPath}`);
-      return;
-    }
-
-    // Method and URL come from pino-http's `req` on the same line.
-    this.logger.error(`${status} ${exception.message}`);
 
     response.status(status).json({
       statusCode: status,
       message,
       errors,
       timestamp: new Date().toISOString(),
-      path: ctx.getRequest().url,
+      path: request.url,
     });
   }
 }

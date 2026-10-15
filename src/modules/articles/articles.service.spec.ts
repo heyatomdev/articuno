@@ -62,6 +62,101 @@ describe('ArticlesService.update status FSM', () => {
   });
 });
 
+describe('ArticlesService.create with a banned word', () => {
+  const prisma = {
+    category: { findFirst: jest.fn() },
+    article: { create: jest.fn() },
+    $transaction: jest.fn(),
+  };
+  const bannedWords = { checkText: jest.fn() };
+  const webhookPublisher = { publishArticleStatusChangedEvent: jest.fn() };
+  const service = new ArticlesService(
+    prisma as any,
+    bannedWords as any,
+    {} as any,
+    webhookPublisher as any,
+  );
+  const dto = (extra: object = {}) => ({
+    categoryId: 'cat-1',
+    translations: [{ languageCode: 'it', title: 'Titolo', content: 'testo' }],
+    ...extra,
+  });
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    prisma.category.findFirst.mockResolvedValue({ id: 'cat-1' });
+    prisma.$transaction.mockImplementation((fn) => fn(prisma));
+    prisma.article.create.mockImplementation(({ data }) => ({
+      id: 'a1',
+      status: data.status,
+    }));
+  });
+
+  it('creates the article HIDDEN and enqueues article.status_changed in the same tx', async () => {
+    bannedWords.checkText.mockResolvedValue(true);
+
+    const article = await service.create('t1', dto() as any);
+
+    expect(article.status).toBe(ContentStatus.HIDDEN);
+    expect(
+      webhookPublisher.publishArticleStatusChangedEvent,
+    ).toHaveBeenCalledWith(
+      't1',
+      'a1',
+      ContentStatus.DRAFT,
+      ContentStatus.HIDDEN,
+      'BANNED_WORD_DETECTED',
+      'system',
+      prisma,
+    );
+  });
+
+  it('reports the requested status as the old one', async () => {
+    bannedWords.checkText.mockResolvedValue(true);
+
+    await service.create('t1', dto({ status: ContentStatus.PUBLISHED }) as any);
+
+    expect(
+      webhookPublisher.publishArticleStatusChangedEvent.mock.calls[0][2],
+    ).toBe(ContentStatus.PUBLISHED);
+  });
+
+  it('rolls the article back if the outbox write fails', async () => {
+    bannedWords.checkText.mockResolvedValue(true);
+    webhookPublisher.publishArticleStatusChangedEvent.mockRejectedValue(
+      new Error('outbox'),
+    );
+
+    await expect(service.create('t1', dto() as any)).rejects.toThrow('outbox');
+    expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it.each([ContentStatus.HIDDEN, ContentStatus.BANNED])(
+    'keeps a requested %s status and emits nothing',
+    async (status) => {
+      bannedWords.checkText.mockResolvedValue(true);
+
+      const article = await service.create('t1', dto({ status }) as any);
+
+      expect(article.status).toBe(status);
+      expect(
+        webhookPublisher.publishArticleStatusChangedEvent,
+      ).not.toHaveBeenCalled();
+    },
+  );
+
+  it('emits nothing for clean content', async () => {
+    bannedWords.checkText.mockResolvedValue(false);
+
+    const article = await service.create('t1', dto() as any);
+
+    expect(article.status).toBe(ContentStatus.DRAFT);
+    expect(
+      webhookPublisher.publishArticleStatusChangedEvent,
+    ).not.toHaveBeenCalled();
+  });
+});
+
 describe('ArticlesService.assertOwnCoverImage', () => {
   const prisma = { tenant: { findFirst: jest.fn() } };
   const service = new ArticlesService(

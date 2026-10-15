@@ -66,12 +66,9 @@ export class AdminCommentsController {
     @GetSession() session: AdminSession,
     @Query() query: CommentFiltersQueryDto,
   ) {
-    return this.commentsService.findAll(
-      session.tenantId,
-      query,
-      query.status,
-      true,
-    );
+    return this.commentsService.findAll(session.tenantId, query, {
+      statuses: query.status ? [query.status] : undefined,
+    });
   }
 
   @Get(':id')
@@ -95,12 +92,7 @@ export class AdminCommentsController {
     @GetSession() session: AdminSession,
     @Param() params: CommentParamsDto,
   ) {
-    return this.commentsService.findOne(
-      session.tenantId,
-      params.id,
-      undefined,
-      true,
-    );
+    return this.commentsService.findOne(session.tenantId, params.id);
   }
 
   @Patch(':id')
