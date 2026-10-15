@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   HealthCheck,
@@ -37,9 +37,15 @@ export class HealthController {
   @ApiOkResponse({
     description: 'Service is ready — all health indicators passed',
   })
-  ready() {
-    return this.health.check([
-      () => this.prismaIndicator.pingCheck('database', this.prisma),
-    ]);
+  async ready() {
+    try {
+      return await this.health.check([
+        () => this.prismaIndicator.pingCheck('database', this.prisma),
+      ]);
+    } catch {
+      // Terminus' 503 body carries the DB error (host, port): not on an
+      // unauthenticated route. The status code is the probe contract.
+      throw new ServiceUnavailableException('Service not ready');
+    }
   }
 }

@@ -127,6 +127,9 @@ export class WebhooksService {
           },
           timeout: 5000,
           maxRedirects: 0,
+          // HTTP(S)_PROXY would let the proxy resolve the target, bypassing
+          // the pinned agent's lookup.
+          proxy: false,
           httpsAgent: this.httpsAgent,
           httpAgent: this.httpAgent,
         }),

@@ -95,6 +95,7 @@ describe('WebhooksService.send SSRF guard', () => {
     const [, , opts] = post.mock.calls[0];
     expect(opts.httpsAgent).toBe(webhookAgent);
     expect(opts.maxRedirects).toBe(0);
+    expect(opts.proxy).toBe(false);
     expect(opts.headers['x-webhook-signature']).toBe(
       createHmac('sha256', 'secret').update('{"a":1}').digest('hex'),
     );

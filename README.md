@@ -60,6 +60,9 @@ pnpm exec prisma migrate deploy   # non `db push`: salterebbe gli indici scritti
 pnpm run start:dev
 ```
 
+Swagger (`/docs`) è attivo solo con `NODE_ENV=development|test` o `ENABLE_SWAGGER=true`.
+CORS: senza `CORS_ORIGINS` nessuna origin browser è ammessa, anche in sviluppo.
+
 ## Run tests
 
 ```bash

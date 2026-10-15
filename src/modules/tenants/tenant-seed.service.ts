@@ -92,8 +92,9 @@ export class TenantSeedService implements OnModuleInit {
         await this.bannedWordsSeed.seedDefaultBannedWords(defaultTenant.id);
       }
     } catch (error) {
+      // WebhookUrlError keeps the detail (DNS_UNRESOLVED vs a private address) in `reason`.
       this.logger.error(
-        `Error seeding default tenant: ${error.message}`,
+        `Error seeding default tenant: ${error.message}${error.reason ? ` (${error.reason})` : ''}`,
         error.stack,
       );
       throw error;

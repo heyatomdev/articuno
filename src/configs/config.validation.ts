@@ -8,6 +8,7 @@ export const configValidationSchema = Joi.object({
   ENABLE_SWAGGER: Joi.boolean()
     .truthy('true')
     .falsy('false')
+    .empty('')
     .default((env: { NODE_ENV?: string }) => swaggerEnabled(env)),
 
   // Environment
@@ -35,7 +36,7 @@ export const configValidationSchema = Joi.object({
   // Prometheus scrape port (@heyatom/nest-common/metrics) — internal network
   // only. METRICS_HOST unset = listen on :: (dual-stack).
   METRICS_PORT: Joi.number().port().default(9091),
-  METRICS_HOST: Joi.string().optional(),
+  METRICS_HOST: Joi.string().empty('').optional(),
 
   // pino levels; unset → info in production, debug elsewhere
   LOG_LEVEL: Joi.string()
