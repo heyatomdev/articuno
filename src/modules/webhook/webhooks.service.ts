@@ -6,6 +6,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { Agent as HttpAgent } from 'node:http';
+import { Agent as HttpsAgent } from 'node:https';
+import {
+  checkWebhookUrl,
+  isWebhookTargetBlocked,
+  webhookAgent,
+  webhookLookup,
+  WebhookUrlError,
+  type WebhookUrlPolicy,
+} from '@heyatom/nest-common/webhooks';
 import { createHmac } from 'crypto';
 import { lastValueFrom } from 'rxjs';
 import { Prisma, WebhookEvent } from '@prisma/client';
@@ -13,14 +24,36 @@ import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-li
 import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 
+/** `blocked` = refused by the SSRF guard: terminal, never retried. */
+export type WebhookSendResult = 'sent' | 'failed' | 'blocked';
+
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
 
+  private readonly urlPolicy: WebhookUrlPolicy;
+  private readonly httpsAgent: HttpsAgent;
+  /** Only reachable with WEBHOOK_ALLOW_PRIVATE_TARGETS (http:// refused otherwise). */
+  private readonly httpAgent?: HttpAgent;
+
   constructor(
     private readonly httpService: HttpService,
     private readonly prisma: PrismaService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.urlPolicy = {
+      allowPrivate: config.get<boolean>('WEBHOOK_ALLOW_PRIVATE_TARGETS'),
+    };
+    if (this.urlPolicy.allowPrivate) {
+      // Development only (refused with NODE_ENV=production by the config
+      // schema): private targets and http:// admitted.
+      const lookup = webhookLookup(this.urlPolicy);
+      this.httpsAgent = new HttpsAgent({ lookup });
+      this.httpAgent = new HttpAgent({ lookup });
+    } else {
+      this.httpsAgent = webhookAgent;
+    }
+  }
 
   async findAll(
     tenantId: string,
@@ -58,8 +91,29 @@ export class WebhooksService {
     return event;
   }
 
-  // Invia al tenant il payload canonico già salvato in outbox.
-  async send(url: string, secret: string, payload: Prisma.JsonValue) {
+  /**
+   * Sends the canonical payload stored in the outbox to the tenant.
+   *
+   * The tenant `webhookUrl` is tenant-controlled, so every send goes through
+   * the SSRF guard: a textual check first (literal IPs never reach `lookup`),
+   * then an agent whose `lookup` refuses non-public addresses at connect time
+   * (no DNS-rebinding window). `blocked` is terminal: retrying a refused
+   * target is the scan itself.
+   */
+  async send(
+    url: string,
+    secret: string,
+    payload: Prisma.JsonValue,
+  ): Promise<WebhookSendResult> {
+    let host: string;
+    try {
+      host = checkWebhookUrl(url, this.urlPolicy).host;
+    } catch (error) {
+      if (!(error instanceof WebhookUrlError)) throw error;
+      this.logger.warn(`Webhook target refused: ${error.reason}`);
+      return 'blocked';
+    }
+
     // Creiamo una firma HMAC per permettere al client di verificare l'origine
     const signature = this.generateSignature(secret, payload);
 
@@ -72,14 +126,24 @@ export class WebhooksService {
             'User-Agent': 'Articuno-Webhook/1.0',
           },
           timeout: 5000,
+          maxRedirects: 0,
+          httpsAgent: this.httpsAgent,
+          httpAgent: this.httpAgent,
         }),
       );
-      return true;
+      return 'sent';
     } catch (error) {
+      if (isWebhookTargetBlocked(error)) {
+        const cause = (error as { cause?: unknown }).cause;
+        const reason = cause instanceof WebhookUrlError ? cause.reason : '';
+        this.logger.warn(`Webhook target refused ${host}: ${reason}`);
+        return 'blocked';
+      }
+      // Host only: the tenant URL may carry a token in its path or query.
       const message =
         error instanceof Error ? error.message : 'Errore sconosciuto';
-      this.logger.error(`Webhook fallito verso ${url}: ${message}`);
-      return false;
+      this.logger.error(`Webhook fallito verso ${host}: ${message}`);
+      return 'failed';
     }
   }
 

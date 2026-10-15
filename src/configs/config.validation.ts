@@ -84,6 +84,15 @@ export const configValidationSchema = Joi.object({
     .allow('')
     .optional(),
 
+  // Development only: lets tenant webhooks target private addresses and
+  // http:// (e.g. SEED_WEBHOOK_URL=http://localhost:8000/webhook). Refused
+  // in production: the SSRF guard is what keeps tenants off the internal net.
+  WEBHOOK_ALLOW_PRIVATE_TARGETS: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false)
+    .when('NODE_ENV', { is: 'production', then: Joi.valid(false) }),
+
   // Delivered webhook_events rows older than this are purged nightly.
   // Unsent and dead-lettered rows are never purged.
   WEBHOOK_EVENT_RETENTION_DAYS: Joi.number().integer().positive().default(30),
