@@ -73,7 +73,10 @@ export class CommentsService {
   private cleanContent(raw: string): string {
     const content = stripTags(raw).trim();
     if (!content) {
-      throw new BadRequestException('Il commento è vuoto');
+      throw new BadRequestException({
+        code: 'COMMENT_EMPTY',
+        message: 'Il commento è vuoto',
+      });
     }
     return content;
   }
@@ -131,7 +134,10 @@ export class CommentsService {
     );
 
     if (!userCheck.isAllowed) {
-      throw new ForbiddenException('User is banned from this tenant');
+      throw new ForbiddenException({
+        code: 'USER_BANNED',
+        message: 'User is banned from this tenant',
+      });
     }
 
     // 2. Applica policy di moderazione (banned words check, user status)
@@ -324,9 +330,10 @@ export class CommentsService {
       dto.status &&
       !isValidModerationTransition(current.status, dto.status)
     ) {
-      throw new BadRequestException(
-        `Transizione di stato non consentita: ${current.status} → ${dto.status}`,
-      );
+      throw new BadRequestException({
+        code: 'INVALID_STATUS_TRANSITION',
+        message: `Transizione di stato non consentita: ${current.status} → ${dto.status}`,
+      });
     }
 
     const data: Prisma.CommentUpdateInput = { status: dto.status };

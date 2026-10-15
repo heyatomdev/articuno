@@ -91,9 +91,11 @@ export class WebhooksService {
     const event = await this.findOne(tenantId, id);
 
     if (event.sentAt) {
-      throw new BadRequestException(
-        'Il webhook è già stato consegnato con successo e non può essere re-inviato',
-      );
+      throw new BadRequestException({
+        code: 'WEBHOOK_ALREADY_DELIVERED',
+        message:
+          'Il webhook è già stato consegnato con successo e non può essere re-inviato',
+      });
     }
 
     // Clearing nextRetryAt on a row a worker currently owns would make it
@@ -112,9 +114,11 @@ export class WebhooksService {
     });
 
     if (count === 0) {
-      throw new ConflictException(
-        'Il webhook è in consegna in questo momento, riprovare tra qualche minuto',
-      );
+      throw new ConflictException({
+        code: 'WEBHOOK_IN_DELIVERY',
+        message:
+          'Il webhook è in consegna in questo momento, riprovare tra qualche minuto',
+      });
     }
 
     return this.findOne(tenantId, id);

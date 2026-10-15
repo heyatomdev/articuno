@@ -121,9 +121,10 @@ export class AdminArticlesController {
     });
 
     if (!tenant?.fileharborEndpoint || !tenant?.fileharborApiKey) {
-      throw new BadRequestException(
-        'FileHarbor non configurato per questo tenant',
-      );
+      throw new BadRequestException({
+        code: 'FILEHARBOR_NOT_CONFIGURED',
+        message: 'FileHarbor non configurato per questo tenant',
+      });
     }
 
     return {
@@ -155,7 +156,10 @@ export class AdminArticlesController {
     try {
       parsed = JSON.parse(rawData || '{}');
     } catch {
-      throw new BadRequestException('Il campo "data" non è un JSON valido');
+      throw new BadRequestException({
+        code: 'INVALID_JSON',
+        message: 'Il campo "data" non è un JSON valido',
+      });
     }
 
     const dto = plainToInstance(cls, parsed);

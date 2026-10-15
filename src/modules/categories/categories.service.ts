@@ -25,7 +25,10 @@ export class CategoriesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug gia esistente');
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: 'Slug gia esistente',
+        });
       }
       throw error;
     }
@@ -101,7 +104,10 @@ export class CategoriesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug gia esistente');
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: 'Slug gia esistente',
+        });
       }
       throw error;
     }

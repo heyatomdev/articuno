@@ -4,6 +4,7 @@ import {
   NestModule,
   RequestMethod,
 } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -31,6 +32,7 @@ import { WebhooksModule } from '@/modules/webhook/webhooks.module';
 import { AdminModule } from '@/modules/admin/admin.module';
 import { HealthModule } from '@/modules/health/health.module';
 import { BastionModule } from '@heyatom/bastion-client/nest';
+import { AllExceptionsFilter } from '@heyatom/nest-common';
 
 /** Comma-separated env list → array; undefined keeps the package default. */
 const splitList = (raw?: string): string[] | undefined =>
@@ -155,6 +157,9 @@ const splitList = (raw?: string): string[] | undefined =>
     AnalyticsModule,
     WebhooksModule,
   ],
+  // No TransformInterceptor: the public contract returns raw resources until
+  // the coordinated envelope migration (api standards plan, phase 3).
+  providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

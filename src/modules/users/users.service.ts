@@ -18,7 +18,10 @@ import {
 const NOT_SYSTEM = { externalId: { notIn: SYSTEM_EXTERNAL_IDS } };
 function assertNotSystem(externalId: string): void {
   if (SYSTEM_EXTERNAL_IDS.includes(externalId)) {
-    throw new BadRequestException(`externalId riservato: ${externalId}`);
+    throw new BadRequestException({
+      code: 'RESERVED_EXTERNAL_ID',
+      message: `externalId riservato: ${externalId}`,
+    });
   }
 }
 

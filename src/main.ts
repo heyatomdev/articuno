@@ -4,7 +4,6 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './modules/app/app.module';
-import { HttpExceptionFilter } from '@/filters/http-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap(): Promise<void> {
@@ -54,9 +53,6 @@ async function bootstrap(): Promise<void> {
         'CORS_ORIGIN is not set in production: browser cross-origin requests are disabled',
       );
     }
-
-    // Use global exception filter
-    app.useGlobalFilters(new HttpExceptionFilter());
 
     app.useBodyParser('json', { limit: '1mb' });
     app.useBodyParser('urlencoded', { limit: '256kb', extended: true });

@@ -191,9 +191,10 @@ export class ArticlesService {
       !tenant?.fileharborEndpoint ||
       !FileHarborService.isUnderEndpoint(url, tenant.fileharborEndpoint)
     ) {
-      throw new BadRequestException(
-        "coverImage deve essere un'immagine del FileHarbor del tenant",
-      );
+      throw new BadRequestException({
+        code: 'INVALID_COVER_IMAGE',
+        message: "coverImage deve essere un'immagine del FileHarbor del tenant",
+      });
     }
   }
 
@@ -283,7 +284,10 @@ export class ArticlesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug traduzione gia esistente');
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: 'Slug traduzione gia esistente',
+        });
       }
       throw error;
     }
@@ -300,7 +304,10 @@ export class ArticlesService {
     const visible = publicArticleStatuses(query.includeDrafts);
 
     if (query.status && !visible.includes(query.status)) {
-      throw new BadRequestException('status=DRAFT richiede includeDrafts=true');
+      throw new BadRequestException({
+        code: 'DRAFTS_NOT_INCLUDED',
+        message: 'status=DRAFT richiede includeDrafts=true',
+      });
     }
 
     // statusFilter overrides query.status: the public caller never picks a
@@ -451,9 +458,10 @@ export class ArticlesService {
       dto.status &&
       !isValidModerationTransition(currentArticle.status, dto.status)
     ) {
-      throw new BadRequestException(
-        `Transizione di stato non consentita: ${currentArticle.status} → ${dto.status}`,
-      );
+      throw new BadRequestException({
+        code: 'INVALID_STATUS_TRANSITION',
+        message: `Transizione di stato non consentita: ${currentArticle.status} → ${dto.status}`,
+      });
     }
 
     if (dto.categoryId) {
@@ -506,7 +514,10 @@ export class ArticlesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug traduzione gia esistente');
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: 'Slug traduzione gia esistente',
+        });
       }
       throw error;
     }

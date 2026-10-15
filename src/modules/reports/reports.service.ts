@@ -76,7 +76,7 @@ const conflictOnOpenDuplicate =
   (message: string) =>
   (error: { code?: string }): never => {
     if (error.code === 'P2002') {
-      throw new ConflictException(message);
+      throw new ConflictException({ code: 'REPORT_ALREADY_OPEN', message });
     }
     throw error;
   };

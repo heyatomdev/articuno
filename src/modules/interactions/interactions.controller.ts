@@ -38,7 +38,10 @@ export class InteractionsController {
 
   private requireUserId(externalUserId?: string) {
     if (!externalUserId || !externalUserId.trim()) {
-      throw new BadRequestException('Header X-User-Id mancante');
+      throw new BadRequestException({
+        code: 'USER_ID_REQUIRED',
+        message: 'Header X-User-Id mancante',
+      });
     }
 
     return externalUserId.trim();

@@ -33,7 +33,10 @@ export class TagsService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(this.CONFLICT_ERROR_MESSAGE);
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: this.CONFLICT_ERROR_MESSAGE,
+        });
       }
       throw error;
     }
@@ -173,7 +176,10 @@ export class TagsService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(this.CONFLICT_ERROR_MESSAGE);
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: this.CONFLICT_ERROR_MESSAGE,
+        });
       }
       throw error;
     }

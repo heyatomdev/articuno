@@ -32,9 +32,10 @@ export class BannedWordsService {
     });
 
     if (exists) {
-      throw new ConflictException(
-        'Questa parola è già presente nella blacklist.',
-      );
+      throw new ConflictException({
+        code: 'BANNED_WORD_EXISTS',
+        message: 'Questa parola è già presente nella blacklist.',
+      });
     }
 
     const created = await this.prisma.bannedWord.create({

@@ -119,9 +119,10 @@ export class ArticleTranslationsService {
       return translation;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(
-          'Traduzione gia esistente o slug duplicato',
-        );
+        throw new ConflictException({
+          code: 'TRANSLATION_EXISTS',
+          message: 'Traduzione gia esistente o slug duplicato',
+        });
       }
       throw error;
     }
@@ -222,7 +223,10 @@ export class ArticleTranslationsService {
       return updatedTranslation;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug traduzione gia esistente');
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: 'Slug traduzione gia esistente',
+        });
       }
       throw error;
     }
