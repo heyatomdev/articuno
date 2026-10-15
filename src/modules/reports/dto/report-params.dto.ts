@@ -9,4 +9,3 @@ export class ReportParamsDto {
   @IsUUID()
   id: string;
 }
-

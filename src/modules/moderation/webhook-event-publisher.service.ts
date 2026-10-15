@@ -7,9 +7,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { Prisma, ContentStatus, TargetType } from '@prisma/client';
-import {
-  ModerationWebhookPayloadDto,
-} from './moderation.types';
+import { ModerationWebhookPayloadDto } from './moderation.types';
 
 @Injectable()
 export class WebhookEventPublisher {
@@ -144,4 +142,3 @@ export class WebhookEventPublisher {
     return this.publishEvent(tenantId, 'article.flagged', payload, db);
   }
 }
-

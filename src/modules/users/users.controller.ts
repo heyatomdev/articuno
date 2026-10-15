@@ -33,7 +33,8 @@ export class UsersController {
   @Post('sync')
   @ApiOperation({
     summary: 'Sync (upsert) a user',
-    description: 'Creates or updates a user record for the current tenant based on their external ID. Use this endpoint to keep the CMS user data in sync with your identity provider.',
+    description:
+      'Creates or updates a user record for the current tenant based on their external ID. Use this endpoint to keep the CMS user data in sync with your identity provider.',
   })
   @ApiBody({ type: UpsertUserDto })
   @ApiResponse({
@@ -41,7 +42,10 @@ export class UsersController {
     description: 'User created or updated successfully.',
     type: UserDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   upsert(@GetTenant() tenant: any, @Body() dto: UpsertUserDto) {
     return this.usersService.upsert(tenant.id, dto);
@@ -51,14 +55,21 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a user',
-    description: 'Permanently deletes a user record identified by their external ID. All associated content (articles, comments, interactions) may be affected depending on tenant configuration.',
+    description:
+      'Permanently deletes a user record identified by their external ID. All associated content (articles, comments, interactions) may be affected depending on tenant configuration.',
   })
-  @ApiParam({ name: 'externalId', description: 'External ID of the user to delete', example: 'user_abc123' })
-  @ApiResponse({ status: 204, description: 'User deleted successfully – no content returned.' })
+  @ApiParam({
+    name: 'externalId',
+    description: 'External ID of the user to delete',
+    example: 'user_abc123',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'User deleted successfully – no content returned.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async remove(@GetTenant() tenant: any, @Param() params: DeleteUserParamsDto) {
     await this.usersService.deleteByExternalId(tenant.id, params.externalId);
   }
 }
-

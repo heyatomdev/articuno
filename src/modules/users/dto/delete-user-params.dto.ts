@@ -10,4 +10,3 @@ export class DeleteUserParamsDto {
   @IsNotEmpty()
   externalId: string;
 }
-

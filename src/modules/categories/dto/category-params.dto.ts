@@ -9,4 +9,3 @@ export class CategoryParamsDto {
   @IsUUID()
   id: string;
 }
-

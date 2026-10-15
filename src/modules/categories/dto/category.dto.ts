@@ -51,4 +51,3 @@ export class CategoryListItemDto extends CategoryDto {
   })
   articlesCount: number;
 }
-

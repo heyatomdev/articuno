@@ -29,4 +29,3 @@ export class AuditListQueryDto extends PageParams {
   @IsOptional()
   actorUserId?: string;
 }
-

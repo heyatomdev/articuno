@@ -9,4 +9,3 @@ export class UserParamsDto {
   @IsUUID()
   id: string;
 }
-

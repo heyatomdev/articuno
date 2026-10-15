@@ -7,4 +7,3 @@ import { BookmarksService } from './bookmarks.service';
   providers: [BookmarksService],
 })
 export class BookmarksModule {}
-

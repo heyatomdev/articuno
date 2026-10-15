@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
-import { PageParams } from "@/common/pagination";
+import { PageParams } from '@/common/pagination';
 
 export class TagsListQuery extends PageParams {
   @ApiPropertyOptional({

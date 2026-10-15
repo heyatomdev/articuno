@@ -6,9 +6,9 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuditsModule } from '@/modules/audits/audits.module';
 
 @Module({
-    imports: [PrismaModule, AuditsModule],
-    controllers: [BannedWordsController],
-    providers: [BannedWordsService, BannedWordsSeedService],
-    exports: [BannedWordsService, BannedWordsSeedService],
+  imports: [PrismaModule, AuditsModule],
+  controllers: [BannedWordsController],
+  providers: [BannedWordsService, BannedWordsSeedService],
+  exports: [BannedWordsService, BannedWordsSeedService],
 })
 export class BannedWordsModule {}

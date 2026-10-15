@@ -1,12 +1,18 @@
-import {ConflictException, Injectable, InternalServerErrorException, Logger, NotFoundException} from '@nestjs/common';
-import {PrismaService} from '@/modules/prisma/prisma.service';
-import {CreateTagDto} from '@/modules/tags/dto/create-tag.dto';
-import {UpdateTagDto} from '@/modules/tags/dto/update-tag.dto';
-import {PaginatedResult, paginate} from "@/common/pagination";
-import {TagsListQuery} from "@/modules/tags/queries/tags.query";
-import {TagDto} from "@/modules/tags/dto/tags.dto";
-import {plainToInstance} from "class-transformer";
-import {slugifySafe} from '@/utils/slugify';
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '@/modules/prisma/prisma.service';
+import { CreateTagDto } from '@/modules/tags/dto/create-tag.dto';
+import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
+import { PaginatedResult, paginate } from '@/common/pagination';
+import { TagsListQuery } from '@/modules/tags/queries/tags.query';
+import { TagDto } from '@/modules/tags/dto/tags.dto';
+import { plainToInstance } from 'class-transformer';
+import { slugifySafe } from '@/utils/slugify';
 
 @Injectable()
 export class TagsService {
@@ -14,7 +20,7 @@ export class TagsService {
 
   private readonly logger = new Logger(TagsService.name);
 
-  private readonly CONFLICT_ERROR_MESSAGE = "Slug already exists";
+  private readonly CONFLICT_ERROR_MESSAGE = 'Slug already exists';
 
   async create(tenantId: string, dto: CreateTagDto) {
     try {
@@ -33,15 +39,22 @@ export class TagsService {
     }
   }
 
-  async findAll(tenantId: string, filters?: TagsListQuery): Promise<PaginatedResult<TagDto>> {
+  async findAll(
+    tenantId: string,
+    filters?: TagsListQuery,
+  ): Promise<PaginatedResult<TagDto>> {
     try {
       this.logger.debug('Fetching all tags from the database');
-      this.logger.debug(`Filters received from ${tenantId}: ${JSON.stringify(filters)}`);
+      this.logger.debug(
+        `Filters received from ${tenantId}: ${JSON.stringify(filters)}`,
+      );
 
       const [items, count] = await this.prisma.$transaction([
         this.prisma.tag.findMany({
           where: {
-            ...(filters.name && { name: { contains: filters.name, mode: 'insensitive' } }),
+            ...(filters.name && {
+              name: { contains: filters.name, mode: 'insensitive' },
+            }),
             tenantId: tenantId,
           },
           orderBy: { name: 'asc' },
@@ -52,7 +65,7 @@ export class TagsService {
               select: {
                 slug: true,
                 name: true,
-              }
+              },
             },
             _count: {
               select: { articles: true },
@@ -61,7 +74,9 @@ export class TagsService {
         }),
         this.prisma.tag.count({
           where: {
-            ...(filters.name && { name: { contains: filters.name, mode: 'insensitive' } }),
+            ...(filters.name && {
+              name: { contains: filters.name, mode: 'insensitive' },
+            }),
             tenantId: tenantId,
           },
         }),
@@ -70,16 +85,17 @@ export class TagsService {
       this.logger.debug(`Found ${count} tags matching the criteria`);
 
       return paginate(
-        plainToInstance(TagDto, items,  {
-          excludeExtraneousValues: false
+        plainToInstance(TagDto, items, {
+          excludeExtraneousValues: false,
         }),
         count,
         filters,
       );
-
     } catch (error) {
       this.logger.error('Failed to fetch tags', error.stack);
-      this.logger.error(`Error name: ${error.name}, Error message: ${error.message}`);
+      this.logger.error(
+        `Error name: ${error.name}, Error message: ${error.message}`,
+      );
       if (error.code) {
         this.logger.error(`Prisma error code: ${error.code}`);
       }
@@ -96,7 +112,7 @@ export class TagsService {
             id: true,
             name: true,
             enabled: true,
-          }
+          },
         },
         _count: {
           select: { articles: true },
@@ -109,7 +125,7 @@ export class TagsService {
     }
 
     return plainToInstance(TagDto, tag, {
-      excludeExtraneousValues: false
+      excludeExtraneousValues: false,
     });
   }
 
@@ -122,7 +138,7 @@ export class TagsService {
             id: true,
             name: true,
             enabled: true,
-          }
+          },
         },
         _count: {
           select: { articles: true },
@@ -135,7 +151,7 @@ export class TagsService {
     }
 
     return plainToInstance(TagDto, tag, {
-      excludeExtraneousValues: false
+      excludeExtraneousValues: false,
     });
   }
 
@@ -176,4 +192,3 @@ export class TagsService {
     }
   }
 }
-

@@ -3,7 +3,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateCategoryDto {
   @ApiPropertyOptional({
-    description: 'New display name for the category. The slug will be re-generated from this value.',
+    description:
+      'New display name for the category. The slug will be re-generated from this value.',
     example: 'Science & Technology',
   })
   @IsOptional()

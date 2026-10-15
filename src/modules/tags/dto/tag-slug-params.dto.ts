@@ -3,7 +3,8 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class TagSlugParamsDto {
   @ApiProperty({
-    description: 'URL-friendly slug of the tag (lowercase alphanumeric words separated by hyphens)',
+    description:
+      'URL-friendly slug of the tag (lowercase alphanumeric words separated by hyphens)',
     example: 'science-and-technology',
     pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
   })
@@ -13,4 +14,3 @@ export class TagSlugParamsDto {
   })
   slug: string;
 }
-

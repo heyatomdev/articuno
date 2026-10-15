@@ -102,7 +102,7 @@ const DEFAULT_BANNED_WORDS: string[] = [
   'buy now',
   'act now',
   'you have won',
-  'claim your prize'
+  'claim your prize',
 ];
 
 @Injectable()
@@ -133,4 +133,3 @@ export class BannedWordsSeedService {
     );
   }
 }
-

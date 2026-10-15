@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBannedWordDto } from './dto/create-banned-word.dto';
@@ -8,120 +12,124 @@ import { BannedWordDto } from './dto/banned-word.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 
 export interface ActorInfo {
-    actorUserId: string;
-    actorRole: string;
+  actorUserId: string;
+  actorRole: string;
 }
 
 @Injectable()
 export class BannedWordsService {
-    constructor(
-        private readonly prisma: PrismaService,
-        private readonly auditLogger: AuditLoggerService,
-    ) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogger: AuditLoggerService,
+  ) {}
 
-    async create(tenantId: string, dto: CreateBannedWordDto, actor?: ActorInfo) {
-        const wordClean = dto.word.toLowerCase().trim();
+  async create(tenantId: string, dto: CreateBannedWordDto, actor?: ActorInfo) {
+    const wordClean = dto.word.toLowerCase().trim();
 
-        // Verifichiamo se esiste già per questo tenant
-        const exists = await this.prisma.bannedWord.findFirst({
-            where: { word: wordClean, tenantId },
-        });
+    // Verifichiamo se esiste già per questo tenant
+    const exists = await this.prisma.bannedWord.findFirst({
+      where: { word: wordClean, tenantId },
+    });
 
-        if (exists) {
-            throw new ConflictException('Questa parola è già presente nella blacklist.');
-        }
-
-        const created = await this.prisma.bannedWord.create({
-            data: {
-                word: wordClean,
-                tenantId,
-            },
-        });
-
-        if (actor) {
-            await this.auditLogger.log({
-                tenantId,
-                actorUserId: actor.actorUserId,
-                actorRole: actor.actorRole,
-                action: AuditAction.BANNED_WORD_CREATED,
-                resourceType: AuditResourceType.BANNED_WORD,
-                resourceId: created.id,
-                resourceName: created.word,
-                changesAfter: { word: created.word },
-                changeSummary: `Banned word added: "${created.word}"`,
-            });
-        }
-
-        return created;
+    if (exists) {
+      throw new ConflictException(
+        'Questa parola è già presente nella blacklist.',
+      );
     }
 
-    async findAll(
-        tenantId: string,
-        filters: BannedWordListQueryDto,
-    ): Promise<PaginatedResult<BannedWordDto>> {
-        const search = filters.search?.trim();
-        const where = {
-            tenantId,
-            ...(search
-                ? { word: { contains: search, mode: 'insensitive' as const } }
-                : {}),
-        };
+    const created = await this.prisma.bannedWord.create({
+      data: {
+        word: wordClean,
+        tenantId,
+      },
+    });
 
-        const [items, total] = await this.prisma.$transaction([
-            this.prisma.bannedWord.findMany({
-                where,
-                orderBy: { word: 'asc' },
-                take: filters.limit,
-                skip: filters.skip,
-            }),
-            this.prisma.bannedWord.count({ where }),
-        ]);
-
-        return paginate(items, total, filters);
+    if (actor) {
+      await this.auditLogger.log({
+        tenantId,
+        actorUserId: actor.actorUserId,
+        actorRole: actor.actorRole,
+        action: AuditAction.BANNED_WORD_CREATED,
+        resourceType: AuditResourceType.BANNED_WORD,
+        resourceId: created.id,
+        resourceName: created.word,
+        changesAfter: { word: created.word },
+        changeSummary: `Banned word added: "${created.word}"`,
+      });
     }
 
-    private async findAllForTenant(tenantId: string) {
-        return this.prisma.bannedWord.findMany({
-            where: { tenantId },
-            orderBy: { word: 'asc' },
-        });
+    return created;
+  }
+
+  async findAll(
+    tenantId: string,
+    filters: BannedWordListQueryDto,
+  ): Promise<PaginatedResult<BannedWordDto>> {
+    const search = filters.search?.trim();
+    const where = {
+      tenantId,
+      ...(search
+        ? { word: { contains: search, mode: 'insensitive' as const } }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.bannedWord.findMany({
+        where,
+        orderBy: { word: 'asc' },
+        take: filters.limit,
+        skip: filters.skip,
+      }),
+      this.prisma.bannedWord.count({ where }),
+    ]);
+
+    return paginate(items, total, filters);
+  }
+
+  private async findAllForTenant(tenantId: string) {
+    return this.prisma.bannedWord.findMany({
+      where: { tenantId },
+      orderBy: { word: 'asc' },
+    });
+  }
+
+  async remove(id: string, tenantId: string, actor?: ActorInfo) {
+    const word = await this.prisma.bannedWord.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!word) {
+      throw new NotFoundException(
+        'Parola non trovata nel database del tenant.',
+      );
     }
 
-    async remove(id: string, tenantId: string, actor?: ActorInfo) {
-        const word = await this.prisma.bannedWord.findFirst({
-            where: { id, tenantId },
-        });
+    const deleted = await this.prisma.bannedWord.delete({
+      where: { id },
+    });
 
-        if (!word) {
-            throw new NotFoundException('Parola non trovata nel database del tenant.');
-        }
-
-        const deleted = await this.prisma.bannedWord.delete({
-            where: { id },
-        });
-
-        if (actor) {
-            await this.auditLogger.log({
-                tenantId,
-                actorUserId: actor.actorUserId,
-                actorRole: actor.actorRole,
-                action: AuditAction.BANNED_WORD_DELETED,
-                resourceType: AuditResourceType.BANNED_WORD,
-                resourceId: deleted.id,
-                resourceName: deleted.word,
-                changesBefore: { word: deleted.word },
-                changeSummary: `Banned word removed: "${deleted.word}"`,
-            });
-        }
-
-        return deleted;
+    if (actor) {
+      await this.auditLogger.log({
+        tenantId,
+        actorUserId: actor.actorUserId,
+        actorRole: actor.actorRole,
+        action: AuditAction.BANNED_WORD_DELETED,
+        resourceType: AuditResourceType.BANNED_WORD,
+        resourceId: deleted.id,
+        resourceName: deleted.word,
+        changesBefore: { word: deleted.word },
+        changeSummary: `Banned word removed: "${deleted.word}"`,
+      });
     }
 
-    // Metodo helper utile per gli altri moduli (Commenti/Articoli)
-    async checkText(tenantId: string, text: string): Promise<boolean> {
-        const bannedWords = await this.findAllForTenant(tenantId);
-        const lowercaseText = text.toLowerCase();
+    return deleted;
+  }
 
-        return bannedWords.some(bw => lowercaseText.includes(bw.word));
-    }
+  // Metodo helper utile per gli altri moduli (Commenti/Articoli)
+  async checkText(tenantId: string, text: string): Promise<boolean> {
+    const bannedWords = await this.findAllForTenant(tenantId);
+    const lowercaseText = text.toLowerCase();
+
+    return bannedWords.some((bw) => lowercaseText.includes(bw.word));
+  }
 }

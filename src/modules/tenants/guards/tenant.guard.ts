@@ -1,14 +1,21 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 
 @Injectable()
 export class TenantGuard implements CanActivate {
-    canActivate(context: ExecutionContext): boolean {
-        const request = context.switchToHttp().getRequest();
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
 
-        if (!request.tenant) {
-            throw new UnauthorizedException('Accesso negato: Tenant non identificato');
-        }
-
-        return true;
+    if (!request.tenant) {
+      throw new UnauthorizedException(
+        'Accesso negato: Tenant non identificato',
+      );
     }
+
+    return true;
+  }
 }
