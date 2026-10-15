@@ -142,6 +142,8 @@ await this.auditLogger.log({ tenantId, actorUserId: session.externalId, ... });
 - **Due-rows index**: partial `webhook_events_due_idx ON ("nextRetryAt") WHERE "sentAt" IS NULL`, hand-written in migration `20261006120000_webhook_outbox_claim_and_retention` (Prisma can't express it — don't remove it from the DB).
 - **Retention**: `WebhooksJob.retention()` (03:00) deletes delivered rows (`sentAt` older than `WEBHOOK_EVENT_RETENTION_DAYS`, default 30) in 5000-row `SKIP LOCKED` batches. Unsent and dead-lettered rows are never deleted.
 - The job is a global worker across tenants; tenant-facing queries (`findAll`, `findOne`, resend) always filter by `tenantId`.
+- **SSRF guard** (`@heyatom/nest-common/webhooks`): `WebhooksService.send` runs `checkWebhookUrl` (https, no credentials, no literal private IP) and posts through `webhookAgent` (every DNS answer must be public, checked at connect time), `maxRedirects: 0`. A refused target returns `'blocked'` → dead-lettered at once (counted `dead_lettered`), never retried. `SEED_WEBHOOK_URL` goes through `assertPublicWebhookUrl` before the seed saves it. `WEBHOOK_ALLOW_PRIVATE_TARGETS=true` (development only, refused in production) admits private and `http://` targets. Logs carry the host, never the full URL.
+- **Signature**: `x-webhook-signature` = hex HMAC-SHA256 of the JSON body with `webhookSecret`. Moving to Standard Webhooks is a coordinated change with the receivers — don't switch it here.
 
 ### FileHarbor (Image Uploads)
 
@@ -168,21 +170,27 @@ Required env var: `DATABASE_URL` (PostgreSQL). Pool: `DATABASE_POOL_MAX` (defaul
 
 `SEED_DEFAULT_TENANT` (default false in production, true elsewhere) creates tenant `default` at boot; its API key is logged outside production only.
 
+Migrations do **not** run in the Docker image (no `migrate deploy`, and `prisma` is pruned): apply them with `pnpm exec prisma migrate deploy` before starting a new version — see README › Deployment.
+
 Validation runs at startup via Joi (`src/configs/config.validation.ts`) — the app will fail fast on misconfigured env vars.
 
-Key runtime settings:
-- API docs: `GET /docs` (Swagger)
+Key runtime settings — the HTTP runtime is `@heyatom/nest-common` (platform standard `../docs/standards/api.md`); don't re-add local copies:
+- Bootstrap: `setupHttpApp` in `main.ts` — shutdown hooks, `trust proxy` = `TRUST_PROXY_HOPS`, helmet, CORS allowlist `CORS_ORIGINS` (`X-API-Key`/`X-User-Id` deliberately **not** in `allowedHeaders`), JSON 1mb, global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`). The urlencoded limit (256kb) is set right after it. Old `CORS_ORIGIN` / `TRUST_PROXY=true` are still read as defaults.
+- Errors: `AllExceptionsFilter` (`APP_FILTER`) → `{ statusCode, code, message, errors?, requestId }`. Domain errors declare an `UPPER_SNAKE` `code` (`throw new ConflictException({ code: 'SLUG_TAKEN', message })`); consumers branch on `code`, never on `message`. P2002 → 409, P2003 → 409, P2025 → 404 globally; anything non-HTTP → generic 500.
+- **No `TransformInterceptor`**: responses are raw resources (no `{ data }` envelope) until the coordinated phase-3 migration with heyatom-client, dbdbuilds-api and Meridian.
+- Logging: `loggerParams` (nestjs-pino), server-generated `X-Request-Id` on every response, `ip` kept on the request line; `LOG_LEVEL` default info in production, debug elsewhere.
+- API docs: `GET /docs` only with `ENABLE_SWAGGER` (unset = on only for an explicit `NODE_ENV` development/test). `SWAGGER_OPTIONS` (`src/common/swagger.ts`) is shared with `pnpm openapi:dump`.
+- Pagination: `PageParams` / `paginate()` / `ApiPaginatedResponse` from the package.
 - Metrics: `GET /metrics` on `METRICS_PORT` (default 9091), not on the API port — see below
 - Health: `GET /health`
-- Global validation pipe: `whitelist: true, forbidNonWhitelisted: true`
 
 ### Metrics
 
-`src/modules/metrics/`, `@prometheus-io/client` directly (own `Registry`, default label `app=articuno`). `MetricsServer` serves `GET /metrics` with `node:http` on `METRICS_PORT` (default 9091), outside the Nest app: no guards, no TenantMiddleware, no CORS — and nothing on the API port (404 there). Isolation is the network's job: never publish 9091 on the host, nginx never proxies it; Prometheus scrapes `articuno:9091` on the internal Docker network. `MetricsMiddleware` (registered in `AppModule.configure`, all routes) records `http_request_duration_seconds` labelled by route pattern, never the raw URL; `/health*` is skipped.
+`MetricsModule` from `@heyatom/nest-common/metrics` (own `Registry`, default label `app=articuno`) serves `GET /metrics` on `METRICS_PORT` (default 9091, `METRICS_HOST` unset = `::`), outside the Nest app: no guards, no TenantMiddleware, no CORS — and nothing on the API port (404 there). Isolation is the network's job: never publish 9091 on the host, nginx never proxies it; Prometheus scrapes `articuno:9091` on the internal Docker network. Its middleware records `http_request_duration_seconds` on every route, labelled by route pattern, never the raw URL; `/health*` is skipped. Domain metrics live in `WebhookMetrics` (`src/modules/webhook/webhook.metrics.ts`) on `MetricsService.registry`.
 
-`articuno_webhook_outbox_events{state}` (gauge, `state` = `overdue` | `dead`, both always emitted) — one `$queryRaw` on `webhook_events` with `sentAt IS NULL`, computed lazily in `collect()` (no query until scraped; a DB error logs `warn` and keeps the previous value). `overdue` = `COALESCE(nextRetryAt, createdAt)` more than 2 minutes in the past (the job runs every 30s; dead-lettered and leased rows have `nextRetryAt` in the future, so they never count). `dead` = `nextRetryAt` equal to the dead-letter sentinel `9999-12-31T23:59:59Z` (`DEAD_LETTER_DATE` in `src/modules/webhook/webhook.constants.ts`, bound as a query parameter — its own file because `WebhooksJob` depends on `MetricsService`). Alerts: `articuno_webhook_outbox_events{state="overdue"} > 0 for 10m`; `increase(articuno_webhook_outbox_events{state="dead"}[1h]) > 0` — `dead` only drops via manual resend, so alert on its increase, not its level.
+`articuno_webhook_outbox_events{state}` (gauge, `state` = `overdue` | `dead`, both always emitted) — one `$queryRaw` on `webhook_events` with `sentAt IS NULL`, computed lazily in `collect()` (no query until scraped; a DB error logs `warn` and keeps the previous value). `overdue` = `COALESCE(nextRetryAt, createdAt)` more than 2 minutes in the past (the job runs every 30s; dead-lettered and leased rows have `nextRetryAt` in the future, so they never count). `dead` = `nextRetryAt` equal to the dead-letter sentinel `9999-12-31T23:59:59Z` (`DEAD_LETTER_DATE` in `src/modules/webhook/webhook.constants.ts`, bound as a query parameter — its own file because `WebhooksJob` depends on `WebhookMetrics`). Alerts: `articuno_webhook_outbox_events{state="overdue"} > 0 for 10m`; `increase(articuno_webhook_outbox_events{state="dead"}[1h]) > 0` — `dead` only drops via manual resend, so alert on its increase, not its level.
 
-`articuno_webhook_delivery_attempts_total{result}` (counter, `result` = `success` | `failure` | `unconfigured` | `dead_lettered`, all four initialised to 0) — incremented by `WebhooksJob.processPendingWebhooks` once per claimed row, right **after** the outcome's `webhookEvent.update` resolves (a failed update counts nothing). `unconfigured` = tenant without `webhookUrl`/`webhookSecret` (rescheduled +1h, attempts still incremented); `dead_lettered` = row reached `MAX_ATTEMPTS` and got the sentinel, no send. Alert: `sum(rate(articuno_webhook_delivery_attempts_total{result="failure"}[15m])) / sum(rate(articuno_webhook_delivery_attempts_total[15m])) > 0.5 and sum(rate(articuno_webhook_delivery_attempts_total[15m])) > 0`.
+`articuno_webhook_delivery_attempts_total{result}` (counter, `result` = `success` | `failure` | `unconfigured` | `dead_lettered`, all four initialised to 0) — incremented by `WebhooksJob.processPendingWebhooks` once per claimed row, right **after** the outcome's `webhookEvent.update` resolves (a failed update counts nothing). `unconfigured` = tenant without `webhookUrl`/`webhookSecret` (rescheduled +1h, attempts still incremented); `dead_lettered` = row reached `MAX_ATTEMPTS` and got the sentinel, no send, or the target was refused by the SSRF guard. Alert: `sum(rate(articuno_webhook_delivery_attempts_total{result="failure"}[15m])) / sum(rate(articuno_webhook_delivery_attempts_total[15m])) > 0.5 and sum(rate(articuno_webhook_delivery_attempts_total[15m])) > 0`.
 
 ## Code Conventions
 
