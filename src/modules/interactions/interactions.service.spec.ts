@@ -128,3 +128,29 @@ describe('InteractionsService article visibility', () => {
     expect(prisma.bookmark.count.mock.calls[0][0].where.tenantId).toBe('t1');
   });
 });
+
+describe('InteractionsService.countView', () => {
+  const prisma = { $executeRaw: jest.fn() };
+  const service = new InteractionsService(prisma as any);
+
+  beforeEach(() => jest.resetAllMocks());
+
+  it('increments a PUBLISHED article of the tenant in one statement', async () => {
+    prisma.$executeRaw.mockResolvedValue(1);
+
+    await service.countView('t1', 'a1');
+
+    const [sql, ...values] = prisma.$executeRaw.mock.calls[0];
+    expect(sql.join('?')).toMatch(/"views" = "views" \+ 1/);
+    expect(sql.join('?')).toMatch(/"status" = 'PUBLISHED'/);
+    expect(values).toEqual(['a1', 't1']);
+  });
+
+  it('404s an article that is missing, of another tenant or not PUBLISHED', async () => {
+    prisma.$executeRaw.mockResolvedValue(0);
+
+    await expect(service.countView('t1', 'a1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});

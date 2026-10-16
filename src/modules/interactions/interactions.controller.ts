@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   UseGuards,
@@ -24,13 +26,14 @@ import {
   LikeToggleResultDto,
 } from '@/modules/interactions/dto/interaction-response.dto';
 
+const USER_ID_HEADER = {
+  name: 'X-User-Id',
+  description: 'External user ID of the end user',
+  required: true,
+};
+
 @ApiTags('Interactions')
 @ApiSecurity('api-key')
-@ApiHeader({
-  name: 'X-User-Id',
-  description: 'External user ID required for all interaction endpoints',
-  required: true,
-})
 @Controller('interactions')
 @UseGuards(TenantGuard)
 export class InteractionsController {
@@ -48,6 +51,7 @@ export class InteractionsController {
   }
 
   @Post('articles/:articleId/like')
+  @ApiHeader(USER_ID_HEADER)
   @ApiOperation({
     summary: 'Toggle like on an article',
     description:
@@ -85,6 +89,7 @@ export class InteractionsController {
   }
 
   @Get('articles/:articleId/status')
+  @ApiHeader(USER_ID_HEADER)
   @ApiOperation({
     summary: 'Get interaction status for an article',
     description:
@@ -119,5 +124,31 @@ export class InteractionsController {
       params.articleId,
       this.requireUserId(externalUserId),
     );
+  }
+
+  @Post('articles/:articleId/view')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Count a view of an article',
+    description:
+      'Adds one to the article view counter. Call it server-side when the article page is served; No deduplication: filter bots and repeated views in the tenant site.',
+  })
+  @ApiParam({
+    name: 'articleId',
+    description: 'UUID of the viewed article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({ status: 204, description: 'View counted.' })
+  @ApiResponse({ status: 400, description: 'Invalid articleId.' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Article not found or not PUBLISHED.',
+  })
+  async countView(
+    @GetTenant() tenant: any,
+    @Param() params: ArticleInteractionParamsDto,
+  ) {
+    await this.interactionsService.countView(tenant.id, params.articleId);
   }
 }

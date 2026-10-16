@@ -25,6 +25,21 @@ export class InteractionsService {
     }
   }
 
+  /**
+   * One atomic increment, PUBLISHED only. Raw SQL so a view does not bump
+   * `updatedAt` (Prisma sets `@updatedAt` on every update).
+   */
+  async countView(tenantId: string, articleId: string): Promise<void> {
+    const count = await this.prisma.$executeRaw`
+      UPDATE "articles" SET "views" = "views" + 1
+      WHERE "id" = ${articleId} AND "tenantId" = ${tenantId}
+        AND "status" = 'PUBLISHED'`;
+
+    if (count === 0) {
+      throw new NotFoundException('Articolo non trovato');
+    }
+  }
+
   async toggleLikeArticle(
     tenantId: string,
     articleId: string,
