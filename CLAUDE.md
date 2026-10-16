@@ -87,7 +87,7 @@ are real foreign keys onto `users(externalId, tenantId)`.
 
 **Admin roles**: every admin controller declares `@Roles(CONTENT_ROLES | MODERATION_ROLES | SUPER_ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), enforced by `BastionUserGuard`; no `@Roles` = SUPER_ADMIN-only. AUTHOR+ articles/translations/categories/tags/stats; MODERATOR+ comments/reports/banned-words, DELETE of articles/categories/tags, article status UNDER_REVIEW/HIDDEN/BANNED; SUPER_ADMIN only for users/audits/webhooks (Bastion's seed grants `articuno-users.manage` / `articuno-config.manage` to no role). Mirrors Meridian's `articuno-*` permissions. Full matrix: [docs/admin-roles.md](docs/admin-roles.md).
 
-**Rate limiting**: admin routes only — `AdminThrottlerGuard` (`THROTTLE_LIMIT` per `THROTTLE_TTL_SECONDS`) per Bastion user. The public API is deliberately not throttled: it is server-to-server and every tenant backend reaches Articuno from the same Docker IP; rate-limit end users in the tenant site.
+**Rate limiting**: admin routes only — `AdminThrottlerGuard` (`THROTTLE_LIMIT` per `THROTTLE_TTL_SECONDS`) per Bastion user. The public API is deliberately not throttled (server-to-server, every tenant backend shares one Docker IP; end users are rate-limited in the tenant site): [docs/DECISIONS.md D-001](docs/DECISIONS.md).
 
 **Public API never sets status**: `Public*Dto` variants omit `status` (articles start DRAFT); status changes go through `/admin/*` and `isValidModerationTransition()`.
 
@@ -216,6 +216,7 @@ Key runtime settings — the HTTP runtime is `@heyatom/nest-common` (platform st
 ## Docs
 
 - [docs/BACKLOG.md](docs/BACKLOG.md) — bug verificati e backlog prioritizzato
+- [docs/DECISIONS.md](docs/DECISIONS.md) — decisioni e deviazioni dallo standard API (D-001 API pubblica senza throttler)
 - [docs/admin-api.md](docs/admin-api.md) — admin panel API reference
 - [docs/article-moderation.md](docs/article-moderation.md) — moderation workflow dettagliato
 - [docs/comment-moderation.md](docs/comment-moderation.md) — comment moderation flow
