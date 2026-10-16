@@ -4745,10 +4745,14 @@
         "parameters": [
           {
             "name": "days",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Length of the `history` window in days, ending today. Totals are all-time.",
             "schema": {
-              "type": "string"
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30,
+              "type": "number"
             }
           }
         ],
