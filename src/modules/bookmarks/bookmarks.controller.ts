@@ -20,7 +20,7 @@ import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BookmarksService } from '@/modules/bookmarks/bookmarks.service';
 import { BookmarkParamsDto } from '@/modules/bookmarks/dto/bookmark-params.dto';
-import { PageParams, ApiPaginatedResponse } from '@/common/pagination';
+import { PageParams, ApiPaginatedResponse } from '@heyatom/nest-common';
 import {
   BookmarkListItemDto,
   BookmarkToggleResultDto,
@@ -40,7 +40,10 @@ export class BookmarksController {
 
   private requireUserId(externalUserId?: string): string {
     if (!externalUserId || !externalUserId.trim()) {
-      throw new BadRequestException('Header X-User-Id mancante');
+      throw new BadRequestException({
+        code: 'USER_ID_REQUIRED',
+        message: 'Header X-User-Id mancante',
+      });
     }
 
     return externalUserId.trim();
@@ -62,9 +65,15 @@ export class BookmarksController {
     description: 'Bookmark toggled successfully.',
     type: BookmarkToggleResultDto,
   })
-  @ApiResponse({ status: 400, description: 'Missing X-User-Id header or invalid articleId.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Missing X-User-Id header or invalid articleId.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article not found.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Article not found or not PUBLISHED.',
+  })
   toggle(
     @GetTenant() tenant: any,
     @Param() params: BookmarkParamsDto,
@@ -101,4 +110,3 @@ export class BookmarksController {
     );
   }
 }
-

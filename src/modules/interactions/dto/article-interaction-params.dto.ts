@@ -9,4 +9,3 @@ export class ArticleInteractionParamsDto {
   @IsUUID()
   articleId: string;
 }
-

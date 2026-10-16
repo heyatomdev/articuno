@@ -68,11 +68,23 @@ describe('TenantSeedService', () => {
     await make({
       SEED_DEFAULT_TENANT: true,
       NODE_ENV: 'development',
-      SEED_WEBHOOK_URL: 'http://hook.local/w',
+      SEED_WEBHOOK_URL: 'http://127.0.0.1:8000/w',
+      WEBHOOK_ALLOW_PRIVATE_TARGETS: true,
     }).onModuleInit();
     expect(logged.join('\n')).toContain('PLAINKEY');
     expect(prisma.tenant.create.mock.calls[0][0].data.webhookUrl).toBe(
-      'http://hook.local/w',
+      'http://127.0.0.1:8000/w',
     );
+  });
+
+  it('refuses a non-public webhook URL without WEBHOOK_ALLOW_PRIVATE_TARGETS', async () => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    await expect(
+      make({
+        SEED_DEFAULT_TENANT: true,
+        SEED_WEBHOOK_URL: 'https://10.0.0.1/w',
+      }).onModuleInit(),
+    ).rejects.toMatchObject({ code: 'WEBHOOK_TARGET_BLOCKED' });
+    expect(prisma.tenant.create).not.toHaveBeenCalled();
   });
 });

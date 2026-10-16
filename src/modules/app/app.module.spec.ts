@@ -1,5 +1,4 @@
 import { Test } from '@nestjs/testing';
-import { AppModule } from './app.module';
 
 /**
  * Compiles the real module graph.
@@ -34,6 +33,9 @@ describe('AppModule', () => {
   });
 
   it('resolves every dependency in the real graph', async () => {
+    // Imported here: ConfigModule.forRoot validates env when app.module loads,
+    // so a static import would run before beforeAll sets ENV.
+    const { AppModule } = await import('./app.module');
     const module = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();

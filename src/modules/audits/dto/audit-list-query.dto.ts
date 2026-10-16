@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { IsEnum, IsOptional } from 'class-validator';
-import { PageParams } from '@/common/pagination';
+import { PageParams } from '@heyatom/nest-common';
 
 export class AuditListQueryDto extends PageParams {
   @ApiProperty({
@@ -29,4 +29,3 @@ export class AuditListQueryDto extends PageParams {
   @IsOptional()
   actorUserId?: string;
 }
-

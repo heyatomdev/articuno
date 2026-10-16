@@ -1,3 +1,5 @@
+import { NotFoundException } from '@nestjs/common';
+import { ContentStatus } from '@prisma/client';
 import { InteractionsService } from './interactions.service';
 
 /** Like toggle: delete-first, and a lost insert race (P2002) still means "liked". */
@@ -58,5 +60,97 @@ describe('InteractionsService.toggleLikeArticle', () => {
     );
 
     await expect(toggle()).rejects.toThrow('boom');
+  });
+});
+
+describe('InteractionsService article visibility', () => {
+  const prisma = {
+    $transaction: jest.fn(),
+    ensureUser: jest.fn(),
+    article: { findFirst: jest.fn() },
+    user: { findFirst: jest.fn() },
+    like: { count: jest.fn() },
+    bookmark: { count: jest.fn() },
+  };
+  const service = new InteractionsService(prisma as any);
+  const statuses = [
+    ContentStatus.DRAFT,
+    ContentStatus.PUBLISHED,
+    ContentStatus.UNDER_REVIEW,
+    ContentStatus.HIDDEN,
+    ContentStatus.BANNED,
+  ];
+  const articleIn = (status: ContentStatus) =>
+    prisma.article.findFirst.mockImplementation(({ where }) =>
+      where.tenantId === 't1' && (!where.status || where.status === status)
+        ? { id: 'a1' }
+        : null,
+    );
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    prisma.ensureUser.mockResolvedValue({ id: 'u1' });
+    prisma.user.findFirst.mockResolvedValue({ id: 'u1' });
+    prisma.like.count.mockResolvedValue(1);
+    prisma.bookmark.count.mockResolvedValue(0);
+    prisma.$transaction.mockImplementation(async (arg) =>
+      Array.isArray(arg) ? Promise.all(arg) : true,
+    );
+  });
+
+  it.each(statuses)('toggleLikeArticle on %s', async (status) => {
+    articleIn(status);
+    const call = service.toggleLikeArticle('t1', 'a1', 'ext-1');
+
+    if (status === ContentStatus.PUBLISHED) {
+      await expect(call).resolves.toEqual({ liked: true });
+    } else {
+      await expect(call).rejects.toThrow(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each(statuses)('getArticleStatus on %s', async (status) => {
+    articleIn(status);
+    const call = service.getArticleStatus('t1', 'a1', 'ext-1');
+
+    if (status === ContentStatus.PUBLISHED) {
+      await expect(call).resolves.toEqual({ liked: true, bookmarked: false });
+    } else {
+      await expect(call).rejects.toThrow(NotFoundException);
+    }
+  });
+
+  it('scopes the like/bookmark counts to the tenant', async () => {
+    articleIn(ContentStatus.PUBLISHED);
+    await service.getArticleStatus('t1', 'a1', 'ext-1');
+    expect(prisma.like.count.mock.calls[0][0].where.tenantId).toBe('t1');
+    expect(prisma.bookmark.count.mock.calls[0][0].where.tenantId).toBe('t1');
+  });
+});
+
+describe('InteractionsService.countView', () => {
+  const prisma = { $executeRaw: jest.fn() };
+  const service = new InteractionsService(prisma as any);
+
+  beforeEach(() => jest.resetAllMocks());
+
+  it('increments a PUBLISHED article of the tenant in one statement', async () => {
+    prisma.$executeRaw.mockResolvedValue(1);
+
+    await service.countView('t1', 'a1');
+
+    const [sql, ...values] = prisma.$executeRaw.mock.calls[0];
+    expect(sql.join('?')).toMatch(/"views" = "views" \+ 1/);
+    expect(sql.join('?')).toMatch(/"status" = 'PUBLISHED'/);
+    expect(values).toEqual(['a1', 't1']);
+  });
+
+  it('404s an article that is missing, of another tenant or not PUBLISHED', async () => {
+    prisma.$executeRaw.mockResolvedValue(0);
+
+    await expect(service.countView('t1', 'a1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

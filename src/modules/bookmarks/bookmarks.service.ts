@@ -1,15 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { PageParams, PaginatedResult, paginate } from '@/common/pagination';
+import { PageParams, PaginatedResult, paginate } from '@heyatom/nest-common';
 import { ContentStatus } from '@prisma/client';
 
 @Injectable()
 export class BookmarksService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Only PUBLISHED articles can be bookmarked: the list hides every other
+  // status, and a moderated article must not be reachable from the public API.
   private async ensureArticleExists(tenantId: string, articleId: string) {
     const article = await this.prisma.article.findFirst({
-      where: { id: articleId, tenantId },
+      where: { id: articleId, tenantId, status: ContentStatus.PUBLISHED },
       select: { id: true },
     });
 

@@ -26,11 +26,10 @@ export class UpsertUserDto {
   language?: string;
 
   @ApiPropertyOptional({
-    description: 'URL of the user\'s avatar image',
+    description: "URL of the user's avatar image",
     example: 'https://cdn.example.com/avatars/user_abc123.jpg',
   })
   @IsOptional()
   @IsUrl()
   avatarUrl?: string;
 }
-

@@ -46,10 +46,10 @@ import {
   ArticleParamsDto,
 } from '@/modules/articles/dto/article-params.dto';
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
-import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
+import { AdminUpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
 import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { FileHarborConfig } from '@/modules/fileharbor/interfaces/fileharbor-config.interface';
 import { PrismaService } from '@/modules/prisma/prisma.service';
@@ -121,9 +121,10 @@ export class AdminArticlesController {
     });
 
     if (!tenant?.fileharborEndpoint || !tenant?.fileharborApiKey) {
-      throw new BadRequestException(
-        'FileHarbor non configurato per questo tenant',
-      );
+      throw new BadRequestException({
+        code: 'FILEHARBOR_NOT_CONFIGURED',
+        message: 'FileHarbor non configurato per questo tenant',
+      });
     }
 
     return {
@@ -155,7 +156,10 @@ export class AdminArticlesController {
     try {
       parsed = JSON.parse(rawData || '{}');
     } catch {
-      throw new BadRequestException('Il campo "data" non è un JSON valido');
+      throw new BadRequestException({
+        code: 'INVALID_JSON',
+        message: 'Il campo "data" non è un JSON valido',
+      });
     }
 
     const dto = plainToInstance(cls, parsed);
@@ -641,7 +645,7 @@ export class AdminArticlesController {
     description: 'BCP 47 language code of the translation to update',
     example: 'en',
   })
-  @ApiBody({ type: UpdateArticleTranslationDto })
+  @ApiBody({ type: AdminUpdateArticleTranslationDto })
   @ApiResponse({
     status: 200,
     description: 'Translation updated successfully.',
@@ -662,7 +666,7 @@ export class AdminArticlesController {
   async updateTranslation(
     @GetSession() session: AdminSession,
     @Param() params: ArticleTranslationParamsDto,
-    @Body() dto: UpdateArticleTranslationDto,
+    @Body() dto: AdminUpdateArticleTranslationDto,
   ) {
     const translation = await this.articleTranslationsService.update(
       session.tenantId,

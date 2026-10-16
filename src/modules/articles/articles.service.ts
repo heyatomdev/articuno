@@ -9,15 +9,20 @@ import { BannedWordsService } from '@/modules/banned-words/banned-words.service'
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { CreateArticleDto } from '@/modules/articles/dto/create-article.dto';
 import { UpdateArticleDto } from '@/modules/articles/dto/update-article.dto';
-import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
-import { ContentStatus } from '@prisma/client';
+import {
+  ArticleFiltersQueryDto,
+  PublicArticleFiltersQueryDto,
+} from '@/modules/articles/dto/article-filters-query.dto';
+import { ContentStatus, Prisma } from '@prisma/client';
+import { publicArticleStatuses } from '@/modules/articles/article-visibility';
 import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
-import { slugifySafe } from '@/utils/slugify';
+import { nextFreeSlug, slugify } from '@/utils/slugify';
 import { generateRandomName } from '@/utils/random-name';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 import { isValidModerationTransition } from '@/modules/moderation/moderation-policy.service';
+import { AutoModerationReasonEnum } from '@/modules/moderation/moderation.types';
 
 @Injectable()
 export class ArticlesService {
@@ -81,11 +86,10 @@ export class ArticlesService {
 
   private sanitizeTranslation<
     T extends { title: string; content: string; excerpt?: string },
-  >(translation: T): T & { slug: string; readingTime: number } {
+  >(translation: T): T & { readingTime: number } {
     translation = stripTranslationText(translation);
     return {
       ...translation,
-      slug: slugifySafe(translation.title),
       content: sanitizeContent(translation.content),
       readingTime: computeReadingTime(translation.content),
       ...(translation.excerpt !== undefined
@@ -186,9 +190,10 @@ export class ArticlesService {
       !tenant?.fileharborEndpoint ||
       !FileHarborService.isUnderEndpoint(url, tenant.fileharborEndpoint)
     ) {
-      throw new BadRequestException(
-        "coverImage deve essere un'immagine del FileHarbor del tenant",
-      );
+      throw new BadRequestException({
+        code: 'INVALID_COVER_IMAGE',
+        message: "coverImage deve essere un'immagine del FileHarbor del tenant",
+      });
     }
   }
 
@@ -223,50 +228,137 @@ export class ArticlesService {
       tenantId,
       translationsInput,
     );
-    const finalStatus = hasBannedWords ? ContentStatus.HIDDEN : requestedStatus;
+    // A banned word hides the article; BANNED is terminal and stays as is.
+    const autoHidden =
+      hasBannedWords &&
+      requestedStatus !== ContentStatus.HIDDEN &&
+      requestedStatus !== ContentStatus.BANNED;
+    const finalStatus = autoHidden ? ContentStatus.HIDDEN : requestedStatus;
 
     const sanitizedTranslations = translationsInput.map((t) =>
       this.sanitizeTranslation(t),
     );
+    const bases = sanitizedTranslations.map((t) => slugify(t.title));
+    const taken = (
+      await this.prisma.articleTranslation.findMany({
+        where: {
+          tenantId,
+          OR: bases.map((base) => ({ slug: { startsWith: base } })),
+        },
+        select: { slug: true },
+      })
+    ).map((t) => t.slug);
+    // Same title in two languages → "titolo", "titolo-2".
+    const slugs = bases.map((base) => {
+      const slug = nextFreeSlug(base, taken);
+      taken.push(slug);
+      return slug;
+    });
 
     try {
-      return await this.prisma.article.create({
-        data: {
-          coverImage: dto.coverImage,
-          status: finalStatus,
-          featured: dto.featured,
-          categoryId: dto.categoryId,
-          authorId: dto.authorId,
-          tenantId,
-          tags: dto.tagIds
-            ? {
-                connect: dto.tagIds.map((id) => ({ id })),
-              }
-            : undefined,
-          translations: {
-            create: sanitizedTranslations.map((translation) => ({
-              ...translation,
-              tenantId,
-            })),
+      return await this.prisma.$transaction(async (tx) => {
+        const article = await tx.article.create({
+          data: {
+            coverImage: dto.coverImage,
+            status: finalStatus,
+            featured: dto.featured,
+            categoryId: dto.categoryId,
+            authorId: dto.authorId,
+            tenantId,
+            tags: dto.tagIds
+              ? {
+                  connect: dto.tagIds.map((id) => ({ id })),
+                }
+              : undefined,
+            translations: {
+              create: sanitizedTranslations.map((translation, i) => ({
+                ...translation,
+                slug: slugs[i],
+                tenantId,
+              })),
+            },
           },
-        },
-        include: this.articleIncludes,
+          include: this.articleIncludes,
+        });
+
+        // Same event the translation path emits when a banned word hides an
+        // existing article. Outbox row in the same tx: delivery is async
+        // (WebhooksJob), the request never waits on the tenant endpoint.
+        if (autoHidden) {
+          await this.webhookPublisher.publishArticleStatusChangedEvent(
+            tenantId,
+            article.id,
+            requestedStatus,
+            ContentStatus.HIDDEN,
+            AutoModerationReasonEnum.BANNED_WORD_DETECTED,
+            'system',
+            tx,
+          );
+        } else if (finalStatus === ContentStatus.PUBLISHED) {
+          article.publishedAt =
+            await this.webhookPublisher.publishArticleLifecycleEvent(
+              tenantId,
+              article.id,
+              null,
+              ContentStatus.PUBLISHED,
+              tx,
+            );
+        }
+
+        return article;
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug traduzione gia esistente');
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: 'Slug traduzione gia esistente',
+        });
       }
       throw error;
     }
   }
 
+  /**
+   * Public listing (X-API-Key): PUBLISHED only, plus DRAFT with `includeDrafts`.
+   * UNDER_REVIEW, HIDDEN and BANNED are never returned here.
+   */
+  async findAllPublic(
+    tenantId: string,
+    query: PublicArticleFiltersQueryDto,
+  ): Promise<PaginatedResult<any>> {
+    const visible = publicArticleStatuses(query.includeDrafts);
+
+    if (query.status && !visible.includes(query.status)) {
+      throw new BadRequestException({
+        code: 'DRAFTS_NOT_INCLUDED',
+        message: 'status=DRAFT richiede includeDrafts=true',
+      });
+    }
+
+    // statusFilter overrides query.status: the public caller never picks a
+    // status outside `visible`.
+    // Newest publication first; drafts (no publishedAt) after, newest first.
+    return this.findAll(
+      tenantId,
+      query,
+      { in: query.status ? [query.status] : visible },
+      [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
+    );
+  }
+
   async findAll(
     tenantId: string,
     query: ArticleFiltersQueryDto,
+    statusFilter?: { in: ContentStatus[] },
+    orderBy: Prisma.ArticleOrderByWithRelationInput[] = [{ createdAt: 'desc' }],
   ): Promise<PaginatedResult<any>> {
     const where: any = {
       tenantId,
-      ...(query.status ? { status: query.status } : {}),
+      ...(statusFilter
+        ? { status: statusFilter }
+        : query.status
+          ? { status: query.status }
+          : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.featured !== undefined ? { featured: query.featured } : {}),
       ...(query.tagId
@@ -308,7 +400,7 @@ export class ArticlesService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.article.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         take: query.limit,
         skip: query.skip,
         include: listIncludes,
@@ -319,7 +411,30 @@ export class ArticlesService {
     return paginate(items, total, query);
   }
 
-  async findOne(tenantId: string, slug: string, languageCode?: string) {
+  /**
+   * Public detail by slug (X-API-Key): PUBLISHED only, plus DRAFT with
+   * `includeDrafts`. Any other status answers 404, same as a missing slug.
+   */
+  findOnePublic(
+    tenantId: string,
+    slug: string,
+    languageCode?: string,
+    includeDrafts?: boolean,
+  ) {
+    return this.findOne(
+      tenantId,
+      slug,
+      languageCode,
+      publicArticleStatuses(includeDrafts),
+    );
+  }
+
+  async findOne(
+    tenantId: string,
+    slug: string,
+    languageCode?: string,
+    statuses?: ContentStatus[],
+  ) {
     const articleIncludes = languageCode
       ? {
           ...this.articleIncludes,
@@ -332,6 +447,7 @@ export class ArticlesService {
     const article = await this.prisma.article.findFirst({
       where: {
         tenantId,
+        ...(statuses ? { status: { in: statuses } } : {}),
         translations: {
           some: {
             tenantId,
@@ -372,9 +488,10 @@ export class ArticlesService {
       dto.status &&
       !isValidModerationTransition(currentArticle.status, dto.status)
     ) {
-      throw new BadRequestException(
-        `Transizione di stato non consentita: ${currentArticle.status} → ${dto.status}`,
-      );
+      throw new BadRequestException({
+        code: 'INVALID_STATUS_TRANSITION',
+        message: `Transizione di stato non consentita: ${currentArticle.status} → ${dto.status}`,
+      });
     }
 
     if (dto.categoryId) {
@@ -412,22 +529,26 @@ export class ArticlesService {
         });
 
         if (dto.status && dto.status !== currentArticle.status) {
-          await this.webhookPublisher.publishArticleStatusChangedEvent(
-            tenantId,
-            updatedArticle.id,
-            currentArticle.status,
-            updatedArticle.status,
-            dto.moderationReason,
-            dto.moderatorId,
-            tx,
-          );
+          updatedArticle.publishedAt =
+            await this.webhookPublisher.publishArticleStatusChangedEvent(
+              tenantId,
+              updatedArticle.id,
+              currentArticle.status,
+              updatedArticle.status,
+              dto.moderationReason,
+              dto.moderatorId,
+              tx,
+            );
         }
 
         return updatedArticle;
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug traduzione gia esistente');
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: 'Slug traduzione gia esistente',
+        });
       }
       throw error;
     }
@@ -443,7 +564,20 @@ export class ArticlesService {
       throw new NotFoundException('Articolo non trovato');
     }
 
-    await this.prisma.article.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      // Slugs and titles are gone after the delete: read them first.
+      const summary = await this.webhookPublisher.articleSummary(
+        tx,
+        tenantId,
+        id,
+      );
+      await tx.article.delete({ where: { id, tenantId } });
+      await this.webhookPublisher.publishArticleDeletedEvent(
+        tenantId,
+        summary,
+        tx,
+      );
+    });
 
     if (article.coverImage) {
       const tenant = await this.prisma.tenant.findFirst({

@@ -1,11 +1,15 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { Logger } from '@nestjs/common';
+import {
+  parseCorsOrigins,
+  setupHttpApp,
+  setupSwagger,
+} from '@heyatom/nest-common';
 import { ConfigService } from '@nestjs/config';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './modules/app/app.module';
-import { HttpExceptionFilter } from '@/filters/http-exception.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { SWAGGER_OPTIONS } from '@/common/swagger';
 
 async function bootstrap(): Promise<void> {
   try {
@@ -17,83 +21,41 @@ async function bootstrap(): Promise<void> {
     app.useLogger(app.get(PinoLogger));
 
     const configService = app.get(ConfigService);
-    const environment =
-      configService.get<string>('environment') ?? 'development';
-    const isProduction = environment === 'production';
-    const corsOrigins = (configService.get<string>('corsOrigin') ?? '')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean);
-    const trustProxy = configService.get<boolean>('trustProxy') ?? false;
-    const port = configService.get<number>('port') ?? 3000;
-    const baseUrl = configService.get<string>('baseUrl') ?? 'Not Set';
-
-    app.enableShutdownHooks();
-    if (trustProxy) {
-      app.set('trust proxy', 1);
-    }
-
-    // Global validation pipe
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
+    const port = configService.getOrThrow<number>('PORT');
+    const baseUrl = configService.get<string>('BASE_URL') || 'Not Set';
+    const corsOrigins = parseCorsOrigins(
+      configService.get<string>('CORS_ORIGINS'),
     );
 
-    // Enable CORS. X-API-Key / X-User-Id are deliberately not allowed: the tenant
-    // key is server-to-server only, a browser must never hold it.
-    app.enableCors({
-      origin: corsOrigins.length > 0 ? corsOrigins : !isProduction,
-      methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+    // Shutdown hooks, trust proxy, helmet, CORS allowlist, 1mb JSON limit,
+    // global ValidationPipe (whitelist + forbidNonWhitelisted + transform).
+    // X-API-Key / X-User-Id are deliberately not in the CORS allowed headers:
+    // the tenant key is server-to-server only, a browser must never hold it.
+    setupHttpApp(app, {
+      trustProxyHops: configService.getOrThrow<number>('TRUST_PROXY_HOPS'),
+      corsOrigins,
+      urlencodedBodyLimit: '256kb',
     });
-    if (isProduction && corsOrigins.length === 0) {
+    if (
+      configService.get('NODE_ENV') === 'production' &&
+      corsOrigins.length === 0
+    ) {
       bootstrapLogger.warn(
-        'CORS_ORIGIN is not set in production: browser cross-origin requests are disabled',
+        'CORS_ORIGINS is not set in production: browser cross-origin requests are disabled',
       );
     }
 
-    // Use global exception filter
-    app.useGlobalFilters(new HttpExceptionFilter());
-
-    app.useBodyParser('json', { limit: '1mb' });
-    app.useBodyParser('urlencoded', { limit: '256kb', extended: true });
-
     // /docs enumerates the whole API surface, admin routes included:
-    // development only, as in Bastion, Herald, Beacon and Gatherly.
-    if (!isProduction) {
-      const config = new DocumentBuilder()
-        .setTitle('Articuno')
-        .setDescription(
-          'Multi-tenant CMS management system built with NestJS, Prisma ORM, and PostgreSQL.',
-        )
-        .setVersion(process?.env?.npm_package_version || '2.0.0')
-        .addApiKey(
-          { type: 'apiKey', name: 'X-API-Key', in: 'header' },
-          'api-key',
-        )
-        .addBearerAuth()
-        .setLicense(
-          'MIT',
-          'https://github.com/heyatomdev/articuno/blob/main/README.md',
-        )
-        .setContact(
-          'Andrea Tombolato',
-          'https://heyatom.dev',
-          'hey@heyatom.dev',
-        )
-        .build();
-
-      const document = SwaggerModule.createDocument(app, config);
-      SwaggerModule.setup('/docs', app, document);
+    // ENABLE_SWAGGER, resolved fail-closed in config.validation.ts.
+    const swagger = configService.get<boolean>('ENABLE_SWAGGER');
+    if (swagger) {
+      setupSwagger(app, SWAGGER_OPTIONS);
     }
 
     await app.listen(port);
 
     bootstrapLogger.log(`Articuno started successfully`);
-    if (!isProduction) {
+    if (swagger) {
       bootstrapLogger.log(`API Documentation: http://localhost:${port}/docs`);
     }
     bootstrapLogger.log(`Current BASE_URL is set to: ${baseUrl}`);

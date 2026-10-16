@@ -196,6 +196,7 @@ curl -X POST http://localhost:3000/admin/articles \
    - Gli slug degli articoli devono essere unici per tenant e lingua (`@@unique([tenantId, slug])`)
    - Gli slug dei tag devono essere unici per tenant
    - Gli slug delle categorie devono essere unici per tenant
+   - Generati dal titolo/nome alla creazione (`-2`, `-3` solo su collisione), non cambiano quando cambia il titolo/nome. Solo i `PATCH` admin di traduzioni, categorie e tag accettano `slug` per cambiarlo esplicitamente (`409 SLUG_TAKEN` se già usato)
 4. **Content Sanitization:** Tutto il contenuto HTML degli articoli viene sanitizzato automaticamente.
 5. **Webhook Events:** Le modifiche di stato degli articoli e commenti generano eventi webhook per sistemi esterni.
 6. **Auto-moderation:**

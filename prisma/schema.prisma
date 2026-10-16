@@ -148,7 +148,9 @@ model Article {
   likesCount    Int     @default(0)
   commentsCount Int     @default(0)
 
-  status ContentStatus @default(DRAFT)
+  status      ContentStatus @default(DRAFT)
+  // Set once, on the first transition to PUBLISHED; never cleared.
+  publishedAt DateTime?
 
   // Relazioni strutturali
   authorId   String?
@@ -170,6 +172,7 @@ model Article {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, status, createdAt])
+  @@index([tenantId, status, publishedAt])
   @@index([tenantId, createdAt])
   @@map("articles")
 }
@@ -198,8 +201,11 @@ model ArticleTranslation {
 model Comment {
   id        String  @id @default(uuid())
   content   String
+  // NO ACTION, not RESTRICT: a tenant cascade deletes users and comments in
+  // one statement. Deleting a user reassigns their comments to the per-tenant
+  // DELETED_USER_ID placeholder first (UsersService); a bare delete is a P2003 → 409.
   authorId  String
-  author    User    @relation(fields: [authorId], references: [id])
+  author    User    @relation(fields: [authorId], references: [id], onDelete: NoAction)
   articleId String
   article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
   tenantId  String
@@ -277,11 +283,14 @@ model Report {
   reporterId    String
   reporter      User    @relation("ReporterReports", fields: [reporterId, tenantId], references: [externalId, tenantId], onDelete: Cascade)
   moderatorId   String?
+  // The DB action is `SET NULL ("moderatorId")` — nulling the whole composite would
+  // null the NOT NULL tenantId. Prisma cannot express the column list: hand-written
+  // in migration 20261014120000_user_delete_foreign_keys (Postgres ≥ 15).
   moderator     User?   @relation("ModeratorReports", fields: [moderatorId, tenantId], references: [externalId, tenantId], onDelete: SetNull)
   moderatorNote String?
 
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -297,7 +306,7 @@ model BannedWord {
   id       String @id @default(uuid())
   word     String
   tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([word, tenantId])
   @@map("banned_words")

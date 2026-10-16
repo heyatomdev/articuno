@@ -9,4 +9,3 @@ import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
   exports: [AuditsService, AuditLoggerService],
 })
 export class AuditsModule {}
-

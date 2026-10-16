@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -29,30 +30,45 @@ import {
   ArticleTranslationDto,
   ArticleTranslationSummaryDto,
 } from '@/modules/articles/dto/article-response.dto';
+import { ArticlePreviewQueryDto } from '@/modules/articles/dto/article-show-query.dto';
+import { publicArticleStatuses } from '@/modules/articles/article-visibility';
 
 @ApiTags('Article Translations')
 @ApiSecurity('api-key')
 @Controller('articles/:id/translations')
 @UseGuards(TenantGuard)
 export class ArticleTranslationsController {
-  constructor(private readonly translationsService: ArticleTranslationsService) {}
+  constructor(
+    private readonly translationsService: ArticleTranslationsService,
+  ) {}
 
   @Post()
   @ApiOperation({
     summary: 'Add a translation',
-    description: 'Creates a new translation for an existing article. Each language code must be unique per article.',
+    description:
+      'Creates a new translation for an existing article. Each language code must be unique per article.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiBody({ type: CreateArticleTranslationDto })
   @ApiResponse({
     status: 201,
     description: 'Translation created successfully.',
     type: ArticleTranslationDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  @ApiResponse({ status: 409, description: 'A translation for this language code already exists.' })
+  @ApiResponse({
+    status: 409,
+    description: 'A translation for this language code already exists.',
+  })
   create(
     @GetTenant() tenant: any,
     @Param() params: ArticleParamsDto,
@@ -64,9 +80,15 @@ export class ArticleTranslationsController {
   @Get()
   @ApiOperation({
     summary: 'List translations',
-    description: 'Returns all translations for an article, ordered by language code.',
+    description:
+      'Returns all translations for an article, ordered by language code. ' +
+      'Only for PUBLISHED articles (DRAFT with `includeDrafts=true`); any other status answers 404.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of translations.',
@@ -74,17 +96,35 @@ export class ArticleTranslationsController {
   })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
-  findAll(@GetTenant() tenant: any, @Param() params: ArticleParamsDto) {
-    return this.translationsService.findAll(tenant.id, params.id);
+  findAll(
+    @GetTenant() tenant: any,
+    @Param() params: ArticleParamsDto,
+    @Query() query: ArticlePreviewQueryDto,
+  ) {
+    return this.translationsService.findAll(
+      tenant.id,
+      params.id,
+      publicArticleStatuses(query.includeDrafts),
+    );
   }
 
   @Get(':languageCode')
   @ApiOperation({
     summary: 'Get a translation by language',
-    description: 'Returns a single translation for the given article and BCP 47 language code.',
+    description:
+      'Returns a single translation for the given article and BCP 47 language code. ' +
+      'Only for PUBLISHED articles (DRAFT with `includeDrafts=true`); any other status answers 404.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code', example: 'en' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiParam({
+    name: 'languageCode',
+    description: 'BCP 47 language code',
+    example: 'en',
+  })
   @ApiResponse({
     status: 200,
     description: 'Translation found.',
@@ -95,50 +135,94 @@ export class ArticleTranslationsController {
   findOne(
     @GetTenant() tenant: any,
     @Param() params: ArticleTranslationParamsDto,
+    @Query() query: ArticlePreviewQueryDto,
   ) {
-    return this.translationsService.findOne(tenant.id, params.id, params.languageCode);
+    return this.translationsService.findOne(
+      tenant.id,
+      params.id,
+      params.languageCode,
+      publicArticleStatuses(query.includeDrafts),
+    );
   }
 
   @Patch(':languageCode')
   @ApiOperation({
     summary: 'Update a translation',
-    description: 'Partially updates an existing article translation. Only provided fields are changed.',
+    description:
+      'Partially updates an existing article translation. Only provided fields are changed.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code of the translation to update', example: 'en' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiParam({
+    name: 'languageCode',
+    description: 'BCP 47 language code of the translation to update',
+    example: 'en',
+  })
   @ApiBody({ type: UpdateArticleTranslationDto })
   @ApiResponse({
     status: 200,
     description: 'Translation updated successfully.',
     type: ArticleTranslationDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article or translation not found.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Article or translation not found.',
+  })
   update(
     @GetTenant() tenant: any,
     @Param() params: ArticleTranslationParamsDto,
     @Body() dto: UpdateArticleTranslationDto,
   ) {
-    return this.translationsService.update(tenant.id, params.id, params.languageCode, dto);
+    return this.translationsService.update(
+      tenant.id,
+      params.id,
+      params.languageCode,
+      dto,
+    );
   }
 
   @Delete(':languageCode')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a translation',
-    description: 'Permanently removes a single language translation from an article.',
+    description:
+      'Permanently removes a single language translation from an article.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the article', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiParam({ name: 'languageCode', description: 'BCP 47 language code of the translation to delete', example: 'en' })
-  @ApiResponse({ status: 204, description: 'Translation deleted successfully – no content returned.' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the article',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiParam({
+    name: 'languageCode',
+    description: 'BCP 47 language code of the translation to delete',
+    example: 'en',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Translation deleted successfully – no content returned.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
-  @ApiResponse({ status: 404, description: 'Article or translation not found.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Article or translation not found.',
+  })
   async remove(
     @GetTenant() tenant: any,
     @Param() params: ArticleTranslationParamsDto,
   ) {
-    await this.translationsService.remove(tenant.id, params.id, params.languageCode);
+    await this.translationsService.remove(
+      tenant.id,
+      params.id,
+      params.languageCode,
+    );
   }
 }
-

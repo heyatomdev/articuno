@@ -9,4 +9,3 @@ export class BookmarkParamsDto {
   @IsUUID()
   articleId: string;
 }
-

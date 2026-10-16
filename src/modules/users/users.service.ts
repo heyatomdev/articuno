@@ -5,19 +5,23 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { UpsertUserDto } from '@/modules/users/dto/upsert-user.dto';
-import { PaginatedResult, paginate } from '@/common/pagination';
+import { PaginatedResult, paginate } from '@heyatom/nest-common';
 import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
-import { UserStatus } from '@prisma/client';
-import { SYSTEM_REPORTER_ID } from '@/modules/users/users.constants';
+import { ReportStatus, TargetType, UserStatus } from '@prisma/client';
+import {
+  DELETED_USER_ID,
+  SYSTEM_EXTERNAL_IDS,
+} from '@/modules/users/users.constants';
 
-/** The system reporter is internal: not listed, not editable, not deletable. */
-const NOT_SYSTEM = { externalId: { not: SYSTEM_REPORTER_ID } };
+/** System users are internal: not listed, not editable, not deletable. */
+const NOT_SYSTEM = { externalId: { notIn: SYSTEM_EXTERNAL_IDS } };
 function assertNotSystem(externalId: string): void {
-  if (externalId === SYSTEM_REPORTER_ID) {
-    throw new BadRequestException(
-      `externalId riservato: ${SYSTEM_REPORTER_ID}`,
-    );
+  if (SYSTEM_EXTERNAL_IDS.includes(externalId)) {
+    throw new BadRequestException({
+      code: 'RESERVED_EXTERNAL_ID',
+      message: `externalId riservato: ${externalId}`,
+    });
   }
 }
 
@@ -168,7 +172,7 @@ export class UsersService {
     });
     if (!user) throw new NotFoundException('Utente non trovato');
 
-    await this.prisma.user.delete({ where: { id } });
+    await this.deleteUser(tenantId, user);
   }
 
   async deleteByExternalId(
@@ -176,15 +180,74 @@ export class UsersService {
     externalId: string,
   ): Promise<void> {
     assertNotSystem(externalId);
-    const result = await this.prisma.user.deleteMany({
-      where: {
-        tenantId,
-        externalId,
-      },
+    const user = await this.prisma.user.findFirst({
+      where: { tenantId, externalId },
+      select: { id: true, externalId: true },
     });
+    if (!user) throw new NotFoundException('Utente non trovato');
 
-    if (result.count === 0) {
-      throw new NotFoundException('Utente non trovato');
-    }
+    await this.deleteUser(tenantId, user);
+  }
+
+  /**
+   * Comments are anonymised, not deleted: they move to the per-tenant
+   * DELETED_USER_ID placeholder (`comments.authorId` is NO ACTION). Likes and
+   * the user's own reports cascade, so the counters they fed are decremented
+   * here; moderated reports keep the decision with `moderatorId` set to NULL
+   * by the FK.
+   */
+  private async deleteUser(
+    tenantId: string,
+    user: { id: string; externalId: string },
+  ): Promise<void> {
+    const placeholder = await this.prisma.ensureUser(
+      tenantId,
+      DELETED_USER_ID,
+      'Utente eliminato',
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.comment.updateMany({
+        where: { authorId: user.id, tenantId },
+        data: { authorId: placeholder.id },
+      });
+
+      // (articleId, userId) is unique: one like per article, decrement by 1.
+      const likes = await tx.like.findMany({
+        where: { userId: user.id, tenantId },
+        select: { articleId: true },
+      });
+      if (likes.length) {
+        const articleIds = likes.map((l) => l.articleId);
+        await tx.like.deleteMany({
+          where: { userId: user.id, tenantId, articleId: { in: articleIds } },
+        });
+        await tx.article.updateMany({
+          where: { id: { in: articleIds }, tenantId },
+          data: { likesCount: { decrement: 1 } },
+        });
+      }
+
+      // `reportCount` resets only once a comment has no open report, so every
+      // open report is still counted in it.
+      const openReports = await tx.report.groupBy({
+        by: ['targetId'],
+        where: {
+          tenantId,
+          reporterId: user.externalId,
+          targetType: TargetType.COMMENT,
+          status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWED] },
+        },
+        _count: { _all: true },
+      });
+      for (const { targetId, _count } of openReports) {
+        await tx.comment.updateMany({
+          where: { id: targetId, tenantId, reportCount: { gte: _count._all } },
+          data: { reportCount: { decrement: _count._all } },
+        });
+      }
+
+      await tx.user.deleteMany({ where: { id: user.id, tenantId } });
+    });
   }
 }

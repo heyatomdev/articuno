@@ -3,7 +3,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCategoryDto {
   @ApiProperty({
-    description: 'Display name of the category. The slug will be auto-generated from this value.',
+    description:
+      'Display name of the category. The slug will be auto-generated from this value.',
     example: 'Science',
   })
   @IsString()
@@ -19,11 +20,11 @@ export class CreateCategoryDto {
   description?: string;
 
   @ApiPropertyOptional({
-    description: 'Optional hex colour associated with the category for UI display.',
+    description:
+      'Optional hex colour associated with the category for UI display.',
     example: '#3B82F6',
   })
   @IsOptional()
   @IsString()
   color?: string;
 }
-

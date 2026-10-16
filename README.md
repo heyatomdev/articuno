@@ -46,76 +46,49 @@ Il microservizio non salva mai le API Key in chiaro. Quando viene creato un Tena
 
 📡 Integrazione Webhook
 
-Il microservizio invia eventi (es. comment.created, article.flagged) all'URL configurato dal Tenant. Ogni richiesta è firmata con un segreto condiviso nell'header x-webhook-signature.
+Il microservizio invia eventi (es. comment.created, article.flagged) all'URL configurato dal Tenant. Ogni richiesta è firmata col segreto condiviso in formato Standard Webhooks (header `webhook-id`, `webhook-timestamp`, `webhook-signature`).
 
 Vedi la Guida Validazione Webhook per i dettagli tecnici.
 
 ## ⚙️ Installazione
 
-1. **Clona il repository**:
-   ```bash
-   git clone [https://github.com/tuo-username/cms-microservice.git](https://github.com/tuo-username/cms-microservice.git)
-   cd cms-microservice
-
-    Installa le dipendenze:
-    Bash
-
-    npm install
-
-    Configura le variabili d'ambiente:
-    Crea un file .env nella root del progetto:
-    Snippet di codice
-
-    DATABASE_URL="postgresql://user:password@localhost:5432/cms_db?schema=public"
-    PORT=3000
-
-    Inizializza il database:
-    Bash
-
-    npx prisma generate
-    npx prisma db push
-
-## Project setup
-
 ```bash
-$ pnpm install
+pnpm install
+cp .env.example .env              # DATABASE_URL, BASTION_URL, …
+pnpm run prisma:generate
+pnpm exec prisma migrate deploy   # non `db push`: salterebbe gli indici scritti a mano nelle migration
+pnpm run start:dev
 ```
 
-## Compile and run the project
-
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
-```
+Swagger (`/docs`) è attivo solo con `NODE_ENV=development|test` o `ENABLE_SWAGGER=true`.
+CORS: senza `CORS_ORIGINS` nessuna origin browser è ammessa, anche in sviluppo.
 
 ## Run tests
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# test coverage
-$ pnpm run test:cov
+pnpm run test
+pnpm run test:cov
 ```
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+**Le migration non girano nell'immagine.** Il `Dockerfile` non esegue `prisma migrate deploy`,
+e non potrebbe: `prisma` è una devDependency e `pnpm prune --prod` rimuove la CLI. Il container
+parte (`node dist/main.js`) sullo schema che trova.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Prima di avviare una nuova versione, applicare le migration da un checkout dello stesso commit
+(o da CI) contro il database di destinazione:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+DATABASE_URL=postgresql://… pnpm exec prisma migrate deploy
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Alcune migration contengono SQL scritto a mano che Prisma non sa esprimere (indice parziale
+`webhook_events_due_idx`, unique parziale `reports_open_reporter_target_key`): `prisma db push`
+non li crea, usare sempre `migrate deploy`.
+
+> Nessun repository della piattaforma esegue oggi `migrate deploy` per articuno (né compose
+> né pipeline): dove giri in produzione va verificato con chi gestisce il deploy.
 
 ## Resources
 

@@ -11,6 +11,7 @@ import {
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { ApiTags, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { DashboardStatsDto } from '@/modules/analytics/dto/dashboard-stats.dto';
+import { DashboardStatsQueryDto } from '@/modules/analytics/dto/dashboard-stats-query.dto';
 
 @ApiTags('Admin / Analytics')
 @ApiBearerAuth()
@@ -24,9 +25,11 @@ export class AdminStatsController {
   @ApiOkResponse({ type: DashboardStatsDto })
   getDashboard(
     @GetSession() session: AdminSession,
-    @Query('days') days?: string,
+    @Query() query: DashboardStatsQueryDto,
   ) {
-    const period = days ? parseInt(days, 10) : 30;
-    return this.analyticsService.getDashboardStats(session.tenantId, period);
+    return this.analyticsService.getDashboardStats(
+      session.tenantId,
+      query.days,
+    );
   }
 }

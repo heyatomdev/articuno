@@ -26,7 +26,7 @@ import { AdminSession } from '@/modules/bastion/bastion.types';
 import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-list-query.dto';
 import { WebhookEventParamsDto } from '@/modules/webhook/dto/webhook-event-params.dto';
 import { WebhooksService } from '@/modules/webhook/webhooks.service';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import {
   WebhookEventDto,
   WebhookResendAllResultDto,

@@ -7,5 +7,3 @@ import { InteractionsService } from './interactions.service';
   providers: [InteractionsService],
 })
 export class InteractionsModule {}
-
-

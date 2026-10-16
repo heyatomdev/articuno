@@ -16,7 +16,7 @@ import {
 } from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AuditListQueryDto } from '@/modules/audits/dto/audit-list-query.dto';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import { AuditLogDto } from '@/modules/audits/dto/audit-log.dto';
 
 @ApiTags('Admin / Audits')

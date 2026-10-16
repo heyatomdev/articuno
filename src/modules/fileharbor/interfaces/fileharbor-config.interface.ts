@@ -4,4 +4,3 @@ export interface FileHarborConfig {
   /** FileHarbor API key (tenant-level) */
   apiKey: string;
 }
-

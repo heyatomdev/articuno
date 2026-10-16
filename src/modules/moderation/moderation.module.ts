@@ -10,4 +10,3 @@ import { BannedWordsModule } from '@/modules/banned-words/banned-words.module';
   exports: [ModerationPolicyService, WebhookEventPublisher],
 })
 export class ModerationModule {}
-

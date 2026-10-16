@@ -24,4 +24,3 @@ export class AdminUpdateReportDto {
   @IsString()
   moderatorNote?: string;
 }
-

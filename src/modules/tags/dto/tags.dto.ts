@@ -1,15 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Exclude, Expose } from 'class-transformer';
-import { IsOptional, IsString, IsUUID } from "class-validator";
-import { TenantDto } from "@/modules/tenants/dto/tenants.dto";
+import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { TenantDto } from '@/modules/tenants/dto/tenants.dto';
 
 export class TagCountDto {
-  @ApiProperty({ description: 'Number of articles associated with this tag', example: 42 })
+  @ApiProperty({
+    description: 'Number of articles associated with this tag',
+    example: 42,
+  })
   articles: number;
 }
 
 export class TagDto {
-
   @ApiProperty({
     description: 'Unique identifier for the tag',
     example: '123e4567-e89b-12d3-a456-426614174000',
@@ -55,7 +57,8 @@ export class TagDto {
   updatedAt?: Date;
 
   @ApiPropertyOptional({
-    description: 'Tenant this tag belongs to (only included in certain admin responses)',
+    description:
+      'Tenant this tag belongs to (only included in certain admin responses)',
     type: () => TenantDto,
   })
   @Expose()
@@ -69,5 +72,4 @@ export class TagDto {
   @Expose()
   @IsOptional()
   _count?: TagCountDto;
-
 }

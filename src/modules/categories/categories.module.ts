@@ -8,4 +8,3 @@ import { CategoriesService } from '@/modules/categories/categories.service';
   exports: [CategoriesService],
 })
 export class CategoriesModule {}
-

@@ -1,49 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  Registry,
-  Histogram,
-  Gauge,
-  Counter,
-  collectDefaultMetrics,
-} from '@prometheus-io/client';
+import { Gauge, Counter } from '@prometheus-io/client';
+import { MetricsService } from '@heyatom/nest-common/metrics';
 import { PrismaService } from '@/modules/prisma/prisma.service';
-import { DEAD_LETTER_DATE } from '@/modules/webhook/webhook.constants';
+import { DEAD_LETTER_DATE } from './webhook.constants';
 
 /**
- * Prometheus metrics for articuno. Uses its own `Registry` rather than the
- * @prometheus-io/client global one, so a `MetricsService` created per test (or per
- * NestJS TestingModule) never collides with metrics registered by another
- * test in the same process.
+ * Webhook outbox metrics, on the shared `MetricsService.registry`
+ * (`@heyatom/nest-common/metrics`, served on METRICS_PORT).
  *
- * DB-backed gauges are computed lazily in a `collect()` callback — the client
- * only invokes it on scrape, so an idle process never runs the query. A failed
- * query logs a warning and leaves the gauge at its previous value instead of
- * failing the whole scrape.
+ * The DB-backed gauge is computed lazily in a `collect()` callback — the
+ * client only invokes it on scrape, so an idle process never runs the query.
+ * A failed query logs a warning and leaves the gauge at its previous value
+ * instead of failing the whole scrape.
  */
 @Injectable()
-export class MetricsService {
-  private readonly logger = new Logger(MetricsService.name);
-  readonly registry = new Registry();
-  readonly httpRequestDuration: Histogram<'method' | 'route' | 'status'>;
+export class WebhookMetrics {
+  private readonly logger = new Logger(WebhookMetrics.name);
   readonly webhookDeliveryAttempts: Counter<'result'>;
 
-  constructor(private readonly prisma: PrismaService) {
-    this.registry.setDefaultLabels({ app: 'articuno' });
-    collectDefaultMetrics({ register: this.registry });
-
-    this.httpRequestDuration = new Histogram({
-      name: 'http_request_duration_seconds',
-      help: 'HTTP request duration in seconds',
-      labelNames: ['method', 'route', 'status'],
-      buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
-      registers: [this.registry],
-    });
-
+  constructor(
+    metrics: MetricsService,
+    private readonly prisma: PrismaService,
+  ) {
     this.webhookDeliveryAttempts = new Counter({
       name: 'articuno_webhook_delivery_attempts_total',
       help: 'Webhook outbox delivery attempts by outcome, counted after the outcome is persisted',
       labelNames: ['result'],
-      registers: [this.registry],
+      registers: [metrics.registry],
     });
     for (const result of [
       'success',
@@ -54,15 +37,11 @@ export class MetricsService {
       this.webhookDeliveryAttempts.inc({ result }, 0);
     }
 
-    this.registerWebhookOutboxGauge();
-  }
-
-  private registerWebhookOutboxGauge(): void {
     const gauge = new Gauge({
       name: 'articuno_webhook_outbox_events',
       help: 'Unsent webhook outbox events: overdue = due for more than 2 minutes (the job runs every 30s, so non-zero means it is stuck), dead = dead-lettered after max attempts (only a manual resend clears it)',
       labelNames: ['state'],
-      registers: [this.registry],
+      registers: [metrics.registry],
       collect: async () => {
         try {
           // Columns are camelCase (no @map) and `timestamp(3)` holding UTC,

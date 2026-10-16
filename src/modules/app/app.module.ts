@@ -1,20 +1,14 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
-import { randomUUID } from 'crypto';
 import type { Request } from 'express';
 import { PrismaModule } from '@/modules/prisma/prisma.module';
 import config from '../../configs/config.schema';
 import { configValidationSchema } from '@/configs/config.validation';
-import { MetricsModule } from '@/modules/metrics/metrics.module';
-import { MetricsMiddleware } from '@/modules/metrics/metrics.middleware';
+import { MetricsModule } from '@heyatom/nest-common/metrics';
 import { AnalyticsModule } from '@/modules/analytics/analytics.module';
 import { ReportsModule } from '@/modules/reports/reports.module';
 import { UsersModule } from '@/modules/users/users.module';
@@ -31,6 +25,11 @@ import { WebhooksModule } from '@/modules/webhook/webhooks.module';
 import { AdminModule } from '@/modules/admin/admin.module';
 import { HealthModule } from '@/modules/health/health.module';
 import { BastionModule } from '@heyatom/bastion-client/nest';
+import {
+  AllExceptionsFilter,
+  loggerParams,
+  minimalRequestSerializer,
+} from '@heyatom/nest-common';
 
 /** Comma-separated env list → array; undefined keeps the package default. */
 const splitList = (raw?: string): string[] | undefined =>
@@ -51,61 +50,37 @@ const splitList = (raw?: string): string[] | undefined =>
       validationSchema: configValidationSchema,
     }),
 
-    // Same pino setup as Bastion: one JSON line per request in production,
-    // pino-pretty single-line in development.
+    // One JSON line per request (pino-pretty single-line in development),
+    // server-generated X-Request-Id, sensitive headers redacted.
     LoggerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const production = config.get('NODE_ENV') === 'production';
-        return {
-          pinoHttp: {
-            level:
-              config.get<string>('LOG_LEVEL') ??
-              (production ? 'info' : 'debug'),
-            transport: production
-              ? undefined
-              : {
-                  target: 'pino-pretty',
-                  options: { singleLine: true, colorize: true },
-                },
-            redact: {
-              paths: [
-                'req.headers.authorization',
-                'req.headers.cookie',
-                'req.headers["x-api-key"]',
-                'res.headers["set-cookie"]',
-              ],
-              remove: true,
-            },
-            genReqId: () => randomUUID(),
-            serializers: {
-              // `raw.ip` honours TRUST_PROXY (`trust proxy` in main.ts).
-              req: (req: {
-                id: string;
-                method: string;
-                url: string;
+      useFactory: (config: ConfigService) =>
+        loggerParams({
+          service: 'articuno',
+          level: config.getOrThrow<string>('LOG_LEVEL'),
+          pretty: config.get('NODE_ENV') !== 'production',
+          serializers: {
+            // `ip` honours TRUST_PROXY_HOPS (`trust proxy`); `remoteAddress`
+            // is the socket peer, i.e. nginx behind the proxy.
+            req: (
+              req: Parameters<typeof minimalRequestSerializer>[0] & {
                 raw: Request;
-              }) => ({
-                id: req.id,
-                method: req.method,
-                url: req.url,
-                ip: req.raw.ip,
-              }),
-              res: (res: { statusCode: number }) => ({
-                statusCode: res.statusCode,
-              }),
-            },
-            customProps: () => ({ service: 'articuno' }),
-            autoLogging: {
-              ignore: (req) => (req.url ?? '').startsWith('/health'),
-            },
+              },
+            ) => ({ ...minimalRequestSerializer(req), ip: req.raw.ip }),
           },
-        };
-      },
+        }),
     }),
 
-    // Prometheus metrics, served on METRICS_PORT — not on the API port
-    MetricsModule,
+    // Prometheus metrics, served on METRICS_PORT — not on the API port.
+    // Also applies the http_request_duration_seconds middleware to every route.
+    MetricsModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        app: 'articuno',
+        port: config.getOrThrow<number>('METRICS_PORT'),
+        host: config.get<string>('METRICS_HOST'),
+      }),
+    }),
 
     // Rate limiting (admin routes only, see AdminThrottlerGuard)
     ThrottlerModule.forRootAsync({
@@ -155,14 +130,8 @@ const splitList = (raw?: string): string[] | undefined =>
     AnalyticsModule,
     WebhooksModule,
   ],
+  // No TransformInterceptor: the public contract returns raw resources until
+  // the coordinated envelope migration (api standards plan, phase 3).
+  providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    // MetricsMiddleware is a middleware and not an APP_INTERCEPTOR on purpose:
-    // interceptors run after guards and TenantMiddleware, so 401s and 429s
-    // would never be counted.
-    consumer
-      .apply(MetricsMiddleware)
-      .forRoutes({ path: '{*splat}', method: RequestMethod.ALL });
-  }
-}
+export class AppModule {}

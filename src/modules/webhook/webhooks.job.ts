@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
-import { MetricsService } from '../metrics/metrics.service';
+import { WebhookMetrics } from './webhook.metrics';
 import { WebhooksService } from './webhooks.service';
 import { DEAD_LETTER_DATE } from './webhook.constants';
 
@@ -31,7 +31,7 @@ export class WebhooksJob {
     private prisma: PrismaService,
     private webhookService: WebhooksService,
     private config: ConfigService,
-    private metrics: MetricsService,
+    private metrics: WebhookMetrics,
   ) {}
 
   /**
@@ -113,13 +113,31 @@ export class WebhooksJob {
         continue;
       }
 
-      const success = await this.webhookService.send(
+      const result = await this.webhookService.send(
         notif.tenant.webhookUrl,
         notif.tenant.webhookSecret,
+        notif.id,
         notif.payload,
       );
 
-      if (success) {
+      // Refused by the SSRF guard: dead-letter at once, retrying a blocked
+      // address is the scan itself. A resend after the tenant fixes its URL
+      // picks it up again.
+      if (result === 'blocked') {
+        await this.prisma.webhookEvent.update({
+          where: { id: notif.id },
+          data: {
+            attempts: notif.attempts + 1,
+            lastError: 'Webhook target non consentito (indirizzo non pubblico)',
+            nextRetryAt: DEAD_LETTER_DATE,
+            claimedUntil: null,
+          },
+        });
+        this.metrics.webhookDeliveryAttempts.inc({ result: 'dead_lettered' });
+        continue;
+      }
+
+      if (result === 'sent') {
         await this.prisma.webhookEvent.update({
           where: { id: notif.id },
           data: {

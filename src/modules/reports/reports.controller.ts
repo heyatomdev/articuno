@@ -25,7 +25,7 @@ import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto'
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType, UserRole } from '@prisma/client';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import { ReportDto } from '@/modules/reports/dto/report-response.dto';
 
 @ApiTags('Reports')
@@ -42,7 +42,8 @@ export class ReportsController {
   @Post()
   @ApiOperation({
     summary: 'Submit a report',
-    description: 'Creates a new report for a user, article, or comment. When the report threshold is reached the target is auto-moderated.',
+    description:
+      'Creates a new report for a user, article, or comment. When the report threshold is reached the target is auto-moderated.',
   })
   @ApiBody({ type: CreateReportDto })
   @ApiResponse({
@@ -50,7 +51,10 @@ export class ReportsController {
     description: 'Report submitted successfully.',
     type: ReportDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Reported target not found.' })
   async create(@GetTenant() tenant: any, @Body() dto: CreateReportDto) {
@@ -72,7 +76,8 @@ export class ReportsController {
   @Get()
   @ApiOperation({
     summary: 'List reports',
-    description: 'Returns a paginated list of reports for the current tenant. Optionally filter by status.',
+    description:
+      'Returns a paginated list of reports for the current tenant. Optionally filter by status.',
   })
   @ApiPaginatedResponse(ReportDto, 'Paginated list of reports.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
@@ -83,16 +88,24 @@ export class ReportsController {
   @Patch(':id/status')
   @ApiOperation({
     summary: 'Update report status',
-    description: 'Updates the resolution status of a specific report (e.g. PENDING → RESOLVED or DISMISSED). Requires a moderator ID.',
+    description:
+      'Updates the resolution status of a specific report (e.g. PENDING → RESOLVED or DISMISSED). Requires a moderator ID.',
   })
-  @ApiParam({ name: 'id', description: 'UUID of the report to update', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID of the report to update',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
   @ApiBody({ type: UpdateReportStatusDto })
   @ApiResponse({
     status: 200,
     description: 'Report status updated successfully.',
     type: ReportDto,
   })
-  @ApiResponse({ status: 400, description: 'Validation error – invalid request body.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error – invalid request body.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Report not found.' })
   async updateStatus(

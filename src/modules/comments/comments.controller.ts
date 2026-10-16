@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -17,13 +18,18 @@ import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { CreateCommentDto } from '@/modules/comments/dto/create-comment.dto';
 import { PublicUpdateCommentDto } from '@/modules/comments/dto/update-comment.dto';
 import { CommentParamsDto } from '@/modules/comments/dto/comment-params.dto';
-import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
-import { ContentStatus, UserRole } from '@prisma/client';
+import { PublicCommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-query.dto';
+import { UserRole } from '@prisma/client';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
-import { ApiPaginatedResponse } from '@/common/pagination';
-import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiCreatedResponse,
+  ApiHeader,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import {
   CommentDto,
   CommentListItemDto,
@@ -40,6 +46,7 @@ export class CommentsController {
 
   @Post()
   @ApiCreatedResponse({ type: CommentDto })
+  @ApiNotFoundResponse({ description: 'Article not found or not PUBLISHED.' })
   async create(@GetTenant() tenant: any, @Body() dto: CreateCommentDto) {
     const comment = await this.commentsService.create(tenant.id, dto);
 
@@ -57,12 +64,15 @@ export class CommentsController {
   }
 
   @Get()
-  @ApiPaginatedResponse(CommentListItemDto, 'Paginated list of comments.')
-  findAll(@GetTenant() tenant: any, @Query() query: CommentFiltersQueryDto) {
-    return this.commentsService.findAll(tenant.id, query, [
-      ContentStatus.VISIBLE,
-      ContentStatus.UNDER_REVIEW,
-    ]);
+  @ApiPaginatedResponse(
+    CommentListItemDto,
+    'Paginated list of VISIBLE and UNDER_REVIEW comments of PUBLISHED articles.',
+  )
+  findAll(
+    @GetTenant() tenant: any,
+    @Query() query: PublicCommentFiltersQueryDto,
+  ) {
+    return this.commentsService.findAllPublic(tenant.id, query);
   }
 
   @Get(':id')
@@ -70,11 +80,28 @@ export class CommentsController {
     type: CommentDto,
     description: 'content is null while the comment is not VISIBLE',
   })
-  findOne(@GetTenant() tenant: any, @Param() params: CommentParamsDto) {
-    return this.commentsService.findOne(tenant.id, params.id, [
-      ContentStatus.VISIBLE,
-      ContentStatus.UNDER_REVIEW,
-    ]);
+  @ApiHeader({
+    name: 'X-User-Id',
+    required: false,
+    description:
+      "External id of the end user. When it is the comment's author, the " +
+      'comment is returned whatever its status or its article status, with content.',
+  })
+  @ApiNotFoundResponse({
+    description:
+      'Comment not found, HIDDEN/BANNED, or its article is not PUBLISHED ' +
+      '(unless X-User-Id is the author).',
+  })
+  findOne(
+    @GetTenant() tenant: any,
+    @Param() params: CommentParamsDto,
+    @Headers('x-user-id') externalUserId?: string,
+  ) {
+    return this.commentsService.findOnePublic(
+      tenant.id,
+      params.id,
+      externalUserId,
+    );
   }
 
   @Patch(':id')

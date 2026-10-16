@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ReportStatus, TargetType } from '@prisma/client';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { PageParams } from '@/common/pagination';
+import { PageParams } from '@heyatom/nest-common';
 
 export class ReportListQueryDto extends PageParams {
   @ApiProperty({
@@ -14,7 +14,8 @@ export class ReportListQueryDto extends PageParams {
   status?: ReportStatus;
 
   @ApiProperty({
-    description: 'Filter by the external ID of the user who submitted the report',
+    description:
+      'Filter by the external ID of the user who submitted the report',
     required: false,
     example: 'user_abc123',
   })
@@ -41,7 +42,8 @@ export class ReportListQueryDto extends PageParams {
   targetId?: string;
 
   @ApiProperty({
-    description: 'Filter by the external ID of the moderator who handled the report',
+    description:
+      'Filter by the external ID of the moderator who handled the report',
     required: false,
     example: 'mod_xyz789',
   })
@@ -58,4 +60,3 @@ export class ReportListQueryDto extends PageParams {
   @IsString()
   reason?: string;
 }
-

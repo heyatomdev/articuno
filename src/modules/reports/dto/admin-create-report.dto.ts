@@ -38,7 +38,8 @@ export class AdminCreateReportDto {
   description?: string;
 
   @ApiPropertyOptional({
-    description: 'Initial status for the report. Defaults to PENDING if omitted.',
+    description:
+      'Initial status for the report. Defaults to PENDING if omitted.',
     enum: ReportStatus,
     example: ReportStatus.RESOLVED,
   })

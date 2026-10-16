@@ -101,7 +101,7 @@ describe('WebhooksJob', () => {
   describe('processPendingWebhooks', () => {
     it('only delivers claimed rows and marks success, releasing the lease', async () => {
       prisma.webhookEvent.findMany.mockResolvedValue([row()]);
-      webhooks.send.mockResolvedValue(true);
+      webhooks.send.mockResolvedValue('sent');
 
       await job.processPendingWebhooks();
 
@@ -109,6 +109,7 @@ describe('WebhooksJob', () => {
       expect(webhooks.send).toHaveBeenCalledWith(
         tenant.webhookUrl,
         tenant.webhookSecret,
+        'e1',
         {},
       );
       expect(prisma.webhookEvent.update).toHaveBeenCalledWith({
@@ -121,7 +122,7 @@ describe('WebhooksJob', () => {
 
     it('records a failed attempt with backoff, replacing the lease', async () => {
       prisma.webhookEvent.findMany.mockResolvedValue([row({ attempts: 2 })]);
-      webhooks.send.mockResolvedValue(false);
+      webhooks.send.mockResolvedValue('failed');
       const before = Date.now();
 
       await job.processPendingWebhooks();
@@ -153,6 +154,21 @@ describe('WebhooksJob', () => {
       expect(inc).toHaveBeenCalledWith({ result: 'dead_lettered' });
     });
 
+    it('dead-letters a target refused by the SSRF guard at once', async () => {
+      prisma.webhookEvent.findMany.mockResolvedValue([row({ attempts: 1 })]);
+      webhooks.send.mockResolvedValue('blocked');
+
+      await job.processPendingWebhooks();
+
+      expect(prisma.webhookEvent.update.mock.calls[0][0].data).toMatchObject({
+        attempts: 2,
+        nextRetryAt: DEAD_LETTER_DATE,
+        claimedUntil: null,
+      });
+      expect(inc).toHaveBeenCalledTimes(1);
+      expect(inc).toHaveBeenCalledWith({ result: 'dead_lettered' });
+    });
+
     it('counts an unconfigured tenant without sending', async () => {
       prisma.webhookEvent.findMany.mockResolvedValue([
         row({ tenant: { webhookUrl: null, webhookSecret: null } }),
@@ -167,7 +183,7 @@ describe('WebhooksJob', () => {
 
     it('does not count an outcome whose update failed', async () => {
       prisma.webhookEvent.findMany.mockResolvedValue([row()]);
-      webhooks.send.mockResolvedValue(true);
+      webhooks.send.mockResolvedValue('sent');
       prisma.webhookEvent.update.mockRejectedValueOnce(new Error('db down'));
 
       await expect(job.processPendingWebhooks()).rejects.toThrow('db down');

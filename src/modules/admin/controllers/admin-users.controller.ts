@@ -30,7 +30,7 @@ import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
 import { UserParamsDto } from '@/modules/users/dto/user-params.dto';
 import { UpdateUserStatusDto } from '@/modules/users/dto/update-user-status.dto';
-import { PaginatedResult, ApiPaginatedResponse } from '@/common/pagination';
+import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 
@@ -48,10 +48,14 @@ export class AdminUsersController {
   @Get()
   @ApiOperation({
     summary: 'List users',
-    description: 'Returns a paginated list of all users belonging to the session tenant.',
+    description:
+      'Returns a paginated list of all users belonging to the session tenant.',
   })
   @ApiPaginatedResponse(UserListItemDto, 'Paginated list of users.')
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   findAll(
     @GetSession() session: AdminSession,
     @Query() query: UserListQueryDto,
@@ -62,11 +66,23 @@ export class AdminUsersController {
   @Get(':id')
   @ApiOperation({
     summary: 'Get a user by ID',
-    description: 'Returns the full profile of a single user identified by their internal UUID.',
+    description:
+      'Returns the full profile of a single user identified by their internal UUID.',
   })
-  @ApiParam({ name: 'id', description: 'Internal UUID of the user', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @ApiResponse({ status: 200, description: 'User found.', type: UserListItemDto })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiParam({
+    name: 'id',
+    description: 'Internal UUID of the user',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User found.',
+    type: UserListItemDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'User not found.' })
   findOne(
     @GetSession() session: AdminSession,
@@ -78,11 +94,19 @@ export class AdminUsersController {
   @Patch(':id/status')
   @ApiOperation({
     summary: 'Update user status',
-    description: 'Changes the moderation status of a user (ACTIVE, BANNED, SHADOW_BANNED).',
+    description:
+      'Changes the moderation status of a user (ACTIVE, BANNED, SHADOW_BANNED).',
   })
   @ApiParam({ name: 'id', description: 'Internal UUID of the user' })
-  @ApiResponse({ status: 200, description: 'User status updated.', type: UserListItemDto })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 200,
+    description: 'User status updated.',
+    type: UserListItemDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async updateStatus(
     @GetSession() session: AdminSession,
@@ -90,7 +114,11 @@ export class AdminUsersController {
     @Body() dto: UpdateUserStatusDto,
   ): Promise<UserListItemDto> {
     const before = await this.usersService.findOne(session.tenantId, params.id);
-    const updated = await this.usersService.updateStatus(session.tenantId, params.id, dto.status);
+    const updated = await this.usersService.updateStatus(
+      session.tenantId,
+      params.id,
+      dto.status,
+    );
 
     await this.auditLogger.log({
       tenantId: session.tenantId,
@@ -112,11 +140,15 @@ export class AdminUsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a user',
-    description: 'Permanently deletes a user and all their associated data from the tenant.',
+    description:
+      'Permanently deletes a user and all their associated data from the tenant.',
   })
   @ApiParam({ name: 'id', description: 'Internal UUID of the user' })
   @ApiResponse({ status: 204, description: 'User deleted.' })
-  @ApiResponse({ status: 401, description: 'Not authenticated – missing or expired session.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated – missing or expired session.',
+  })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async remove(
     @GetSession() session: AdminSession,

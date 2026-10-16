@@ -11,4 +11,3 @@ import { ModerationModule } from '@/modules/moderation/moderation.module';
   exports: [ArticleTranslationsService],
 })
 export class ArticleTranslationsModule {}
-

@@ -22,14 +22,14 @@ import {
 } from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateCategoryDto } from '@/modules/categories/dto/create-category.dto';
-import { UpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
+import { AdminUpdateCategoryDto } from '@/modules/categories/dto/update-category.dto';
 import { CategoryParamsDto } from '@/modules/categories/dto/category-params.dto';
 import { CategoryListQueryDto } from '@/modules/categories/dto/category-list-query.dto';
 import {
   CategoryDto,
   CategoryListItemDto,
 } from '@/modules/categories/dto/category.dto';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
@@ -93,7 +93,7 @@ export class AdminCategoriesController {
   async update(
     @GetSession() session: AdminSession,
     @Param() params: CategoryParamsDto,
-    @Body() dto: UpdateCategoryDto,
+    @Body() dto: AdminUpdateCategoryDto,
   ) {
     const category = await this.categoriesService.update(
       session.tenantId,

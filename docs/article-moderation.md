@@ -77,6 +77,8 @@ Il microservizio garantisce che il sito principale sia sempre aggiornato:
   }
 }
 ```
+
+Ogni ingresso in `PUBLISHED` emette anche `article.published` (con `firstPublication`), ogni uscita `article.unpublished`: vedi §8 della [guida di integrazione](../../docs/integrations/articuno.md).
 ## 6. Sicurezza
 
 - SEO: Quando un articolo viene rimosso (BANNED o HIDDEN), il microservizio consiglia al Tenant di gestire correttamente i redirect o i meta-tag per evitare penalizzazioni sui motori di ricerca.

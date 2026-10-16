@@ -9,7 +9,7 @@ import { Reflector } from '@nestjs/core';
  * enforces: content (`articuno-content.*`) is AUTHOR+, moderation
  * (`articuno-moderation.manage`: comments, reports, banned words, deletes,
  * hide/ban) is MODERATOR+, users and config (`articuno-users.manage`,
- * `articuno-config.manage`: audits, webhooks, notifications) are granted to
+ * `articuno-config.manage`: audits, webhooks) are granted to
  * no role, i.e. SUPER_ADMIN only.
  */
 export const Roles = Reflector.createDecorator<readonly string[]>();

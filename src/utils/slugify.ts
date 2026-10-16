@@ -1,21 +1,31 @@
+export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 /**
- * Genera uno slug leggibile, sicuro per URL e con un suffisso per evitare conflitti.
- * @param text - Testo di input
- * @returns Uno slug tipo "titolo-articolo-a3f9b2d1"
+ * Slug leggibile e sicuro per URL, senza suffissi: "Titolo Articolo" → "titolo-articolo".
+ * Testo senza caratteri utili → "untitled".
  */
-export function slugifySafe(text: string): string {
-  const normalizedText = text
+export function slugify(text: string): string {
+  const slug = text
     .toString()
-    .normalize('NFD')                     // separa i caratteri accentati
-    .replace(/[\u0300-\u036f]/g, '')      // rimuove accenti
+    .normalize('NFD') // separa i caratteri accentati
+    .replace(/[̀-ͯ]/g, '') // rimuove accenti
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')          // sostituisce caratteri non alfanumerici con '-'
-    .replace(/^-+|-+$/g, '');             // rimuove '-' iniziali/finali
+    .replace(/[^a-z0-9]+/g, '-') // sostituisce caratteri non alfanumerici con '-'
+    .replace(/^-+|-+$/g, ''); // rimuove '-' iniziali/finali
+  return slug || 'untitled';
+}
 
-  // Genera un suffisso crittograficamente sicuro usando timestamp + random
-  const timestamp = Date.now().toString(36); // es: 'xnc8eq'
-  const randomPart = crypto.getRandomValues(new Uint8Array(4)).reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '').slice(0, 8); // es: 'a3f9b2d1'
-  const suffix = `${timestamp}${randomPart}`.slice(-8); // Prende ultimi 8 caratteri per univocità
-  return `${normalizedText}-${suffix}`;
+/**
+ * Primo slug libero tra `base`, `base-2`, `base-3`… dati gli slug già presenti
+ * nel tenant (basta passare quelli che iniziano con `base`).
+ * ponytail: lettura e insert non atomici, due create concorrenti con lo stesso titolo
+ * → una prende P2002/409 SLUG_TAKEN; retry sul P2002 se diventa un problema reale.
+ */
+export function nextFreeSlug(base: string, taken: Iterable<string>): string {
+  const used = new Set(taken);
+  if (!used.has(base)) return base;
+  let n = 2;
+  while (used.has(`${base}-${n}`)) n++;
+  return `${base}-${n}`;
 }

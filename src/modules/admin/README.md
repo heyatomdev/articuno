@@ -24,7 +24,7 @@ src/modules/admin/
 
 Ogni controller:
 1. Usa `@UseGuards(BastionUserGuard, AdminThrottlerGuard)` — Bastion user-JWT (RS256, verificato via JWKS)
-2. Dichiara `@Roles(CONTENT_ROLES | MODERATION_ROLES | SUPER_ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), verificato da `BastionUserGuard`; senza `@Roles` la rotta è SUPER_ADMIN-only. AUTHOR+ = articoli/traduzioni/categorie/tag/stats; MODERATOR+ = commenti, report, banned words, DELETE di articoli/categorie/tag e stati UNDER_REVIEW/HIDDEN/BANNED sugli articoli; SUPER_ADMIN = users, audits, webhooks, notifications (`articuno-users.manage` / `articuno-config.manage` non sono assegnati a nessun ruolo nel seed di Bastion; allineato a Meridian)
+2. Dichiara `@Roles(CONTENT_ROLES | MODERATION_ROLES | SUPER_ADMIN_ROLES)` (`bastion/decorators/roles.decorator.ts`), verificato da `BastionUserGuard`; senza `@Roles` la rotta è SUPER_ADMIN-only. AUTHOR+ = articoli/traduzioni/categorie/tag/stats; MODERATOR+ = commenti, report, banned words, DELETE di articoli/categorie/tag e stati UNDER_REVIEW/HIDDEN/BANNED sugli articoli; SUPER_ADMIN = users, audits, webhooks (`articuno-users.manage` / `articuno-config.manage` non sono assegnati a nessun ruolo nel seed di Bastion; allineato a Meridian). Matrice completa: [docs/admin-roles.md](../../../docs/admin-roles.md)
 3. Usa `@GetSession()` decorator per estrarre i dati della sessione
 4. Estrae `session.tenantId` per mantenere l'isolamento multi-tenant
 4. Delega la logica di business ai servizi esistenti

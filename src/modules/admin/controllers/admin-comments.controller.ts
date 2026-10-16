@@ -33,7 +33,7 @@ import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-q
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
-import { ApiPaginatedResponse } from '@/common/pagination';
+import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import {
   CommentDto,
   CommentListItemDto,
@@ -66,12 +66,9 @@ export class AdminCommentsController {
     @GetSession() session: AdminSession,
     @Query() query: CommentFiltersQueryDto,
   ) {
-    return this.commentsService.findAll(
-      session.tenantId,
-      query,
-      query.status,
-      true,
-    );
+    return this.commentsService.findAll(session.tenantId, query, {
+      statuses: query.status ? [query.status] : undefined,
+    });
   }
 
   @Get(':id')
@@ -95,12 +92,7 @@ export class AdminCommentsController {
     @GetSession() session: AdminSession,
     @Param() params: CommentParamsDto,
   ) {
-    return this.commentsService.findOne(
-      session.tenantId,
-      params.id,
-      undefined,
-      true,
-    );
+    return this.commentsService.findOne(session.tenantId, params.id);
   }
 
   @Patch(':id')

@@ -10,7 +10,7 @@ import { UpdateArticleTranslationDto } from '@/modules/articles/dto/update-artic
 import { ContentStatus } from '@prisma/client';
 import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
-import { slugifySafe } from '@/utils/slugify';
+import { nextFreeSlug, slugify } from '@/utils/slugify';
 import { WebhookEventPublisher } from '@/modules/moderation/webhook-event-publisher.service';
 
 @Injectable()
@@ -23,9 +23,17 @@ export class ArticleTranslationsService {
 
   private static readonly AUTO_MODERATION_REASON = 'BANNED_WORD_DETECTED';
 
-  private async ensureArticleExists(tenantId: string, articleId: string) {
+  private async ensureArticleExists(
+    tenantId: string,
+    articleId: string,
+    statuses?: ContentStatus[],
+  ) {
     const article = await this.prisma.article.findFirst({
-      where: { id: articleId, tenantId },
+      where: {
+        id: articleId,
+        tenantId,
+        ...(statuses ? { status: { in: statuses } } : {}),
+      },
     });
 
     if (!article) {
@@ -68,11 +76,10 @@ export class ArticleTranslationsService {
 
   private sanitizeTranslation<
     T extends { title: string; content: string; excerpt?: string },
-  >(translation: T): T & { slug: string; readingTime: number } {
+  >(translation: T): T & { readingTime: number } {
     translation = stripTranslationText(translation);
     return {
       ...translation,
-      slug: slugifySafe(translation.title),
       content: sanitizeContent(translation.content),
       readingTime: computeReadingTime(translation.content),
       ...(translation.excerpt !== undefined
@@ -94,11 +101,20 @@ export class ArticleTranslationsService {
     );
 
     const sanitizedDto = this.sanitizeTranslation(dto);
+    const base = slugify(sanitizedDto.title);
+    const taken = await this.prisma.articleTranslation.findMany({
+      where: { tenantId, slug: { startsWith: base } },
+      select: { slug: true },
+    });
 
     try {
       const translation = await this.prisma.articleTranslation.create({
         data: {
           ...sanitizedDto,
+          slug: nextFreeSlug(
+            base,
+            taken.map((t) => t.slug),
+          ),
           articleId,
           tenantId,
         },
@@ -111,16 +127,25 @@ export class ArticleTranslationsService {
       return translation;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(
-          'Traduzione gia esistente o slug duplicato',
-        );
+        throw new ConflictException({
+          code: 'TRANSLATION_EXISTS',
+          message: 'Traduzione gia esistente o slug duplicato',
+        });
       }
       throw error;
     }
   }
 
-  async findAll(tenantId: string, articleId: string) {
-    await this.ensureArticleExists(tenantId, articleId);
+  /**
+   * `statuses` restricts the parent article's status (public API: see
+   * `publicArticleStatuses`); admin callers omit it and see every status.
+   */
+  async findAll(
+    tenantId: string,
+    articleId: string,
+    statuses?: ContentStatus[],
+  ) {
+    await this.ensureArticleExists(tenantId, articleId, statuses);
 
     return this.prisma.articleTranslation.findMany({
       where: { articleId, tenantId },
@@ -136,9 +161,21 @@ export class ArticleTranslationsService {
     });
   }
 
-  async findOne(tenantId: string, articleId: string, languageCode: string) {
+  async findOne(
+    tenantId: string,
+    articleId: string,
+    languageCode: string,
+    statuses?: ContentStatus[],
+  ) {
     const translation = await this.prisma.articleTranslation.findFirst({
-      where: { articleId, tenantId, languageCode },
+      where: {
+        articleId,
+        tenantId,
+        languageCode,
+        ...(statuses
+          ? { article: { tenantId, status: { in: statuses } } }
+          : {}),
+      },
     });
 
     if (!translation) {
@@ -152,7 +189,7 @@ export class ArticleTranslationsService {
     tenantId: string,
     articleId: string,
     languageCode: string,
-    dto: UpdateArticleTranslationDto,
+    dto: UpdateArticleTranslationDto & { slug?: string },
   ) {
     const translation = await this.findOne(tenantId, articleId, languageCode);
 
@@ -161,6 +198,7 @@ export class ArticleTranslationsService {
       ? await this.bannedWordsService.checkText(tenantId, textToCheck)
       : false;
 
+    // The slug never follows `title`: it changes only when `slug` is passed (admin).
     const sanitizedDto: UpdateArticleTranslationDto & {
       slug?: string;
       readingTime?: number;
@@ -177,10 +215,6 @@ export class ArticleTranslationsService {
         : {}),
     };
 
-    if (dto.title !== undefined && dto.title !== translation.title) {
-      sanitizedDto.slug = slugifySafe(sanitizedDto.title);
-    }
-
     try {
       const updatedTranslation = await this.prisma.articleTranslation.update({
         where: { id: translation.id },
@@ -194,7 +228,10 @@ export class ArticleTranslationsService {
       return updatedTranslation;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException('Slug traduzione gia esistente');
+        throw new ConflictException({
+          code: 'SLUG_TAKEN',
+          message: 'Slug traduzione gia esistente',
+        });
       }
       throw error;
     }

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { BannedWordsSeedService } from '@/modules/banned-words/banned-words-seed.service';
 import * as crypto from 'crypto';
+import { assertPublicWebhookUrl } from '@heyatom/nest-common/webhooks';
 
 @Injectable()
 export class TenantSeedService implements OnModuleInit {
@@ -47,6 +48,17 @@ export class TenantSeedService implements OnModuleInit {
         // Hash the API key (SHA-256)
         const hashedApiKey = this.hashApiKey(plainApiKey);
 
+        // Same SSRF rule as the send path: refuse a non-public target at
+        // save time instead of dead-lettering every event later.
+        const webhookUrl = this.config.get<string>('SEED_WEBHOOK_URL') || null;
+        if (webhookUrl) {
+          await assertPublicWebhookUrl(webhookUrl, {
+            allowPrivate: this.config.get<boolean>(
+              'WEBHOOK_ALLOW_PRIVATE_TARGETS',
+            ),
+          });
+        }
+
         // Create default tenant
         const defaultTenant = await this.prisma.tenant.create({
           data: {
@@ -57,7 +69,7 @@ export class TenantSeedService implements OnModuleInit {
             defaultLanguage: 'it',
             apiKey: hashedApiKey,
             enabled: true,
-            webhookUrl: this.config.get<string>('SEED_WEBHOOK_URL') || null,
+            webhookUrl,
             webhookSecret: this.generateWebhookSecret(),
           },
         });
@@ -80,8 +92,9 @@ export class TenantSeedService implements OnModuleInit {
         await this.bannedWordsSeed.seedDefaultBannedWords(defaultTenant.id);
       }
     } catch (error) {
+      // WebhookUrlError keeps the detail (DNS_UNRESOLVED vs a private address) in `reason`.
       this.logger.error(
-        `Error seeding default tenant: ${error.message}`,
+        `Error seeding default tenant: ${error.message}${error.reason ? ` (${error.reason})` : ''}`,
         error.stack,
       );
       throw error;

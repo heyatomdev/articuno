@@ -12,4 +12,3 @@ import { FileHarborModule } from '@/modules/fileharbor/fileharbor.module';
   exports: [ArticlesService],
 })
 export class ArticlesModule {}
-
