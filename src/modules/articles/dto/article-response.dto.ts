@@ -69,6 +69,12 @@ export class ArticleBaseDto {
   @ApiProperty({ type: String, nullable: true }) authorId: string | null;
   @ApiProperty() categoryId: string;
   @ApiProperty() tenantId: string;
+  @ApiProperty({
+    type: Date,
+    nullable: true,
+    description: 'First publication; never cleared or moved',
+  })
+  publishedAt: Date | null;
   @ApiProperty() createdAt: Date;
   @ApiProperty() updatedAt: Date;
 }

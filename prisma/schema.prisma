@@ -148,7 +148,9 @@ model Article {
   likesCount    Int     @default(0)
   commentsCount Int     @default(0)
 
-  status ContentStatus @default(DRAFT)
+  status      ContentStatus @default(DRAFT)
+  // Set once, on the first transition to PUBLISHED; never cleared.
+  publishedAt DateTime?
 
   // Relazioni strutturali
   authorId   String?
@@ -170,6 +172,7 @@ model Article {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, status, createdAt])
+  @@index([tenantId, status, publishedAt])
   @@index([tenantId, createdAt])
   @@map("articles")
 }

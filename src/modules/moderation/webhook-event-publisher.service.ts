@@ -101,7 +101,9 @@ export class WebhookEventPublisher {
   }
 
   /**
-   * Pubblica un evento di cambio stato articolo
+   * Pubblica un evento di cambio stato articolo, più l'evento di ciclo di vita
+   * (`article.published` / `article.unpublished`) che ne deriva.
+   * Returns the article's `publishedAt` after the change.
    */
   async publishArticleStatusChangedEvent(
     tenantId: string,
@@ -111,7 +113,7 @@ export class WebhookEventPublisher {
     reason?: string,
     moderatorId?: string,
     db?: Prisma.TransactionClient,
-  ): Promise<string> {
+  ): Promise<Date | null> {
     const payload = {
       articleId,
       oldStatus,
@@ -120,7 +122,102 @@ export class WebhookEventPublisher {
       moderatorId: moderatorId ?? null,
     };
 
-    return this.publishEvent(tenantId, 'article.status_changed', payload, db);
+    await this.publishEvent(tenantId, 'article.status_changed', payload, db);
+    return this.publishArticleLifecycleEvent(
+      tenantId,
+      articleId,
+      oldStatus,
+      newStatus,
+      db,
+    );
+  }
+
+  /**
+   * Entering PUBLISHED → `article.published`; the first time it also sets
+   * `publishedAt` (`firstPublication: true`). Leaving PUBLISHED →
+   * `article.unpublished`. Call after the status write, in the same `db`: the
+   * conditional update waits on that row lock, so concurrent publishes see
+   * exactly one first publication. Returns `publishedAt`.
+   */
+  async publishArticleLifecycleEvent(
+    tenantId: string,
+    articleId: string,
+    oldStatus: ContentStatus | null,
+    newStatus: ContentStatus,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<Date | null> {
+    if (newStatus === ContentStatus.PUBLISHED) {
+      const now = new Date();
+      const { count } = await db.article.updateMany({
+        where: { id: articleId, tenantId, publishedAt: null },
+        data: { publishedAt: now },
+      });
+      const article = await this.articleSummary(db, tenantId, articleId);
+      await this.publishEvent(
+        tenantId,
+        'article.published',
+        {
+          articleId,
+          publishedAt: article.publishedAt.toISOString(),
+          firstPublication: count === 1,
+          translations: article.translations,
+        },
+        db,
+      );
+      return article.publishedAt;
+    }
+
+    const article = await this.articleSummary(db, tenantId, articleId);
+    // publishedAt null: never actually published (e.g. created PUBLISHED but
+    // auto-hidden by a banned word in the same request).
+    if (oldStatus === ContentStatus.PUBLISHED && article.publishedAt) {
+      await this.publishEvent(
+        tenantId,
+        'article.unpublished',
+        { articleId, newStatus, translations: article.translations },
+        db,
+      );
+    }
+    return article.publishedAt;
+  }
+
+  /** `article.deleted`; call with the summary read before the delete. */
+  async publishArticleDeletedEvent(
+    tenantId: string,
+    article: Awaited<ReturnType<WebhookEventPublisher['articleSummary']>>,
+    db?: Prisma.TransactionClient,
+  ): Promise<string> {
+    return this.publishEvent(
+      tenantId,
+      'article.deleted',
+      {
+        articleId: article.id,
+        status: article.status,
+        publishedAt: article.publishedAt?.toISOString() ?? null,
+        translations: article.translations,
+      },
+      db,
+    );
+  }
+
+  /** What a receiver needs to link or purge the article: slug and title per language. */
+  articleSummary(
+    db: Prisma.TransactionClient,
+    tenantId: string,
+    articleId: string,
+  ) {
+    return db.article.findFirstOrThrow({
+      where: { id: articleId, tenantId },
+      select: {
+        id: true,
+        status: true,
+        publishedAt: true,
+        translations: {
+          select: { languageCode: true, slug: true, title: true },
+          orderBy: { languageCode: 'asc' },
+        },
+      },
+    });
   }
 
   /**

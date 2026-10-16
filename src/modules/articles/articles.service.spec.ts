@@ -70,7 +70,10 @@ describe('ArticlesService.create with a banned word', () => {
     $transaction: jest.fn(),
   };
   const bannedWords = { checkText: jest.fn() };
-  const webhookPublisher = { publishArticleStatusChangedEvent: jest.fn() };
+  const webhookPublisher = {
+    publishArticleStatusChangedEvent: jest.fn(),
+    publishArticleLifecycleEvent: jest.fn(),
+  };
   const service = new ArticlesService(
     prisma as any,
     bannedWords as any,
@@ -179,6 +182,82 @@ describe('ArticlesService.create with a banned word', () => {
     expect(
       webhookPublisher.publishArticleStatusChangedEvent,
     ).not.toHaveBeenCalled();
+    expect(
+      webhookPublisher.publishArticleLifecycleEvent,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('enqueues article.published in the same tx when created PUBLISHED', async () => {
+    bannedWords.checkText.mockResolvedValue(false);
+    const publishedAt = new Date();
+    webhookPublisher.publishArticleLifecycleEvent.mockResolvedValue(
+      publishedAt,
+    );
+
+    const article = await service.create(
+      't1',
+      dto({ status: ContentStatus.PUBLISHED }) as any,
+    );
+
+    expect(webhookPublisher.publishArticleLifecycleEvent).toHaveBeenCalledWith(
+      't1',
+      'a1',
+      null,
+      ContentStatus.PUBLISHED,
+      prisma,
+    );
+    expect(article.publishedAt).toBe(publishedAt);
+  });
+});
+
+describe('ArticlesService.remove', () => {
+  const prisma = {
+    article: { findFirst: jest.fn(), delete: jest.fn() },
+    $transaction: jest.fn(),
+  };
+  const webhookPublisher = {
+    articleSummary: jest.fn(),
+    publishArticleDeletedEvent: jest.fn(),
+  };
+  const service = new ArticlesService(
+    prisma as any,
+    {} as any,
+    {} as any,
+    webhookPublisher as any,
+  );
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    prisma.$transaction.mockImplementation((fn) => fn(prisma));
+  });
+
+  it('reads the summary, deletes and enqueues article.deleted in one tx', async () => {
+    prisma.article.findFirst.mockResolvedValue({ id: 'a1', coverImage: null });
+    const summary = { id: 'a1', translations: [] };
+    webhookPublisher.articleSummary.mockResolvedValue(summary);
+
+    await service.remove('t1', 'a1');
+
+    expect(webhookPublisher.articleSummary).toHaveBeenCalledWith(
+      prisma,
+      't1',
+      'a1',
+    );
+    expect(prisma.article.delete).toHaveBeenCalledWith({
+      where: { id: 'a1', tenantId: 't1' },
+    });
+    expect(webhookPublisher.publishArticleDeletedEvent).toHaveBeenCalledWith(
+      't1',
+      summary,
+      prisma,
+    );
+  });
+
+  it('emits nothing for an article of another tenant', async () => {
+    prisma.article.findFirst.mockResolvedValue(null);
+
+    await expect(service.remove('t1', 'a1')).rejects.toThrow(NotFoundException);
+    expect(webhookPublisher.publishArticleDeletedEvent).not.toHaveBeenCalled();
   });
 });
 

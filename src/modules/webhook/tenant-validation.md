@@ -1,6 +1,6 @@
 # Guida alla Validazione dei Webhook per i Tenant
 
-Articuno invia gli eventi (moderazione, cambi di stato degli articoli) al tuo `webhookUrl` con richieste `POST` firmate in formato [Standard Webhooks](https://www.standardwebhooks.com/). Contratto completo ed elenco eventi: [guida di integrazione §8](../../../../docs/integrations/articuno.md).
+Articuno invia gli eventi (pubblicazione, ritiro e cancellazione degli articoli, moderazione) al tuo `webhookUrl` con richieste `POST` firmate in formato [Standard Webhooks](https://www.standardwebhooks.com/). Contratto completo ed elenco eventi: [guida di integrazione §8](../../../../docs/integrations/articuno.md).
 
 ## Header
 

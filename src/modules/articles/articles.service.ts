@@ -13,7 +13,7 @@ import {
   ArticleFiltersQueryDto,
   PublicArticleFiltersQueryDto,
 } from '@/modules/articles/dto/article-filters-query.dto';
-import { ContentStatus } from '@prisma/client';
+import { ContentStatus, Prisma } from '@prisma/client';
 import { publicArticleStatuses } from '@/modules/articles/article-visibility';
 import { sanitizeContent, stripTranslationText } from '@/utils/html-sanitizer';
 import { computeReadingTime } from '@/utils/reading-time';
@@ -294,6 +294,15 @@ export class ArticlesService {
             'system',
             tx,
           );
+        } else if (finalStatus === ContentStatus.PUBLISHED) {
+          article.publishedAt =
+            await this.webhookPublisher.publishArticleLifecycleEvent(
+              tenantId,
+              article.id,
+              null,
+              ContentStatus.PUBLISHED,
+              tx,
+            );
         }
 
         return article;
@@ -328,15 +337,20 @@ export class ArticlesService {
 
     // statusFilter overrides query.status: the public caller never picks a
     // status outside `visible`.
-    return this.findAll(tenantId, query, {
-      in: query.status ? [query.status] : visible,
-    });
+    // Newest publication first; drafts (no publishedAt) after, newest first.
+    return this.findAll(
+      tenantId,
+      query,
+      { in: query.status ? [query.status] : visible },
+      [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
+    );
   }
 
   async findAll(
     tenantId: string,
     query: ArticleFiltersQueryDto,
     statusFilter?: { in: ContentStatus[] },
+    orderBy: Prisma.ArticleOrderByWithRelationInput[] = [{ createdAt: 'desc' }],
   ): Promise<PaginatedResult<any>> {
     const where: any = {
       tenantId,
@@ -386,7 +400,7 @@ export class ArticlesService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.article.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         take: query.limit,
         skip: query.skip,
         include: listIncludes,
@@ -515,15 +529,16 @@ export class ArticlesService {
         });
 
         if (dto.status && dto.status !== currentArticle.status) {
-          await this.webhookPublisher.publishArticleStatusChangedEvent(
-            tenantId,
-            updatedArticle.id,
-            currentArticle.status,
-            updatedArticle.status,
-            dto.moderationReason,
-            dto.moderatorId,
-            tx,
-          );
+          updatedArticle.publishedAt =
+            await this.webhookPublisher.publishArticleStatusChangedEvent(
+              tenantId,
+              updatedArticle.id,
+              currentArticle.status,
+              updatedArticle.status,
+              dto.moderationReason,
+              dto.moderatorId,
+              tx,
+            );
         }
 
         return updatedArticle;
@@ -549,7 +564,20 @@ export class ArticlesService {
       throw new NotFoundException('Articolo non trovato');
     }
 
-    await this.prisma.article.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      // Slugs and titles are gone after the delete: read them first.
+      const summary = await this.webhookPublisher.articleSummary(
+        tx,
+        tenantId,
+        id,
+      );
+      await tx.article.delete({ where: { id, tenantId } });
+      await this.webhookPublisher.publishArticleDeletedEvent(
+        tenantId,
+        summary,
+        tx,
+      );
+    });
 
     if (article.coverImage) {
       const tenant = await this.prisma.tenant.findFirst({

@@ -1102,7 +1102,7 @@
     },
     "/categories/{id}": {
       "patch": {
-        "description": "Updates the name, description, or colour of an existing category. The slug is re-generated when the name changes.",
+        "description": "Updates the name, description, or colour of an existing category. The slug does not change.",
         "operationId": "CategoriesController_update",
         "parameters": [
           {
@@ -1429,15 +1429,6 @@
         "operationId": "InteractionsController_toggleLikeArticle",
         "parameters": [
           {
-            "name": "X-User-Id",
-            "in": "header",
-            "description": "External user ID required for all interaction endpoints",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "articleId",
             "required": true,
             "in": "path",
@@ -1451,6 +1442,15 @@
             "name": "x-user-id",
             "required": true,
             "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "description": "External user ID of the end user",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1494,15 +1494,6 @@
         "operationId": "InteractionsController_getArticleStatus",
         "parameters": [
           {
-            "name": "X-User-Id",
-            "in": "header",
-            "description": "External user ID required for all interaction endpoints",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "articleId",
             "required": true,
             "in": "path",
@@ -1516,6 +1507,15 @@
             "name": "x-user-id",
             "required": true,
             "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-User-Id",
+            "in": "header",
+            "description": "External user ID of the end user",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1548,6 +1548,47 @@
           }
         ],
         "summary": "Get interaction status for an article",
+        "tags": [
+          "Interactions"
+        ]
+      }
+    },
+    "/interactions/articles/{articleId}/view": {
+      "post": {
+        "description": "Adds one to the article view counter. Call it server-side when the article page is served; No deduplication: filter bots and repeated views in the tenant site.",
+        "operationId": "InteractionsController_countView",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the viewed article",
+            "schema": {
+              "example": "123e4567-e89b-12d3-a456-426614174000",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "View counted."
+          },
+          "400": {
+            "description": "Invalid articleId."
+          },
+          "401": {
+            "description": "Missing or invalid API key."
+          },
+          "404": {
+            "description": "Article not found or not PUBLISHED."
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Count a view of an article",
         "tags": [
           "Interactions"
         ]
@@ -1962,7 +2003,7 @@
     },
     "/tags/{id}": {
       "patch": {
-        "description": "Updates the name (and consequently the slug) of an existing tag.",
+        "description": "Updates the name of an existing tag. The slug does not change.",
         "operationId": "TagsController_update",
         "parameters": [
           {
@@ -2890,7 +2931,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateArticleTranslationDto"
+                "$ref": "#/components/schemas/AdminUpdateArticleTranslationDto"
               }
             }
           }
@@ -3134,7 +3175,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateTagDto"
+                "$ref": "#/components/schemas/AdminUpdateTagDto"
               }
             }
           }
@@ -3340,7 +3381,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateCategoryDto"
+                "$ref": "#/components/schemas/AdminUpdateCategoryDto"
               }
             }
           }
@@ -5070,6 +5111,12 @@
           "tenantId": {
             "type": "string"
           },
+          "publishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "First publication; never cleared or moved"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -5117,6 +5164,7 @@
           "authorId",
           "categoryId",
           "tenantId",
+          "publishedAt",
           "createdAt",
           "updatedAt",
           "category",
@@ -5221,6 +5269,12 @@
           "tenantId": {
             "type": "string"
           },
+          "publishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "First publication; never cleared or moved"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -5268,6 +5322,7 @@
           "authorId",
           "categoryId",
           "tenantId",
+          "publishedAt",
           "createdAt",
           "updatedAt",
           "category",
@@ -5437,6 +5492,12 @@
           "tenantId": {
             "type": "string"
           },
+          "publishedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "First publication; never cleared or moved"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -5472,6 +5533,7 @@
           "authorId",
           "categoryId",
           "tenantId",
+          "publishedAt",
           "createdAt",
           "updatedAt",
           "category",
@@ -5644,7 +5706,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "New display name for the category. The slug will be re-generated from this value.",
+            "description": "New display name for the category. The slug does not change.",
             "example": "Science & Technology"
           },
           "description": {
@@ -6337,7 +6399,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "New display name for the tag. The slug will be re-generated from this value.",
+            "description": "New display name for the tag. The slug does not change.",
             "example": "Science & Technology"
           }
         }
@@ -6369,6 +6431,84 @@
         "required": [
           "externalId"
         ]
+      },
+      "AdminUpdateArticleTranslationDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Updated localized title of the article.",
+            "example": "Getting Started with NestJS – Revised"
+          },
+          "content": {
+            "type": "string",
+            "description": "Updated full HTML/Markdown body of the article.",
+            "example": "<p>NestJS is a progressive Node.js framework...</p>"
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "Updated short plain-text summary shown in listing pages.",
+            "example": "An updated guide to building your first NestJS application."
+          },
+          "metaTitle": {
+            "type": "string",
+            "description": "Updated SEO meta title.",
+            "example": "NestJS Guide – Revised | My Blog"
+          },
+          "metaDescription": {
+            "type": "string",
+            "description": "Updated SEO meta description.",
+            "example": "Learn NestJS from scratch with this revised step-by-step tutorial."
+          },
+          "slug": {
+            "type": "string",
+            "description": "New URL slug (lowercase alphanumeric words separated by hyphens). Old links stop working: change it only on purpose.",
+            "example": "science-and-technology",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
+      },
+      "AdminUpdateTagDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New display name for the tag. The slug does not change.",
+            "example": "Science & Technology"
+          },
+          "slug": {
+            "type": "string",
+            "description": "New URL slug (lowercase alphanumeric words separated by hyphens). Old links stop working: change it only on purpose.",
+            "example": "science-and-technology",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
+      },
+      "AdminUpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New display name for the category. The slug does not change.",
+            "example": "Science & Technology"
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated description of the category.",
+            "example": "Articles covering science, technology and research."
+          },
+          "color": {
+            "type": "string",
+            "description": "Updated hex colour for the category.",
+            "example": "#10B981"
+          },
+          "slug": {
+            "type": "string",
+            "description": "New URL slug (lowercase alphanumeric words separated by hyphens). Old links stop working: change it only on purpose.",
+            "example": "science-and-technology",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
       },
       "AdminCreateReportDto": {
         "type": "object",
