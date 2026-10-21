@@ -371,10 +371,18 @@ export class ArticlesService {
             },
           }
         : {}),
-      ...(query.languageCode
+      // One `some`: with both, the title must match in that language.
+      ...(query.languageCode || query.search
         ? {
             translations: {
-              some: { languageCode: query.languageCode },
+              some: {
+                ...(query.languageCode
+                  ? { languageCode: query.languageCode }
+                  : {}),
+                ...(query.search
+                  ? { title: { contains: query.search, mode: 'insensitive' } }
+                  : {}),
+              },
             },
           }
         : {}),

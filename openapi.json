@@ -2449,7 +2449,7 @@
         ]
       },
       "get": {
-        "description": "Returns a paginated list of articles for the session tenant. Supports filtering by status, category, tag, and featured flag.",
+        "description": "Returns a paginated list of articles for the session tenant. Supports filtering by status, category, tag, language and featured flag, title search (`search`) and sorting (`sortBy`, `sortOrder`).",
         "operationId": "AdminArticlesController_findAll",
         "parameters": [
           {
@@ -2527,6 +2527,47 @@
                 "UNDER_REVIEW",
                 "HIDDEN",
                 "BANNED"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive substring of a translation title. With `languageCode`, the title must match in that language.",
+            "schema": {
+              "maxLength": 100,
+              "example": "nestjs",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Sort field. `publishedAt` puts never-published articles last. Default `createdAt`.",
+            "schema": {
+              "default": "createdAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt",
+                "publishedAt",
+                "views"
+              ]
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "Sort direction. Default `desc`.",
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
               ]
             }
           }
@@ -4083,6 +4124,16 @@
             "description": "Filter by username (case-insensitive partial match)",
             "schema": {
               "example": "john",
+              "type": "string"
+            }
+          },
+          {
+            "name": "externalId",
+            "required": false,
+            "in": "query",
+            "description": "Exact external id (Bastion `sub`): resolves an id from the audit log, e.g. `actorUserId`, to its user.",
+            "schema": {
+              "example": "5f0c2a7e-1b2c-4d3e-8f90-123456789abc",
               "type": "string"
             }
           },

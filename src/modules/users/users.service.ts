@@ -84,6 +84,8 @@ export class UsersService {
         : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.role ? { role: query.role } : {}),
+      // AND, not a spread: NOT_SYSTEM already owns the `externalId` key.
+      ...(query.externalId ? { AND: [{ externalId: query.externalId }] } : {}),
     };
 
     const [items, total] = await this.prisma.$transaction([

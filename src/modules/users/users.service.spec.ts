@@ -33,6 +33,18 @@ describe('UsersService hides the system reporter', () => {
     expect(prisma.user.count.mock.calls[0][0].where).toMatchObject(notSystem);
   });
 
+  it('filters by exact externalId without dropping the system exclusion', async () => {
+    await service.findAll('t1', {
+      limit: 20,
+      skip: 0,
+      externalId: 'u-1',
+    } as any);
+    expect(prisma.user.findMany.mock.calls[0][0].where).toMatchObject({
+      ...notSystem,
+      AND: [{ externalId: 'u-1' }],
+    });
+  });
+
   it('404s on it by id', async () => {
     prisma.user.findFirst.mockResolvedValue(null);
     await expect(service.findOne('t1', 'sys-id')).rejects.toThrow(

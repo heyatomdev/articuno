@@ -60,6 +60,12 @@ Authorization: Bearer <bastion-user-jwt>
 - `categoryId`: ID della categoria
 - `featured`: true | false
 - `tagId`: ID del tag
+- `languageCode`: solo articoli con una traduzione in quella lingua (e solo quella traduzione)
+- `search`: sottostringa del titolo di una traduzione, case-insensitive, max 100 caratteri (trim);
+  con `languageCode` il titolo deve combaciare in quella lingua
+- `sortBy`: `createdAt` (default) | `updatedAt` | `publishedAt` (mai pubblicati in fondo) | `views`;
+  pareggi per `id`
+- `sortOrder`: `asc` | `desc` (default)
 - `page`: numero di pagina, 1-based (default: 1)
 - `limit`: numero di risultati per pagina (default: 20, max: 100)
 
