@@ -6956,7 +6956,12 @@
           "nextRetryAt": {
             "format": "date-time",
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Next scheduled attempt; null when delivered, due now, or dead-lettered"
+          },
+          "deadLettered": {
+            "type": "boolean",
+            "description": "Max attempts reached: never retried again until a manual resend"
           },
           "createdAt": {
             "format": "date-time",
@@ -6972,6 +6977,7 @@
           "attempts",
           "lastError",
           "nextRetryAt",
+          "deadLettered",
           "createdAt"
         ]
       },
@@ -7156,6 +7162,23 @@
           "bannedWords"
         ]
       },
+      "DashboardWebhooksDto": {
+        "type": "object",
+        "properties": {
+          "undelivered": {
+            "type": "number",
+            "description": "Outbox events not delivered yet (any state)"
+          },
+          "deadLettered": {
+            "type": "number",
+            "description": "Undelivered events past max attempts: need a manual resend"
+          }
+        },
+        "required": [
+          "undelivered",
+          "deadLettered"
+        ]
+      },
       "DashboardLanguageDto": {
         "type": "object",
         "properties": {
@@ -7292,6 +7315,9 @@
           "taxonomy": {
             "$ref": "#/components/schemas/DashboardTaxonomyDto"
           },
+          "webhooks": {
+            "$ref": "#/components/schemas/DashboardWebhooksDto"
+          },
           "languages": {
             "type": "array",
             "items": {
@@ -7322,6 +7348,7 @@
           "reports",
           "users",
           "taxonomy",
+          "webhooks",
           "languages",
           "topArticles",
           "history"

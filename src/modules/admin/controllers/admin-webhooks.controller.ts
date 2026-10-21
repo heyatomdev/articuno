@@ -26,6 +26,7 @@ import { AdminSession } from '@/modules/bastion/bastion.types';
 import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-list-query.dto';
 import { WebhookEventParamsDto } from '@/modules/webhook/dto/webhook-event-params.dto';
 import { WebhooksService } from '@/modules/webhook/webhooks.service';
+import { toWebhookEventView } from '@/modules/webhook/webhook.constants';
 import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import {
   WebhookEventDto,
@@ -51,11 +52,15 @@ export class AdminWebhooksController {
     status: 401,
     description: 'Not authenticated – missing or expired session.',
   })
-  findAll(
+  async findAll(
     @GetSession() session: AdminSession,
     @Query() query: WebhookEventListQueryDto,
   ) {
-    return this.webhookEventsService.findAll(session.tenantId, query);
+    const page = await this.webhookEventsService.findAll(
+      session.tenantId,
+      query,
+    );
+    return { ...page, data: page.data.map(toWebhookEventView) };
   }
 
   @Get(':id')
@@ -75,11 +80,13 @@ export class AdminWebhooksController {
     description: 'Not authenticated – missing or expired session.',
   })
   @ApiResponse({ status: 404, description: 'Webhook event not found.' })
-  findOne(
+  async findOne(
     @GetSession() session: AdminSession,
     @Param() params: WebhookEventParamsDto,
   ) {
-    return this.webhookEventsService.findOne(session.tenantId, params.id);
+    return toWebhookEventView(
+      await this.webhookEventsService.findOne(session.tenantId, params.id),
+    );
   }
 
   @Post(':id/resend')
@@ -108,11 +115,13 @@ export class AdminWebhooksController {
     status: 409,
     description: 'Event is being delivered right now — retry in a few minutes.',
   })
-  resendOne(
+  async resendOne(
     @GetSession() session: AdminSession,
     @Param() params: WebhookEventParamsDto,
   ) {
-    return this.webhookEventsService.resendOne(session.tenantId, params.id);
+    return toWebhookEventView(
+      await this.webhookEventsService.resendOne(session.tenantId, params.id),
+    );
   }
 
   @Post('resend-all-failed')
