@@ -5920,6 +5920,44 @@
           "avatarUrl"
         ]
       },
+      "CommentArticleTranslationSummaryDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "languageCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "slug",
+          "languageCode"
+        ]
+      },
+      "CommentArticleSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "translations": {
+            "description": "At most one: the first translation by languageCode.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentArticleTranslationSummaryDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "translations"
+        ]
+      },
       "CommentListItemDto": {
         "type": "object",
         "properties": {
@@ -5964,6 +6002,14 @@
           },
           "author": {
             "$ref": "#/components/schemas/CommentAuthorSummaryDto"
+          },
+          "article": {
+            "description": "Admin list only (`GET /admin/comments`).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommentArticleSummaryDto"
+              }
+            ]
           }
         },
         "required": [

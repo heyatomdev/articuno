@@ -1,5 +1,5 @@
 import { ContentStatus, UserRole, UserStatus } from '@prisma/client';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserDto } from '@/modules/users/dto/user.dto';
 
 // Response shapes of CommentsService, mirroring its Prisma `include` clauses.
@@ -41,10 +41,30 @@ export class CommentAuthorSummaryDto {
   @ApiProperty({ type: String, nullable: true }) avatarUrl: string | null;
 }
 
+export class CommentArticleTranslationSummaryDto {
+  @ApiProperty() title: string;
+  @ApiProperty() slug: string;
+  @ApiProperty() languageCode: string;
+}
+
+export class CommentArticleSummaryDto {
+  @ApiProperty() id: string;
+  @ApiProperty({
+    type: [CommentArticleTranslationSummaryDto],
+    description: 'At most one: the first translation by languageCode.',
+  })
+  translations: CommentArticleTranslationSummaryDto[];
+}
+
 /** A comment in a list. */
 export class CommentListItemDto extends CommentBaseDto {
   @ApiProperty({ type: CommentTenantSummaryDto })
   tenant: CommentTenantSummaryDto;
   @ApiProperty({ type: CommentAuthorSummaryDto })
   author: CommentAuthorSummaryDto;
+  @ApiPropertyOptional({
+    type: CommentArticleSummaryDto,
+    description: 'Admin list only (`GET /admin/comments`).',
+  })
+  article?: CommentArticleSummaryDto;
 }

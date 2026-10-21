@@ -68,6 +68,7 @@ export class AdminCommentsController {
   ) {
     return this.commentsService.findAll(session.tenantId, query, {
       statuses: query.status ? [query.status] : undefined,
+      withArticle: true,
     });
   }
 

@@ -472,6 +472,25 @@ describe('CommentsService public visibility', () => {
       );
     });
 
+    it('findAll includes the parent article only when asked', async () => {
+      const query = Object.assign(new CommentFiltersQueryDto(), { limit: 100 });
+      await service.findAll('t1', query, { withArticle: true });
+      expect(prisma.comment.findMany.mock.lastCall[0].include.article).toEqual({
+        select: {
+          id: true,
+          translations: {
+            select: { title: true, slug: true, languageCode: true },
+            orderBy: { languageCode: 'asc' },
+            take: 1,
+          },
+        },
+      });
+      await service.findAllPublic('t1', publicQuery());
+      expect(
+        prisma.comment.findMany.mock.lastCall[0].include.article,
+      ).toBeUndefined();
+    });
+
     it('findOne reads a HIDDEN comment of a BANNED article', async () => {
       await expect(
         service.findOne('t1', 'c-BANNED-HIDDEN'),
