@@ -7,6 +7,12 @@ export class AuditLogDto {
   @ApiProperty() timestamp: Date;
   @ApiProperty() tenantId: string;
   @ApiProperty({ description: 'External ID of the actor' }) actorUserId: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Username of the actor, null when unknown',
+  })
+  actorUsername: string | null;
   @ApiProperty({ description: 'Role of the actor at the time of the action' })
   actorRole: string;
   @ApiProperty({ enum: AuditAction, enumName: 'AuditAction' })

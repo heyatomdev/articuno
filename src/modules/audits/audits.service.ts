@@ -28,7 +28,7 @@ export class AuditsService {
       this.prisma.auditLog.count({ where }),
     ]);
 
-    return paginate(items, total, query);
+    return paginate(await this.withActorNames(tenantId, items), total, query);
   }
 
   async findOne(id: string, tenantId: string) {
@@ -40,6 +40,27 @@ export class AuditsService {
       throw new NotFoundException('Audit log not found');
     }
 
-    return auditLog;
+    const [named] = await this.withActorNames(tenantId, [auditLog]);
+    return named;
+  }
+
+  /**
+   * `actorUserId` is an externalId, not a relation: one lookup per page adds
+   * the actor's `username` (null when the user is gone or has none), so the
+   * console does not show a bare id.
+   */
+  private async withActorNames<T extends { actorUserId: string }>(
+    tenantId: string,
+    rows: T[],
+  ): Promise<(T & { actorUsername: string | null })[]> {
+    const ids = [...new Set(rows.map((r) => r.actorUserId))];
+    const users = ids.length
+      ? await this.prisma.user.findMany({
+          where: { tenantId, externalId: { in: ids } },
+          select: { externalId: true, username: true },
+        })
+      : [];
+    const names = new Map(users.map((u) => [u.externalId, u.username]));
+    return rows.map((r) => ({ ...r, actorUsername: names.get(r.actorUserId) ?? null }));
   }
 }

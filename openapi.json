@@ -6743,6 +6743,11 @@
             "type": "string",
             "description": "External ID of the actor"
           },
+          "actorUsername": {
+            "type": "string",
+            "nullable": true,
+            "description": "Username of the actor, null when unknown"
+          },
           "actorRole": {
             "type": "string",
             "description": "Role of the actor at the time of the action"
@@ -6788,6 +6793,7 @@
           "timestamp",
           "tenantId",
           "actorUserId",
+          "actorUsername",
           "actorRole",
           "action",
           "resourceType",
