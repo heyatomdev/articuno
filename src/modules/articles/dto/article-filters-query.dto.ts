@@ -1,7 +1,14 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ContentStatus } from '@prisma/client';
+import { ContentStatus, Prisma } from '@prisma/client';
 import { PageParams } from '@heyatom/nest-common';
 
 const ARTICLE_STATUSES: ContentStatus[] = [
@@ -17,6 +24,14 @@ export const PUBLIC_ARTICLE_STATUSES: ContentStatus[] = [
   ContentStatus.PUBLISHED,
   ContentStatus.DRAFT,
 ];
+
+export const ARTICLE_SORT_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'publishedAt',
+  'views',
+] as const;
+export type ArticleSortField = (typeof ARTICLE_SORT_FIELDS)[number];
 
 export const toBoolean = ({ value }: { value: unknown }) => {
   if (value === 'true' || value === true) {
@@ -77,6 +92,52 @@ export class ArticleFiltersQueryDto extends ArticleFiltersBaseQueryDto {
   @IsOptional()
   @IsIn(ARTICLE_STATUSES)
   status?: ContentStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'Case-insensitive substring of a translation title. With `languageCode`, ' +
+      'the title must match in that language.',
+    maxLength: 100,
+    example: 'nestjs',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Sort field. `publishedAt` puts never-published articles last. Default `createdAt`.',
+    enum: ARTICLE_SORT_FIELDS,
+    default: 'createdAt',
+  })
+  @IsOptional()
+  @IsIn(ARTICLE_SORT_FIELDS)
+  sortBy?: ArticleSortField;
+
+  @ApiPropertyOptional({
+    description: 'Sort direction. Default `desc`.',
+    enum: ['asc', 'desc'],
+    default: 'desc',
+  })
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
+}
+
+/** Admin list order: the requested field, nulls last for publishedAt, id as tiebreak. */
+export function adminArticleOrderBy(
+  query: Pick<ArticleFiltersQueryDto, 'sortBy' | 'sortOrder'>,
+): Prisma.ArticleOrderByWithRelationInput[] {
+  const sort = query.sortOrder ?? 'desc';
+  const field = query.sortBy ?? 'createdAt';
+  return [
+    field === 'publishedAt'
+      ? { publishedAt: { sort, nulls: 'last' } }
+      : { [field]: sort },
+    { id: sort },
+  ];
 }
 
 /**

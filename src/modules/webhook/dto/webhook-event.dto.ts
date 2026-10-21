@@ -19,7 +19,18 @@ export class WebhookEventDto {
   sentAt: Date | null;
   @ApiProperty() attempts: number;
   @ApiProperty({ type: String, nullable: true }) lastError: string | null;
-  @ApiProperty({ type: Date, nullable: true }) nextRetryAt: Date | null;
+  @ApiProperty({
+    type: Date,
+    nullable: true,
+    description:
+      'Next scheduled attempt; null when delivered, due now, or dead-lettered',
+  })
+  nextRetryAt: Date | null;
+  @ApiProperty({
+    description:
+      'Max attempts reached: never retried again until a manual resend',
+  })
+  deadLettered: boolean;
   @ApiProperty() createdAt: Date;
 }
 

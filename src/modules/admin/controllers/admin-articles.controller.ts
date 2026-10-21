@@ -48,7 +48,10 @@ import {
 import { CreateArticleTranslationDto } from '@/modules/articles/dto/create-article-translation.dto';
 import { AdminUpdateArticleTranslationDto } from '@/modules/articles/dto/update-article-translation.dto';
 import { ArticleTranslationParamsDto } from '@/modules/articles/dto/article-translation-params.dto';
-import { ArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
+import {
+  ArticleFiltersQueryDto,
+  adminArticleOrderBy,
+} from '@/modules/articles/dto/article-filters-query.dto';
 import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { FileHarborConfig } from '@/modules/fileharbor/interfaces/fileharbor-config.interface';
@@ -276,7 +279,8 @@ export class AdminArticlesController {
   @ApiOperation({
     summary: 'List articles',
     description:
-      'Returns a paginated list of articles for the session tenant. Supports filtering by status, category, tag, and featured flag.',
+      'Returns a paginated list of articles for the session tenant. Supports filtering by status, category, tag, ' +
+      'language and featured flag, title search (`search`) and sorting (`sortBy`, `sortOrder`).',
   })
   @ApiPaginatedResponse(ArticleListItemDto, 'Paginated list of articles.')
   @ApiResponse({
@@ -287,7 +291,12 @@ export class AdminArticlesController {
     @GetSession() session: AdminSession,
     @Query() query: ArticleFiltersQueryDto,
   ) {
-    return this.articlesService.findAll(session.tenantId, query);
+    return this.articlesService.findAll(
+      session.tenantId,
+      query,
+      undefined,
+      adminArticleOrderBy(query),
+    );
   }
 
   @Get(':key')

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ContentStatus, ReportStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { APP_VERSION } from '@/common/version';
+import { DEAD_LETTER_DATE } from '@/modules/webhook/webhook.constants';
 
 /** Rows a `groupBy(['status'])` returns, collapsed into a plain lookup. */
 type StatusCount<T extends string> = { status: T; _count: { _all: number } };
@@ -50,6 +51,8 @@ export class AnalyticsService {
       bannedWords,
       languageRows,
       topArticles,
+      webhooksUndelivered,
+      webhooksDeadLettered,
     ] = await Promise.all([
       this.prisma.dailyStats.findMany({
         where: { tenantId, date: { gte: startDate } },
@@ -121,6 +124,10 @@ export class AnalyticsService {
           },
         },
       }),
+      this.prisma.webhookEvent.count({ where: { tenantId, sentAt: null } }),
+      this.prisma.webhookEvent.count({
+        where: { tenantId, sentAt: null, nextRetryAt: DEAD_LETTER_DATE },
+      }),
     ]);
 
     const byArticle = tally(articleRows);
@@ -177,6 +184,12 @@ export class AnalyticsService {
         shadowBanned: byUser[UserStatus.SHADOW_BANNED] ?? 0,
       },
       taxonomy: { categories, tags, bannedWords },
+      // Outbox health, all-time: dead-lettered rows never retry on their own,
+      // so the console raises them next to the moderation queue.
+      webhooks: {
+        undelivered: webhooksUndelivered,
+        deadLettered: webhooksDeadLettered,
+      },
       // One row per language with at least one translation, busiest first.
       // An article counts once per language it is translated into, so the
       // total across rows exceeds `articles.total` on a bilingual tenant.

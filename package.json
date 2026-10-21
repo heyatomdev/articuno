@@ -1,6 +1,6 @@
 {
   "name": "articuno",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Multi-tenant blog platform with Prisma",
   "scripts": {
     "build": "nest build && tsc-alias",
@@ -23,7 +23,7 @@
     "node": ">=20.19.0"
   },
   "dependencies": {
-    "@heyatom/bastion-client": "^0.8.0",
+    "@heyatom/bastion-client": "^0.9.0",
     "@heyatom/nest-common": "^0.3.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.2.7",

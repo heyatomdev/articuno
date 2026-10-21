@@ -6,6 +6,7 @@ import { ArticlesService } from './articles.service';
 import {
   ArticleFiltersQueryDto,
   PublicArticleFiltersQueryDto,
+  adminArticleOrderBy,
 } from './dto/article-filters-query.dto';
 
 describe('ArticlesService.update status FSM', () => {
@@ -501,5 +502,98 @@ describe('PublicArticleFiltersQueryDto validation', () => {
     });
     expect(dto.includeDrafts).toBe(true);
     expect(validateSync(dto)).toHaveLength(0);
+  });
+});
+
+describe('ArticlesService.findAll admin search', () => {
+  const prisma = {
+    article: { findMany: jest.fn(), count: jest.fn() },
+    $transaction: jest.fn(),
+  };
+  const service = new ArticlesService(
+    prisma as any,
+    {} as any,
+    {} as any,
+    {} as any,
+  );
+  const whereOf = async (extra: object) => {
+    await service.findAll(
+      't1',
+      Object.assign(new ArticleFiltersQueryDto(), extra),
+    );
+    return prisma.article.findMany.mock.calls[0][0].where;
+  };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    prisma.article.findMany.mockResolvedValue([]);
+    prisma.article.count.mockResolvedValue(0);
+    prisma.$transaction.mockImplementation((ops) => Promise.all(ops));
+  });
+
+  it('matches a translation title, case-insensitive', async () => {
+    expect((await whereOf({ search: 'nest' })).translations).toEqual({
+      some: { title: { contains: 'nest', mode: 'insensitive' } },
+    });
+  });
+
+  it('requires the title match in the filtered language', async () => {
+    expect(
+      (await whereOf({ search: 'nest', languageCode: 'it' })).translations,
+    ).toEqual({
+      some: {
+        languageCode: 'it',
+        title: { contains: 'nest', mode: 'insensitive' },
+      },
+    });
+  });
+
+  it('adds no translation filter without search or language', async () => {
+    expect((await whereOf({})).translations).toBeUndefined();
+  });
+});
+
+describe('adminArticleOrderBy', () => {
+  it('defaults to createdAt desc with an id tiebreak', () => {
+    expect(adminArticleOrderBy({})).toEqual([
+      { createdAt: 'desc' },
+      { id: 'desc' },
+    ]);
+  });
+
+  it('puts unpublished articles last on publishedAt', () => {
+    expect(
+      adminArticleOrderBy({ sortBy: 'publishedAt', sortOrder: 'asc' }),
+    ).toEqual([{ publishedAt: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }]);
+  });
+
+  it('sorts by views', () => {
+    expect(adminArticleOrderBy({ sortBy: 'views' })).toEqual([
+      { views: 'desc' },
+      { id: 'desc' },
+    ]);
+  });
+});
+
+describe('ArticleFiltersQueryDto validation', () => {
+  const validate = (raw: object) =>
+    validateSync(plainToInstance(ArticleFiltersQueryDto, raw));
+
+  it('trims search and caps it at 100 characters', () => {
+    const dto = plainToInstance(ArticleFiltersQueryDto, { search: '  nest ' });
+    expect(dto.search).toBe('nest');
+    expect(validate({ search: 'x'.repeat(101) })).not.toHaveLength(0);
+  });
+
+  it.each(['createdAt', 'updatedAt', 'publishedAt', 'views'])(
+    'accepts sortBy=%s',
+    (sortBy) => {
+      expect(validate({ sortBy, sortOrder: 'asc' })).toHaveLength(0);
+    },
+  );
+
+  it('rejects an unknown sort field or direction', () => {
+    expect(validate({ sortBy: 'title' })).not.toHaveLength(0);
+    expect(validate({ sortOrder: 'up' })).not.toHaveLength(0);
   });
 });

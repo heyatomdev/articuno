@@ -54,6 +54,15 @@ export class DashboardTaxonomyDto {
   @ApiProperty() bannedWords: number;
 }
 
+export class DashboardWebhooksDto {
+  @ApiProperty({ description: 'Outbox events not delivered yet (any state)' })
+  undelivered: number;
+  @ApiProperty({
+    description: 'Undelivered events past max attempts: need a manual resend',
+  })
+  deadLettered: number;
+}
+
 export class DashboardLanguageDto {
   @ApiProperty({ example: 'en' }) code: string;
   @ApiProperty() translations: number;
@@ -93,6 +102,7 @@ export class DashboardStatsDto {
   @ApiProperty({ type: DashboardReportsDto }) reports: DashboardReportsDto;
   @ApiProperty({ type: DashboardUsersDto }) users: DashboardUsersDto;
   @ApiProperty({ type: DashboardTaxonomyDto }) taxonomy: DashboardTaxonomyDto;
+  @ApiProperty({ type: DashboardWebhooksDto }) webhooks: DashboardWebhooksDto;
   @ApiProperty({ type: [DashboardLanguageDto] })
   languages: DashboardLanguageDto[];
   @ApiProperty({ type: [DashboardTopArticleDto] })

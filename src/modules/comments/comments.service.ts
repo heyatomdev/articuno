@@ -38,6 +38,11 @@ export interface CommentScope {
   articleStatuses?: ContentStatus[];
   /** Null `content` on comments that are not VISIBLE (public API). */
   sanitize?: boolean;
+  /**
+   * Admin list: the parent article's id and its first translation by
+   * `languageCode` (title, slug), so a row can name the article it sits under.
+   */
+  withArticle?: boolean;
 }
 
 @Injectable()
@@ -289,6 +294,18 @@ export class CommentsService {
               avatarUrl: true,
             },
           },
+          ...(scope.withArticle && {
+            article: {
+              select: {
+                id: true,
+                translations: {
+                  select: { title: true, slug: true, languageCode: true },
+                  orderBy: { languageCode: 'asc' as const },
+                  take: 1,
+                },
+              },
+            },
+          }),
         },
       }),
       this.prisma.comment.count({ where }),
