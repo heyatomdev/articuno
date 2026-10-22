@@ -5,6 +5,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -97,6 +98,37 @@ export function canSetArticleStatus(
   );
 }
 
+/**
+ * The article JSON of a create/update, taken from one place only, chosen by
+ * content type: the `data` field of a multipart body, the whole body otherwise.
+ * Falling back from one to the other let a caller put `status` where a proxy
+ * in front (Meridian checks it before forwarding) wasn't looking: a JSON body
+ * with a `data` string, or a multipart body with a bare `status` field.
+ */
+export function articlePayload(
+  contentType: string | undefined,
+  rawBody: unknown,
+): string {
+  const body = (rawBody ?? {}) as Record<string, unknown>;
+  if (!contentType?.startsWith('multipart/form-data')) {
+    return JSON.stringify(body);
+  }
+  const extra = Object.keys(body).filter((k) => k !== 'data');
+  if (extra.length || typeof body.data !== 'string') {
+    throw new BadRequestException({
+      code: 'INVALID_MULTIPART',
+      message:
+        'Il body multipart accetta solo il campo testo "data" e il file "coverImage"',
+    });
+  }
+  return body.data;
+}
+
+/** Re-attributing an article to someone else is a moderator's call, like hiding it. */
+export function canSetArticleAuthor(role: string): boolean {
+  return (MODERATION_ROLES as readonly string[]).includes(role);
+}
+
 @ApiTags('Admin / Articles')
 @ApiBearerAuth()
 @Controller('admin/articles')
@@ -144,6 +176,14 @@ export class AdminArticlesController {
     if (!canSetArticleStatus(session.userRole, to, from)) {
       throw new ForbiddenException(
         `Ruolo non autorizzato a impostare lo stato ${to}`,
+      );
+    }
+  }
+
+  private assertCanSetAuthor(session: AdminSession, authorId?: string | null) {
+    if (authorId !== undefined && !canSetArticleAuthor(session.userRole)) {
+      throw new ForbiddenException(
+        "Ruolo non autorizzato a cambiare l'autore dell'articolo",
       );
     }
   }
@@ -231,14 +271,15 @@ export class AdminArticlesController {
   })
   async create(
     @GetSession() session: AdminSession,
-    @Body('data') rawData: string,
+    @Headers('content-type') contentType: string | undefined,
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const payload =
-      rawData ??
-      (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
-    const dto = await this.parseAndValidateDto(CreateArticleDto, payload);
+    const dto = await this.parseAndValidateDto(
+      CreateArticleDto,
+      articlePayload(contentType, rawBody),
+    );
+    this.assertCanSetAuthor(session, dto.authorId);
     if (!file) {
       // an upload replaces dto.coverImage with FileHarbor's own URL
       await this.articlesService.assertOwnCoverImage(
@@ -385,14 +426,18 @@ export class AdminArticlesController {
   async update(
     @GetSession() session: AdminSession,
     @Param() params: ArticleParamsDto,
-    @Body('data') rawData: string,
+    @Headers('content-type') contentType: string | undefined,
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const payload =
-      rawData ??
-      (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
-    const dto = await this.parseAndValidateDto(UpdateArticleDto, payload);
+    const dto = await this.parseAndValidateDto(
+      UpdateArticleDto,
+      articlePayload(contentType, rawBody),
+    );
+    this.assertCanSetAuthor(session, dto.authorId);
+    // The moderator in `article.status_changed` is whoever made the change,
+    // never a value from the body.
+    dto.moderatorId = session.externalId;
     if (!file) {
       // an upload replaces dto.coverImage with FileHarbor's own URL
       await this.articlesService.assertOwnCoverImage(
