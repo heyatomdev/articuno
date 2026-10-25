@@ -164,6 +164,8 @@ await this.fileHarborService.uploadImageIfProvided(file, 'article', externalId, 
 
 Supported types: JPEG, PNG, GIF, WebP (max 10 MB). `deleteImageSafely()` silently ignores 404s.
 
+HTTP goes through `FileHarborClient` (`@heyatom/client/fileharbor`), one per call since the config is per tenant (not the global Nest module); FileHarbor answers `{ data }`, read `.data`. Validation, endpoint check, id extraction and "404 = already deleted" stay in `FileHarborService`. The client gets `fileHarborFetch`: no redirects (`redirect: 'manual'`, so the tenant key never follows a `Location`) and 1 MB max response body.
+
 ### Scheduled Jobs
 
 | Job | Schedule | Purpose |
