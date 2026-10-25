@@ -23,13 +23,12 @@ import { UserRole } from '@prisma/client';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
 import {
-  ApiCreatedResponse,
-  ApiHeader,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-} from '@nestjs/swagger';
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
+import { ApiHeader, ApiNotFoundResponse } from '@nestjs/swagger';
 import {
   CommentDto,
   CommentListItemDto,
@@ -45,7 +44,7 @@ export class CommentsController {
   ) {}
 
   @Post()
-  @ApiCreatedResponse({ type: CommentDto })
+  @ApiCreatedData(CommentDto)
   @ApiNotFoundResponse({ description: 'Article not found or not PUBLISHED.' })
   async create(@GetTenant() tenant: any, @Body() dto: CreateCommentDto) {
     const comment = await this.commentsService.create(tenant.id, dto);
@@ -76,10 +75,7 @@ export class CommentsController {
   }
 
   @Get(':id')
-  @ApiOkResponse({
-    type: CommentDto,
-    description: 'content is null while the comment is not VISIBLE',
-  })
+  @ApiOkData(CommentDto, 'content is null while the comment is not VISIBLE')
   @ApiHeader({
     name: 'X-User-Id',
     required: false,
@@ -105,7 +101,7 @@ export class CommentsController {
   }
 
   @Patch(':id')
-  @ApiOkResponse({ type: CommentDto })
+  @ApiOkData(CommentDto)
   async update(
     @GetTenant() tenant: any,
     @Param() params: CommentParamsDto,

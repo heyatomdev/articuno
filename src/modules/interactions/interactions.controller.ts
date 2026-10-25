@@ -17,6 +17,7 @@ import {
   ApiParam,
   ApiHeader,
 } from '@nestjs/swagger';
+import { ApiCreatedData, ApiOkData } from '@heyatom/nest-common';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { InteractionsService } from '@/modules/interactions/interactions.service';
@@ -62,11 +63,7 @@ export class InteractionsController {
     description: 'UUID of the article to like/unlike',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({
-    status: 201,
-    description: 'Like toggled successfully.',
-    type: LikeToggleResultDto,
-  })
+  @ApiCreatedData(LikeToggleResultDto, 'Like toggled successfully.')
   @ApiResponse({
     status: 400,
     description: 'Missing X-User-Id header or invalid articleId.',
@@ -100,11 +97,10 @@ export class InteractionsController {
     description: 'UUID of the article to check',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Interaction status returned successfully.',
-    type: ArticleInteractionStatusDto,
-  })
+  @ApiOkData(
+    ArticleInteractionStatusDto,
+    'Interaction status returned successfully.',
+  )
   @ApiResponse({
     status: 400,
     description: 'Missing X-User-Id header or invalid articleId.',

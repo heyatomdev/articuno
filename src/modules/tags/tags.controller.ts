@@ -28,7 +28,12 @@ import { UpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
 import { TagParamsDto } from '@/modules/tags/dto/tag-params.dto';
 import { TagSlugParamsDto } from '@/modules/tags/dto/tag-slug-params.dto';
 import { TagsListQuery } from '@/modules/tags/queries/tags.query';
-import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  PaginatedResult,
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import { TagDto } from '@/modules/tags/dto/tags.dto';
 
 @ApiTags('Tags')
@@ -45,11 +50,7 @@ export class TagsController {
       'Creates a new tag for the current tenant. The slug is auto-generated from the name.',
   })
   @ApiBody({ type: CreateTagDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Tag created successfully.',
-    type: TagDto,
-  })
+  @ApiCreatedData(TagDto, 'Tag created successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
@@ -88,7 +89,7 @@ export class TagsController {
     description: 'URL-friendly slug of the tag (e.g. "technology")',
     example: 'technology',
   })
-  @ApiResponse({ status: 200, description: 'Tag found.', type: TagDto })
+  @ApiOkData(TagDto, 'Tag found.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Tag not found.' })
   findOne(@GetTenant() tenant: any, @Param() params: TagSlugParamsDto) {
@@ -107,11 +108,7 @@ export class TagsController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: UpdateTagDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Tag updated successfully.',
-    type: TagDto,
-  })
+  @ApiOkData(TagDto, 'Tag updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',

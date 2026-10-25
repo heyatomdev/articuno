@@ -53,7 +53,11 @@ import {
   ArticleFiltersQueryDto,
   adminArticleOrderBy,
 } from '@/modules/articles/dto/article-filters-query.dto';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { FileHarborConfig } from '@/modules/fileharbor/interfaces/fileharbor-config.interface';
 import { PrismaService } from '@/modules/prisma/prisma.service';
@@ -255,11 +259,7 @@ export class AdminArticlesController {
       },
     },
   })
-  @ApiResponse({
-    status: 201,
-    description: 'Article created successfully.',
-    type: ArticleDto,
-  })
+  @ApiCreatedData(ArticleDto, 'Article created successfully.')
   @ApiResponse({
     status: 400,
     description:
@@ -352,7 +352,7 @@ export class AdminArticlesController {
     description: 'UUID of the article, or a translation slug',
     example: 'getting-started-with-nestjs',
   })
-  @ApiResponse({ status: 200, description: 'Article found.', type: ArticleDto })
+  @ApiOkData(ArticleDto, 'Article found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -408,11 +408,7 @@ export class AdminArticlesController {
       },
     },
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Article updated successfully.',
-    type: ArticleDto,
-  })
+  @ApiOkData(ArticleDto, 'Article updated successfully.')
   @ApiResponse({
     status: 400,
     description:
@@ -575,11 +571,7 @@ export class AdminArticlesController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: CreateArticleTranslationDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Translation created successfully.',
-    type: ArticleTranslationDto,
-  })
+  @ApiCreatedData(ArticleTranslationDto, 'Translation created successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
@@ -629,11 +621,7 @@ export class AdminArticlesController {
     description: 'UUID of the article',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'List of translations.',
-    type: [ArticleTranslationSummaryDto],
-  })
+  @ApiOkData([ArticleTranslationSummaryDto], 'List of translations.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -662,11 +650,7 @@ export class AdminArticlesController {
     description: 'BCP 47 language code',
     example: 'en',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Translation found.',
-    type: ArticleTranslationDto,
-  })
+  @ApiOkData(ArticleTranslationDto, 'Translation found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -700,11 +684,7 @@ export class AdminArticlesController {
     example: 'en',
   })
   @ApiBody({ type: AdminUpdateArticleTranslationDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Translation updated successfully.',
-    type: ArticleTranslationDto,
-  })
+  @ApiOkData(ArticleTranslationDto, 'Translation updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
