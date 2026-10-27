@@ -30,7 +30,11 @@ import {
 } from '@/modules/articles/dto/article-params.dto';
 import { PublicArticleFiltersQueryDto } from '@/modules/articles/dto/article-filters-query.dto';
 import { ArticleShowQueryDto } from '@/modules/articles/dto/article-show-query.dto';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import {
   ArticleDto,
   ArticleListItemDto,
@@ -52,11 +56,7 @@ export class ArticlesController {
       'Content is automatically checked for banned words; matching content will be created with a HIDDEN status.',
   })
   @ApiBody({ type: PublicCreateArticleDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Article created successfully.',
-    type: ArticleDto,
-  })
+  @ApiCreatedData(ArticleDto, 'Article created successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
@@ -102,7 +102,7 @@ export class ArticlesController {
     description: 'URL-friendly slug of the article',
     example: 'getting-started-with-nestjs',
   })
-  @ApiResponse({ status: 200, description: 'Article found.', type: ArticleDto })
+  @ApiOkData(ArticleDto, 'Article found.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({
     status: 404,
@@ -134,11 +134,7 @@ export class ArticlesController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: PublicUpdateArticleDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Article updated successfully.',
-    type: ArticleDto,
-  })
+  @ApiOkData(ArticleDto, 'Article updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error or invalid status transition.',

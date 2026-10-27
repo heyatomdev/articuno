@@ -32,7 +32,11 @@ import { ReportParamsDto } from '@/modules/reports/dto/report-params.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import { ReportDto } from '@/modules/reports/dto/report-response.dto';
 
 @ApiTags('Admin / Reports')
@@ -55,11 +59,7 @@ export class AdminReportsController {
       "`reporterId` is automatically set to the session user's external ID.",
   })
   @ApiBody({ type: AdminCreateReportDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Report submitted successfully.',
-    type: ReportDto,
-  })
+  @ApiCreatedData(ReportDto, 'Report submitted successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
@@ -121,7 +121,7 @@ export class AdminReportsController {
     description: 'UUID of the report',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({ status: 200, description: 'Report found.', type: ReportDto })
+  @ApiOkData(ReportDto, 'Report found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -146,11 +146,7 @@ export class AdminReportsController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: AdminUpdateReportDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Report status updated successfully.',
-    type: ReportDto,
-  })
+  @ApiOkData(ReportDto, 'Report status updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',

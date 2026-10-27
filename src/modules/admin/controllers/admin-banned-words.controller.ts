@@ -30,7 +30,11 @@ import {
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { CreateBannedWordDto } from '@/modules/banned-words/dto/create-banned-word.dto';
 import { BannedWordListQueryDto } from '@/modules/banned-words/dto/banned-word-list-query.dto';
-import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  PaginatedResult,
+  ApiPaginatedResponse,
+  ApiCreatedData,
+} from '@heyatom/nest-common';
 import { BannedWordDto } from '@/modules/banned-words/dto/banned-word.dto';
 
 @ApiTags('Admin / Banned Words')
@@ -48,11 +52,7 @@ export class AdminBannedWordsController {
       "Adds a new word to the tenant's banned word list. The word must be between 2 and 50 characters.",
   })
   @ApiBody({ type: CreateBannedWordDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Banned word added successfully.',
-    type: BannedWordDto,
-  })
+  @ApiCreatedData(BannedWordDto, 'Banned word added successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – word is missing or out of length bounds.',

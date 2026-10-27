@@ -19,6 +19,7 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
+import { ApiCreatedData, ApiOkData } from '@heyatom/nest-common';
 import { ArticleTranslationsService } from '@/modules/article-translations/article-translations.service';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
@@ -54,11 +55,7 @@ export class ArticleTranslationsController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: CreateArticleTranslationDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Translation created successfully.',
-    type: ArticleTranslationDto,
-  })
+  @ApiCreatedData(ArticleTranslationDto, 'Translation created successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
@@ -89,11 +86,7 @@ export class ArticleTranslationsController {
     description: 'UUID of the article',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'List of translations.',
-    type: [ArticleTranslationSummaryDto],
-  })
+  @ApiOkData([ArticleTranslationSummaryDto], 'List of translations.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Article not found.' })
   findAll(
@@ -125,11 +118,7 @@ export class ArticleTranslationsController {
     description: 'BCP 47 language code',
     example: 'en',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Translation found.',
-    type: ArticleTranslationDto,
-  })
+  @ApiOkData(ArticleTranslationDto, 'Translation found.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Translation not found.' })
   findOne(
@@ -162,11 +151,7 @@ export class ArticleTranslationsController {
     example: 'en',
   })
   @ApiBody({ type: UpdateArticleTranslationDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Translation updated successfully.',
-    type: ArticleTranslationDto,
-  })
+  @ApiOkData(ArticleTranslationDto, 'Translation updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',

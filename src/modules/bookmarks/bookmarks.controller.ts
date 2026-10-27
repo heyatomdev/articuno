@@ -20,7 +20,11 @@ import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BookmarksService } from '@/modules/bookmarks/bookmarks.service';
 import { BookmarkParamsDto } from '@/modules/bookmarks/dto/bookmark-params.dto';
-import { PageParams, ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  PageParams,
+  ApiPaginatedResponse,
+  ApiCreatedData,
+} from '@heyatom/nest-common';
 import {
   BookmarkListItemDto,
   BookmarkToggleResultDto,
@@ -60,11 +64,7 @@ export class BookmarksController {
     description: 'UUID of the article to bookmark/unbookmark',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({
-    status: 201,
-    description: 'Bookmark toggled successfully.',
-    type: BookmarkToggleResultDto,
-  })
+  @ApiCreatedData(BookmarkToggleResultDto, 'Bookmark toggled successfully.')
   @ApiResponse({
     status: 400,
     description: 'Missing X-User-Id header or invalid articleId.',

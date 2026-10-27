@@ -31,7 +31,11 @@ import {
   CategoryDto,
   CategoryListItemDto,
 } from '@/modules/categories/dto/category.dto';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 
 @ApiTags('Categories')
 @ApiSecurity('api-key')
@@ -47,11 +51,7 @@ export class CategoriesController {
       'Creates a new category for the current tenant. The slug is auto-generated from the name.',
   })
   @ApiBody({ type: CreateCategoryDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Category created successfully.',
-    type: CategoryDto,
-  })
+  @ApiCreatedData(CategoryDto, 'Category created successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
@@ -88,11 +88,7 @@ export class CategoriesController {
     description: 'URL-friendly slug of the category (e.g. "science")',
     example: 'science',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Category found.',
-    type: CategoryDto,
-  })
+  @ApiOkData(CategoryDto, 'Category found.')
   @ApiResponse({ status: 401, description: 'Missing or invalid API key.' })
   @ApiResponse({ status: 404, description: 'Category not found.' })
   findOne(@GetTenant() tenant: any, @Param() params: CategorySlugParamsDto) {
@@ -111,11 +107,7 @@ export class CategoriesController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: UpdateCategoryDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Category updated successfully.',
-    type: CategoryDto,
-  })
+  @ApiOkData(CategoryDto, 'Category updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',

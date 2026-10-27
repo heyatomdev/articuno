@@ -29,12 +29,15 @@ import {
   CategoryDto,
   CategoryListItemDto,
 } from '@/modules/categories/dto/category.dto';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 
 @ApiTags('Admin / Categories')
 @ApiBearerAuth()
@@ -49,7 +52,7 @@ export class AdminCategoriesController {
   ) {}
 
   @Post()
-  @ApiCreatedResponse({ type: CategoryDto })
+  @ApiCreatedData(CategoryDto)
   async create(
     @GetSession() session: AdminSession,
     @Body() dto: CreateCategoryDto,
@@ -80,7 +83,7 @@ export class AdminCategoriesController {
   }
 
   @Get(':id')
-  @ApiOkResponse({ type: CategoryDto })
+  @ApiOkData(CategoryDto)
   findOne(
     @GetSession() session: AdminSession,
     @Param() params: CategoryParamsDto,
@@ -89,7 +92,7 @@ export class AdminCategoriesController {
   }
 
   @Patch(':id')
-  @ApiOkResponse({ type: CategoryDto })
+  @ApiOkData(CategoryDto)
   async update(
     @GetSession() session: AdminSession,
     @Param() params: CategoryParamsDto,

@@ -25,7 +25,11 @@ import { ReportListQueryDto } from '@/modules/reports/dto/report-list-query.dto'
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType, UserRole } from '@prisma/client';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import { ReportDto } from '@/modules/reports/dto/report-response.dto';
 
 @ApiTags('Reports')
@@ -46,11 +50,7 @@ export class ReportsController {
       'Creates a new report for a user, article, or comment. When the report threshold is reached the target is auto-moderated.',
   })
   @ApiBody({ type: CreateReportDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Report submitted successfully.',
-    type: ReportDto,
-  })
+  @ApiCreatedData(ReportDto, 'Report submitted successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
@@ -97,11 +97,7 @@ export class ReportsController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: UpdateReportStatusDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Report status updated successfully.',
-    type: ReportDto,
-  })
+  @ApiOkData(ReportDto, 'Report status updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',

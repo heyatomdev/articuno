@@ -16,7 +16,7 @@ import {
 } from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
 import { AuditListQueryDto } from '@/modules/audits/dto/audit-list-query.dto';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import { ApiPaginatedResponse, ApiOkData } from '@heyatom/nest-common';
 import { AuditLogDto } from '@/modules/audits/dto/audit-log.dto';
 
 @ApiTags('Admin / Audits')
@@ -56,11 +56,7 @@ export class AdminAuditsController {
     description: 'UUID of the audit log entry',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Audit log entry found.',
-    type: AuditLogDto,
-  })
+  @ApiOkData(AuditLogDto, 'Audit log entry found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',

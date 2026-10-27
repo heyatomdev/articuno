@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -29,6 +29,7 @@ import {
   AllExceptionsFilter,
   loggerParams,
   minimalRequestSerializer,
+  TransformInterceptor,
 } from '@heyatom/nest-common';
 
 /** Comma-separated env list → array; undefined keeps the package default. */
@@ -130,8 +131,9 @@ const splitList = (raw?: string): string[] | undefined =>
     AnalyticsModule,
     WebhooksModule,
   ],
-  // No TransformInterceptor: the public contract returns raw resources until
-  // the coordinated envelope migration (api standards plan, phase 3).
-  providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
+  providers: [
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
+  ],
 })
 export class AppModule {}

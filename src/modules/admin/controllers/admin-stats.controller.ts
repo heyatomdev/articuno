@@ -9,7 +9,8 @@ import {
   Roles,
 } from '@/modules/bastion/decorators/roles.decorator';
 import { GetSession } from '@/modules/bastion/decorators/get-session.decorator';
-import { ApiTags, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOkData } from '@heyatom/nest-common';
 import { DashboardStatsDto } from '@/modules/analytics/dto/dashboard-stats.dto';
 import { DashboardStatsQueryDto } from '@/modules/analytics/dto/dashboard-stats-query.dto';
 
@@ -22,7 +23,7 @@ export class AdminStatsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('dashboard')
-  @ApiOkResponse({ type: DashboardStatsDto })
+  @ApiOkData(DashboardStatsDto)
   getDashboard(
     @GetSession() session: AdminSession,
     @Query() query: DashboardStatsQueryDto,

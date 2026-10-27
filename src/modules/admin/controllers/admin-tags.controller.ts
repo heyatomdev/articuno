@@ -26,13 +26,17 @@ import { CreateTagDto } from '@/modules/tags/dto/create-tag.dto';
 import { AdminUpdateTagDto } from '@/modules/tags/dto/update-tag.dto';
 import { TagParamsDto } from '@/modules/tags/dto/tag-params.dto';
 import { TagsListQuery } from '@/modules/tags/queries/tags.query';
-import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  PaginatedResult,
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import { TagDto } from '@/modules/tags/dto/tags.dto';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 
 @ApiTags('Admin / Tags')
 @ApiBearerAuth()
@@ -47,7 +51,7 @@ export class AdminTagsController {
   ) {}
 
   @Post()
-  @ApiCreatedResponse({ type: TagDto })
+  @ApiCreatedData(TagDto)
   async create(@GetSession() session: AdminSession, @Body() dto: CreateTagDto) {
     const tag = await this.tagsService.create(session.tenantId, dto);
 
@@ -75,13 +79,13 @@ export class AdminTagsController {
   }
 
   @Get(':id')
-  @ApiOkResponse({ type: TagDto })
+  @ApiOkData(TagDto)
   findOne(@GetSession() session: AdminSession, @Param() params: TagParamsDto) {
     return this.tagsService.findOne(session.tenantId, params.id);
   }
 
   @Patch(':id')
-  @ApiOkResponse({ type: TagDto })
+  @ApiOkData(TagDto)
   async update(
     @GetSession() session: AdminSession,
     @Param() params: TagParamsDto,
