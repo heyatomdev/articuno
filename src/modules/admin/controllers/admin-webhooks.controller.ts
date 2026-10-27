@@ -27,7 +27,11 @@ import { WebhookEventListQueryDto } from '@/modules/webhook/dto/webhook-event-li
 import { WebhookEventParamsDto } from '@/modules/webhook/dto/webhook-event-params.dto';
 import { WebhooksService } from '@/modules/webhook/webhooks.service';
 import { toWebhookEventView } from '@/modules/webhook/webhook.constants';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiPaginatedResponse,
+  ApiOkData,
+  markPaginated,
+} from '@heyatom/nest-common';
 import {
   WebhookEventDto,
   WebhookResendAllResultDto,
@@ -60,7 +64,9 @@ export class AdminWebhooksController {
       session.tenantId,
       query,
     );
-    return { ...page, data: page.data.map(toWebhookEventView) };
+    // markPaginated: the spread drops paginate()'s marker, and TransformInterceptor would
+    // wrap the page again.
+    return markPaginated({ ...page, data: page.data.map(toWebhookEventView) });
   }
 
   @Get(':id')
@@ -70,11 +76,7 @@ export class AdminWebhooksController {
       'Returns the full detail of a single webhook event (payload, attempts, sentAt, lastError, nextRetryAt).',
   })
   @ApiParam({ name: 'id', description: 'Internal UUID of the webhook event' })
-  @ApiResponse({
-    status: 200,
-    description: 'Webhook event found.',
-    type: WebhookEventDto,
-  })
+  @ApiOkData(WebhookEventDto, 'Webhook event found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -97,11 +99,7 @@ export class AdminWebhooksController {
       'Resets attempts to 0 and clears nextRetryAt / lastError for the given event so that the delivery cron picks it up on the next cycle. Returns 400 if the event was already delivered successfully.',
   })
   @ApiParam({ name: 'id', description: 'Internal UUID of the webhook event' })
-  @ApiResponse({
-    status: 200,
-    description: 'Webhook event reset — will be retried shortly.',
-    type: WebhookEventDto,
-  })
+  @ApiOkData(WebhookEventDto, 'Webhook event reset — will be retried shortly.')
   @ApiResponse({
     status: 400,
     description: 'Event already delivered — resend not needed.',
@@ -131,11 +129,7 @@ export class AdminWebhooksController {
     description:
       'Resets attempts, nextRetryAt and lastError to 0 / null for every undelivered event belonging to the current tenant, except events a worker is delivering right now. Use this after a temporary outage of the receiving system to trigger re-delivery of the entire backlog.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Number of events reset.',
-    type: WebhookResendAllResultDto,
-  })
+  @ApiOkData(WebhookResendAllResultDto, 'Number of events reset.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',

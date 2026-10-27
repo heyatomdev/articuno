@@ -29,7 +29,7 @@ export class HealthController {
     description:
       'Always returns 200. Used by container orchestrators to check if the process is alive.',
   })
-  @ApiOkResponse({ schema: { example: { status: 'ok' } } })
+  @ApiOkResponse({ schema: { example: { data: { status: 'ok' } } } })
   live() {
     return { status: 'ok' };
   }

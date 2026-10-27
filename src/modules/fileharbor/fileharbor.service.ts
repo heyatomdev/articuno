@@ -4,12 +4,48 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import * as FormData from 'form-data';
-import { firstValueFrom } from 'rxjs';
-import { FileHarborImageDto } from './dto/file-harbor.dto';
+import {
+  apiKeyAuth,
+  FileHarborClient,
+  HeyAtomHttpError,
+  type ImageResponseDto,
+} from '@heyatom/client/fileharbor';
 import { ImageCleanupOptions } from './interfaces/cleanup-options.interface';
 import { FileHarborConfig } from './interfaces/fileharbor-config.interface';
+
+/** FileHarbor answers are small JSON documents. */
+export const FILEHARBOR_MAX_RESPONSE_BYTES = 1024 * 1024;
+
+/**
+ * `fetch` for the tenant's FileHarbor: never follows a redirect (it would carry
+ * the tenant API key to wherever the `Location` points; a 3xx comes back as an
+ * error status) and refuses bodies over `FILEHARBOR_MAX_RESPONSE_BYTES`.
+ */
+export const fileHarborFetch: typeof fetch = async (input, init) => {
+  const res = await fetch(input, { ...init, redirect: 'manual' });
+  if (!res.body) return res;
+
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > FILEHARBOR_MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error(
+        `FileHarbor response over ${FILEHARBOR_MAX_RESPONSE_BYTES} bytes`,
+      );
+    }
+    chunks.push(value);
+  }
+  return new Response(size ? Buffer.concat(chunks) : null, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: res.headers,
+  });
+};
 
 @Injectable()
 export class FileHarborService {
@@ -28,7 +64,15 @@ export class FileHarborService {
   private static readonly UPLOAD_TIMEOUT = 30000; // 30 seconds
   private static readonly DELETE_TIMEOUT = 15000; // 15 seconds
 
-  constructor(private readonly httpService: HttpService) {}
+  /** One client per call: endpoint and API key are per tenant. */
+  private client(config: FileHarborConfig): FileHarborClient {
+    return new FileHarborClient({
+      baseUrl: config.endpoint,
+      auth: apiKeyAuth(config.apiKey),
+      timeoutMs: FileHarborService.DELETE_TIMEOUT,
+      fetch: fileHarborFetch,
+    });
+  }
 
   /**
    * Safely delete a single image
@@ -115,40 +159,31 @@ export class FileHarborService {
     description = 'Imported image',
     externalId: string,
     config: FileHarborConfig,
-  ): Promise<FileHarborImageDto> {
+  ): Promise<ImageResponseDto> {
     this.validateImageFile(file);
 
     try {
-      const form = this.createFormData(file, {
-        description,
-        creatorId: externalId,
-      });
-
-      const response = await firstValueFrom(
-        this.httpService.post<FileHarborImageDto>(
-          `${config.endpoint}/images`,
-          form,
-          {
-            headers: {
-              ...form.getHeaders(),
-              'X-API-Key': config.apiKey,
-            },
-            timeout: FileHarborService.UPLOAD_TIMEOUT,
-          },
-        ),
+      const { data: image } = await this.client(config).uploadImage(
+        {
+          data: file.buffer,
+          filename: file.originalname,
+          contentType: file.mimetype,
+        },
+        { description },
+        { userId: externalId, timeoutMs: FileHarborService.UPLOAD_TIMEOUT },
       );
 
-      if (!response.data?.fullPath) {
+      if (!image?.fullPath) {
         throw new Error('Upload succeeded but no URL returned');
       }
 
-      this.logger.log(`Image uploaded: ${response.data.fullPath}`);
-      return response.data;
+      this.logger.log(`Image uploaded: ${image.fullPath}`);
+      return image;
     } catch (error) {
       // Status and a slice of the body tell FileHarbor errors apart from a proxy in front of it
-      const body = error.response?.data;
+      const body = error instanceof HeyAtomHttpError ? error.body : undefined;
       this.logger.error(
-        `Upload failed: ${error.message} (${config.endpoint}/images, status ${error.response?.status ?? 'n/a'}, body ${String(typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 500)})`,
+        `Upload failed: ${error.message} (${config.endpoint}/images, status ${error instanceof HeyAtomHttpError ? error.status : 'n/a'}, body ${String(typeof body === 'string' ? body : JSON.stringify(body)).slice(0, 500)})`,
         error.stack,
       );
       throw new InternalServerErrorException(`Upload failed: ${error.message}`);
@@ -181,25 +216,15 @@ export class FileHarborService {
     }
 
     try {
-      const response = await firstValueFrom(
-        this.httpService.delete(
-          `${config.endpoint}/images/${encodeURIComponent(fileId)}`,
-          {
-            headers: {
-              'X-API-Key': config.apiKey,
-            },
-            timeout: FileHarborService.DELETE_TIMEOUT,
-          },
-        ),
-      );
+      const response = await this.client(config).deleteImage(fileId);
 
       this.logger.log(`Image deleted: ${fileId}`);
-      return response.data;
+      return response;
     } catch (error) {
       this.logger.error(`Delete failed for ${fileId}: ${error.message}`);
 
       // Don't throw for 404 errors (file already deleted)
-      if (error.response?.status === 404) {
+      if (error instanceof HeyAtomHttpError && error.status === 404) {
         this.logger.warn(`File already deleted: ${fileId}`);
         return { id: fileId, status: 'already_deleted' };
       }
@@ -243,26 +268,6 @@ export class FileHarborService {
         `File size too large. Maximum ${FileHarborService.MAX_IMAGE_SIZE / 1024 / 1024}MB allowed`,
       );
     }
-  }
-
-  /**
-   * Create FormData object from file and additional fields
-   */
-  private createFormData(
-    file: Express.Multer.File,
-    additionalFields: Record<string, string>,
-  ): FormData {
-    const form = new FormData();
-    form.append('file', file.buffer, {
-      filename: file.originalname,
-      contentType: file.mimetype,
-    });
-
-    Object.entries(additionalFields).forEach(([key, value]) => {
-      form.append(key, value);
-    });
-
-    return form;
   }
 
   /**

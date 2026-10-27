@@ -33,7 +33,7 @@ import { CommentFiltersQueryDto } from '@/modules/comments/dto/comment-filters-q
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { PrismaService } from '@/modules/prisma/prisma.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import { ApiPaginatedResponse, ApiOkData } from '@heyatom/nest-common';
 import {
   CommentDto,
   CommentListItemDto,
@@ -83,7 +83,7 @@ export class AdminCommentsController {
     description: 'UUID of the comment',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({ status: 200, description: 'Comment found.', type: CommentDto })
+  @ApiOkData(CommentDto, 'Comment found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -108,11 +108,7 @@ export class AdminCommentsController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: UpdateCommentDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Comment updated successfully.',
-    type: CommentDto,
-  })
+  @ApiOkData(CommentDto, 'Comment updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',

@@ -61,6 +61,9 @@ export class AuditsService {
         })
       : [];
     const names = new Map(users.map((u) => [u.externalId, u.username]));
-    return rows.map((r) => ({ ...r, actorUsername: names.get(r.actorUserId) ?? null }));
+    return rows.map((r) => ({
+      ...r,
+      actorUsername: names.get(r.actorUserId) ?? null,
+    }));
   }
 }

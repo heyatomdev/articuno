@@ -24,7 +24,11 @@ import { CreateBannedWordDto } from './dto/create-banned-word.dto';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
 import { BannedWordListQueryDto } from './dto/banned-word-list-query.dto';
-import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  PaginatedResult,
+  ApiPaginatedResponse,
+  ApiCreatedData,
+} from '@heyatom/nest-common';
 import { BannedWordDto } from './dto/banned-word.dto';
 
 @ApiTags('Banned Words')
@@ -42,11 +46,7 @@ export class BannedWordsController {
       'Any content containing this word will be automatically hidden during creation or moderation checks.',
   })
   @ApiBody({ type: CreateBannedWordDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Banned word added successfully.',
-    type: BannedWordDto,
-  })
+  @ApiCreatedData(BannedWordDto, 'Banned word added successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',

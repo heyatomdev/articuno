@@ -5,6 +5,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -52,7 +53,11 @@ import {
   ArticleFiltersQueryDto,
   adminArticleOrderBy,
 } from '@/modules/articles/dto/article-filters-query.dto';
-import { ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  ApiPaginatedResponse,
+  ApiCreatedData,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import { FileHarborService } from '@/modules/fileharbor/fileharbor.service';
 import { FileHarborConfig } from '@/modules/fileharbor/interfaces/fileharbor-config.interface';
 import { PrismaService } from '@/modules/prisma/prisma.service';
@@ -95,6 +100,37 @@ export function canSetArticleStatus(
   return (
     !touchesModeration || (MODERATION_ROLES as readonly string[]).includes(role)
   );
+}
+
+/**
+ * The article JSON of a create/update, taken from one place only, chosen by
+ * content type: the `data` field of a multipart body, the whole body otherwise.
+ * Falling back from one to the other let a caller put `status` where a proxy
+ * in front (Meridian checks it before forwarding) wasn't looking: a JSON body
+ * with a `data` string, or a multipart body with a bare `status` field.
+ */
+export function articlePayload(
+  contentType: string | undefined,
+  rawBody: unknown,
+): string {
+  const body = (rawBody ?? {}) as Record<string, unknown>;
+  if (!contentType?.startsWith('multipart/form-data')) {
+    return JSON.stringify(body);
+  }
+  const extra = Object.keys(body).filter((k) => k !== 'data');
+  if (extra.length || typeof body.data !== 'string') {
+    throw new BadRequestException({
+      code: 'INVALID_MULTIPART',
+      message:
+        'Il body multipart accetta solo il campo testo "data" e il file "coverImage"',
+    });
+  }
+  return body.data;
+}
+
+/** Re-attributing an article to someone else is a moderator's call, like hiding it. */
+export function canSetArticleAuthor(role: string): boolean {
+  return (MODERATION_ROLES as readonly string[]).includes(role);
 }
 
 @ApiTags('Admin / Articles')
@@ -144,6 +180,14 @@ export class AdminArticlesController {
     if (!canSetArticleStatus(session.userRole, to, from)) {
       throw new ForbiddenException(
         `Ruolo non autorizzato a impostare lo stato ${to}`,
+      );
+    }
+  }
+
+  private assertCanSetAuthor(session: AdminSession, authorId?: string | null) {
+    if (authorId !== undefined && !canSetArticleAuthor(session.userRole)) {
+      throw new ForbiddenException(
+        "Ruolo non autorizzato a cambiare l'autore dell'articolo",
       );
     }
   }
@@ -215,11 +259,7 @@ export class AdminArticlesController {
       },
     },
   })
-  @ApiResponse({
-    status: 201,
-    description: 'Article created successfully.',
-    type: ArticleDto,
-  })
+  @ApiCreatedData(ArticleDto, 'Article created successfully.')
   @ApiResponse({
     status: 400,
     description:
@@ -231,14 +271,15 @@ export class AdminArticlesController {
   })
   async create(
     @GetSession() session: AdminSession,
-    @Body('data') rawData: string,
+    @Headers('content-type') contentType: string | undefined,
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const payload =
-      rawData ??
-      (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
-    const dto = await this.parseAndValidateDto(CreateArticleDto, payload);
+    const dto = await this.parseAndValidateDto(
+      CreateArticleDto,
+      articlePayload(contentType, rawBody),
+    );
+    this.assertCanSetAuthor(session, dto.authorId);
     if (!file) {
       // an upload replaces dto.coverImage with FileHarbor's own URL
       await this.articlesService.assertOwnCoverImage(
@@ -311,7 +352,7 @@ export class AdminArticlesController {
     description: 'UUID of the article, or a translation slug',
     example: 'getting-started-with-nestjs',
   })
-  @ApiResponse({ status: 200, description: 'Article found.', type: ArticleDto })
+  @ApiOkData(ArticleDto, 'Article found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -367,11 +408,7 @@ export class AdminArticlesController {
       },
     },
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Article updated successfully.',
-    type: ArticleDto,
-  })
+  @ApiOkData(ArticleDto, 'Article updated successfully.')
   @ApiResponse({
     status: 400,
     description:
@@ -385,14 +422,18 @@ export class AdminArticlesController {
   async update(
     @GetSession() session: AdminSession,
     @Param() params: ArticleParamsDto,
-    @Body('data') rawData: string,
+    @Headers('content-type') contentType: string | undefined,
     @Body() rawBody: object,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const payload =
-      rawData ??
-      (typeof rawBody === 'object' ? JSON.stringify(rawBody) : undefined);
-    const dto = await this.parseAndValidateDto(UpdateArticleDto, payload);
+    const dto = await this.parseAndValidateDto(
+      UpdateArticleDto,
+      articlePayload(contentType, rawBody),
+    );
+    this.assertCanSetAuthor(session, dto.authorId);
+    // The moderator in `article.status_changed` is whoever made the change,
+    // never a value from the body.
+    dto.moderatorId = session.externalId;
     if (!file) {
       // an upload replaces dto.coverImage with FileHarbor's own URL
       await this.articlesService.assertOwnCoverImage(
@@ -530,11 +571,7 @@ export class AdminArticlesController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({ type: CreateArticleTranslationDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Translation created successfully.',
-    type: ArticleTranslationDto,
-  })
+  @ApiCreatedData(ArticleTranslationDto, 'Translation created successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
@@ -584,11 +621,7 @@ export class AdminArticlesController {
     description: 'UUID of the article',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'List of translations.',
-    type: [ArticleTranslationSummaryDto],
-  })
+  @ApiOkData([ArticleTranslationSummaryDto], 'List of translations.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -617,11 +650,7 @@ export class AdminArticlesController {
     description: 'BCP 47 language code',
     example: 'en',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Translation found.',
-    type: ArticleTranslationDto,
-  })
+  @ApiOkData(ArticleTranslationDto, 'Translation found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -655,11 +684,7 @@ export class AdminArticlesController {
     example: 'en',
   })
   @ApiBody({ type: AdminUpdateArticleTranslationDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Translation updated successfully.',
-    type: ArticleTranslationDto,
-  })
+  @ApiOkData(ArticleTranslationDto, 'Translation updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',

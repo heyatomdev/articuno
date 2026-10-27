@@ -30,7 +30,11 @@ import { UserListQueryDto } from '@/modules/users/dto/user-list-query.dto';
 import { UserListItemDto } from '@/modules/users/dto/user-list-item.dto';
 import { UserParamsDto } from '@/modules/users/dto/user-params.dto';
 import { UpdateUserStatusDto } from '@/modules/users/dto/update-user-status.dto';
-import { PaginatedResult, ApiPaginatedResponse } from '@heyatom/nest-common';
+import {
+  PaginatedResult,
+  ApiPaginatedResponse,
+  ApiOkData,
+} from '@heyatom/nest-common';
 import { AuditLoggerService } from '@/modules/audits/audit-logger.service';
 import { AuditAction, AuditResourceType } from '@prisma/client';
 
@@ -74,11 +78,7 @@ export class AdminUsersController {
     description: 'Internal UUID of the user',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'User found.',
-    type: UserListItemDto,
-  })
+  @ApiOkData(UserListItemDto, 'User found.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',
@@ -98,11 +98,7 @@ export class AdminUsersController {
       'Changes the moderation status of a user (ACTIVE, BANNED, SHADOW_BANNED).',
   })
   @ApiParam({ name: 'id', description: 'Internal UUID of the user' })
-  @ApiResponse({
-    status: 200,
-    description: 'User status updated.',
-    type: UserListItemDto,
-  })
+  @ApiOkData(UserListItemDto, 'User status updated.')
   @ApiResponse({
     status: 401,
     description: 'Not authenticated – missing or expired session.',

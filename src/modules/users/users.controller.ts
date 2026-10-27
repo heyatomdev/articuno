@@ -16,6 +16,7 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
+import { ApiCreatedData } from '@heyatom/nest-common';
 import { UsersService } from '@/modules/users/users.service';
 import { TenantGuard } from '@/modules/tenants/guards/tenant.guard';
 import { GetTenant } from '@/modules/tenants/decorators/get-tenant.decorator';
@@ -37,11 +38,7 @@ export class UsersController {
       'Creates or updates a user record for the current tenant based on their external ID. Use this endpoint to keep the CMS user data in sync with your identity provider.',
   })
   @ApiBody({ type: UpsertUserDto })
-  @ApiResponse({
-    status: 201,
-    description: 'User created or updated successfully.',
-    type: UserDto,
-  })
+  @ApiCreatedData(UserDto, 'User created or updated successfully.')
   @ApiResponse({
     status: 400,
     description: 'Validation error – invalid request body.',
